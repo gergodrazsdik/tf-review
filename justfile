@@ -39,7 +39,7 @@ test:
     dotnet run --project tests/TfReview.Agents.Tests --no-build
     dotnet run --project tests/TfReview.Core.Tests --no-build
     dotnet run --project tests/TfReview.GitHub.Tests --no-build
-    dotnet run --project tests/TfReview.Rag.Tests --no-build
+    TF_STANDARDS_DIR="{{ justfile_directory() }}/../tf-standards" dotnet run --project tests/TfReview.Rag.Tests --no-build
     TF_STANDARDS_DIR="{{ justfile_directory() }}/../tf-standards" dotnet run --project tests/TfReview.Scanners.Tests --no-build
 
 # Build the review image with podman; it can't run from a recipe in the Claude sandbox
