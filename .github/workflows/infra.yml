@@ -1,0 +1,71 @@
+---
+name: infra
+
+on:
+  pull_request:
+    paths: &infra-paths
+      - "infra/**"
+      - "scripts/tofu-init.sh"
+      - ".github/workflows/infra.yml"
+  push:
+    branches: [main]
+    paths: *infra-paths
+
+permissions:
+  contents: read
+
+env:
+  ARM_USE_OIDC: "true"
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  TF_STATE_RESOURCE_GROUP: ${{ vars.TF_STATE_RESOURCE_GROUP }}
+  TF_STATE_STORAGE_ACCOUNT: ${{ vars.TF_STATE_STORAGE_ACCOUNT }}
+  TF_STATE_CONTAINER: ${{ vars.TF_STATE_CONTAINER }}
+
+jobs:
+  plan:
+    # Fork PRs get no OIDC token, so they can't reach Azure.
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID_PLAN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: 1.13.2
+          tofu_wrapper: false
+      - name: Init
+        run: scripts/tofu-init.sh
+      - name: Plan
+        run: tofu -chdir=infra plan -input=false -no-color -lock-timeout=5m
+
+  apply:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    environment: prod
+    concurrency:
+      group: tfstate-infra
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID_APPLY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: 1.13.2
+          tofu_wrapper: false
+      - name: Init
+        run: scripts/tofu-init.sh
+      - name: Apply
+        run: tofu -chdir=infra apply -input=false -auto-approve -lock-timeout=5m
