@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="TUnit" />
+    <ProjectReference Include="../../src/TfReview.Rag/TfReview.Rag.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../../docs/contracts/examples/tf-review.yml" Link="contracts/tf-review.yml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

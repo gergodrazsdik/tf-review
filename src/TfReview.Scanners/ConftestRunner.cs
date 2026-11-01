@@ -21,11 +21,8 @@ public closed record ConftestOutcome;
 /// </summary>
 public sealed record ConftestRan(IReadOnlyList<ConftestViolation> Violations) : ConftestOutcome
 {
-    /// <summary>
-    /// One finding per resource and rule, because ADR-002 fails once per missing tag. The policies don't
-    /// say which attribute failed, so the evidence points at the resource's planned values.
-    /// </summary>
-    public IReadOnlyList<Finding> ToFindings() =>
+    /// <summary>One finding per resource and rule, because ADR-002 fails once per missing tag.</summary>
+    public IReadOnlyList<Finding> ToFindings(CondensedPlan plan) =>
     [
         .. Violations
             .GroupBy(violation => (violation.Address, violation.DocId))
@@ -36,16 +33,37 @@ public sealed record ConftestRan(IReadOnlyList<ConftestViolation> Violations) : 
                 Reporter.Scanner,
                 Deterministic: true,
                 string.Join("; ", group.Select(violation => violation.Message)),
-                [
-                    new PlanEvidence(CondensedPlan.PointerTo(group.Key.Address, "change", "after")),
-                    new DocEvidence(group.Key.DocId),
-                ]))
+                [.. Pointers(plan, group.Key.Address, group), new DocEvidence(group.Key.DocId)]))
             .OrderBy(finding => finding.ResourceAddress, StringComparer.Ordinal)
             .ThenBy(finding => finding.Rule, StringComparer.Ordinal),
     ];
+
+    /// <summary>
+    /// A pointer per failed attribute. An attribute can be absent from the condensed plan, either because
+    /// it's missing altogether, which is what POL-001 can fire on, or because an update left it unchanged.
+    /// The evidence then points at the resource's planned values, so the evidence check keeps the finding.
+    /// </summary>
+    private static IEnumerable<Evidence> Pointers(CondensedPlan plan, string address, IEnumerable<ConftestViolation> violations)
+    {
+        var pointers = violations
+            .Select(violation => violation.Attribute)
+            .OfType<string>()
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .Select(attribute => CondensedPlan.PointerTo(address, "change", "after", attribute))
+            .Where(plan.Resolves)
+            .ToList();
+
+        if (pointers.Count == 0)
+        {
+            pointers.Add(CondensedPlan.PointerTo(address, "change", "after"));
+        }
+
+        return pointers.Select(pointer => (Evidence)new PlanEvidence(pointer));
+    }
 }
 
-public sealed record ConftestViolation(string DocId, string Address, Severity Severity, string Message);
+public sealed record ConftestViolation(string DocId, string Address, Severity Severity, string Message, string? Attribute = null);
 
 public sealed record ConftestFailed(ConftestFailure Reason) : ConftestOutcome;
 
@@ -170,8 +188,22 @@ public sealed partial class ConftestRunner(IProcessRunner processes, string prog
             throw new JsonException("Malformed policy details.");
         }
 
-        return new ConftestViolation(docId, address, severity, failure.GetProperty("msg").GetString() ?? string.Empty);
+        // Optional, so a corpus whose policies don't report it still works. It ends up in a pointer.
+        string? attribute = null;
+        if (details.TryGetProperty("attribute", out var value))
+        {
+            attribute = value.GetString() ?? string.Empty;
+            if (!AttributeName().IsMatch(attribute))
+            {
+                throw new JsonException("Malformed attribute.");
+            }
+        }
+
+        return new ConftestViolation(docId, address, severity, failure.GetProperty("msg").GetString() ?? string.Empty, attribute);
     }
+
+    [GeneratedRegex("^[A-Za-z0-9_-]+$")]
+    private static partial Regex AttributeName();
 
     [GeneratedRegex("^(ADR|POL|DES)-[0-9]{3}$")]
     private static partial Regex DocId();
