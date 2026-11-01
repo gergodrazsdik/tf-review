@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.AI;
@@ -20,7 +21,8 @@ const string Config = $"""
       commit: {Commit}
     """;
 
-JsonSerializerOptions fileOptions = new() { WriteIndented = true };
+// Relaxed escaping keeps recorded answers readable in a diff. These files are never rendered as HTML.
+JsonSerializerOptions fileOptions = new() { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
 var cases = Directory.GetDirectories(CasesDirectory).Order(StringComparer.Ordinal).ToArray();
 var standardsDirectory = Environment.GetEnvironmentVariable("TF_STANDARDS_DIR")
