@@ -42,6 +42,23 @@ test:
     TF_STANDARDS_DIR="{{ justfile_directory() }}/../tf-standards" dotnet run --project tests/TfReview.Rag.Tests --no-build
     TF_STANDARDS_DIR="{{ justfile_directory() }}/../tf-standards" dotnet run --project tests/TfReview.Scanners.Tests --no-build
 
+# Replay recorded model answers over the seeded cases: offline and free, so it proves only the code around the model
+[group('dev')]
+e2e:
+    dotnet build -m:1 tests/TfReview.Eval
+    TF_STANDARDS_DIR="{{ justfile_directory() }}/../tf-standards" dotnet run --project tests/TfReview.Eval --no-build -- replay
+
+# Run the seeded cases against the real model; it costs cents, and CI's e2e-live workflow is the usual way
+[group('dev')]
+e2e-live runs="3":
+    dotnet build -m:1 tests/TfReview.Eval
+    TF_STANDARDS_DIR="{{ justfile_directory() }}/../tf-standards" dotnet run --project tests/TfReview.Eval --no-build -- live --runs {{ runs }}
+
+# Refresh the eval fixtures from the seeded branches' redacted plans; run it outside the Claude sandbox
+[group('dev')]
+fixtures:
+    scripts/fixtures.sh
+
 # Build the review image with podman; it can't run from a recipe in the Claude sandbox
 [group('dev')]
 image:

@@ -283,8 +283,8 @@ gh repo edit gergodrazsdik/tf-standards --template
 | `just cost <plan.json>` | `tf-review`, `tf-review-demo` | `infracost scan <plan.json> --json` with the token read from pass for that run only and `SSH_AUTH_SOCK` unset |
 | `just review <plan.json>` | `tf-review` | Runs the reviewer console app locally on one plan |
 | `just e2e` | `tf-review` | Replays recorded model responses over the committed fixtures and asserts the expected findings; offline, no Azure and no token spend, so the Claude Code Stop hook can run it |
-| `just e2e-live` | `tf-review` | Runs the committed fixtures against the real model N times and asserts on `review-result.json`; manual and CI only |
-| `just fixtures` | `tf-review` | Plans each seeded branch in a worktree and commits only the redacted output to `tests/fixtures/`; you run it |
+| `just e2e-live` | `tf-review` | Runs the committed fixtures against the real model N times and asserts on the review result; manual, and the `e2e-live` workflow runs it on PRs that change the agent, its prompts or the fixtures |
+| `just fixtures` | `tf-review` | Takes the redacted plan each seeded branch's review already made, replaces every GUID with zeros, and writes it to `tests/fixtures/cases/`, so no raw plan reaches a laptop and no Azure login is needed |
 | `just bootstrap-plan` / `bootstrap-apply` / `bootstrap-migrate` | `tf-review` | The bootstrap project with your `az login`; apply and migrate ask first |
 | `just secrets-sync` | `tf-review` | Copies pass entries into Actions secrets and Key Vault; you run it, never an agent |
 | `just policy-test` | `tf-standards` | `opa fmt --fail`, `conftest verify`, frontmatter schema check |
@@ -508,7 +508,7 @@ Work runs in this order, so unknowns surface first and a real comment lands befo
 
 *6. Evaluation and gate*
 
-- [ ] Seeded branches as draft PRs, each changing one thing so they stay mergeable: `seed/c5-missing-tags`, `seed/c6-bad-name`, `seed/c8-tag-value`, `seed/c9-bad-environment`, `seed/c10-subnet`. C5 and C6 add new resources, because renaming an existing one likely forces replacement. **You:** `just fixtures`, committing redacted output only
+- [x] Seeded branches as draft PRs (`tf-review-demo` #10–14), each changing one thing so they stay mergeable: `seed/c5-missing-tags`, `seed/c6-bad-name`, `seed/c8-tag-value`, `seed/c9-bad-environment`, `seed/c10-subnet`. C5 and C6 add new resources, because renaming an existing one likely forces replacement. `just fixtures` commits their redacted plans with every GUID zeroed, because resource IDs hold the subscription ID
 - [ ] `just e2e` (replay, and **you** add it as the Stop hook, because `.claude/settings.json` is write-protected) and `just e2e-live`
 - [ ] Gate: 3 of 3 `just e2e-live` runs per case: C5, C6 and C9 found with exact address, rule and citation; C8 and C10 `reviewed` with no findings, where `not_reviewed` fails; plus one real PR with a sticky comment. Agent findings are asserted before any conftest backstop
 
