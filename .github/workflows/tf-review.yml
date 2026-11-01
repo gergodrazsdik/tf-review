@@ -29,6 +29,9 @@ on:
         required: true
       AZURE_SUBSCRIPTION_ID:
         required: true
+      INFRACOST_CLI_AUTHENTICATION_TOKEN:
+        description: Needed only when the config enables cost. Without it, cost is reported as not reviewed.
+        required: false
 
 permissions:
   contents: read
@@ -178,6 +181,7 @@ jobs:
         env:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID_REVIEW }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          INFRACOST_CLI_AUTHENTICATION_TOKEN: ${{ secrets.INFRACOST_CLI_AUTHENTICATION_TOKEN }}
           TF_REVIEW_OPENAI_ENDPOINT: ${{ vars.TF_REVIEW_OPENAI_ENDPOINT }}
           TF_REVIEW_OPENAI_DEPLOYMENT: ${{ vars.TF_REVIEW_OPENAI_DEPLOYMENT }}
         run: |
@@ -188,6 +192,7 @@ jobs:
             -e HOME=/tmp -e AZURE_CLIENT_ID -e AZURE_TENANT_ID \
             -e AZURE_FEDERATED_TOKEN_FILE=/run/federated-token \
             -e TF_REVIEW_OPENAI_ENDPOINT -e TF_REVIEW_OPENAI_DEPLOYMENT \
+            -e INFRACOST_CLI_AUTHENTICATION_TOKEN \
             -v "$RUNNER_TEMP/federated-token:/run/federated-token:ro" \
             "$IMAGE" review /work/redacted.json /work/config.yml /work/result.json "$COMMIT"
       - name: Publish

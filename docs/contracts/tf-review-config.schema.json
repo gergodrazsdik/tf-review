@@ -27,10 +27,10 @@
       }
     },
     "agents": {
-      "description": "Specialist agents to run. Only the agents that exist are allowed: security and cost join in M2, along with the orchestrator and the LLM arbiter, which always run.",
+      "description": "What to run. conventions is an agent. cost prices the plan with Infracost, which needs the INFRACOST_CLI_AUTHENTICATION_TOKEN secret. Only what exists is allowed: security and the cost agent join in M2, along with the orchestrator and the LLM arbiter, which always run.",
       "type": "array",
       "uniqueItems": true,
-      "items": { "enum": ["conventions"] },
+      "items": { "enum": ["conventions", "cost"] },
       "default": ["conventions"]
     },
     "thresholds": {

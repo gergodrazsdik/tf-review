@@ -13,7 +13,10 @@ public sealed class ConfigException(string message) : Exception(message);
 /// </summary>
 public sealed partial record TfReviewConfig(string Repository, string Commit, IReadOnlyList<string> Agents, bool Blocking)
 {
-    private static readonly string[] KnownAgents = ["conventions"];
+    private static readonly string[] KnownAgents = ["conventions", "cost"];
+
+    // Cost needs a secret a repo has to set up first, so a repo opts in.
+    private static readonly string[] DefaultAgents = ["conventions"];
 
     private static readonly IDeserializer Yaml = new DeserializerBuilder()
         .WithNamingConvention(UnderscoredNamingConvention.Instance)
@@ -48,7 +51,7 @@ public sealed partial record TfReviewConfig(string Repository, string Commit, IR
             throw new ConfigException("standards.commit must be a full commit SHA.");
         }
 
-        var agents = file.Agents ?? [.. KnownAgents];
+        var agents = file.Agents ?? [.. DefaultAgents];
         if (agents.Any(agent => !KnownAgents.Contains(agent, StringComparer.Ordinal)))
         {
             throw new ConfigException("agents has an agent that doesn't exist yet.");

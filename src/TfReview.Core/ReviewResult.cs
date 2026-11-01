@@ -150,6 +150,19 @@ public sealed record TokenUsage(
     public long? LatencyMs { get; init; }
 }
 
+/// <summary>What one resource costs a month before and after the plan, in US dollars, at list prices.</summary>
+public sealed record ResourceCostChange(
+    [property: JsonPropertyName("resource_address")] string ResourceAddress,
+    [property: JsonPropertyName("before_usd")] decimal BeforeUsd,
+    [property: JsonPropertyName("after_usd")] decimal AfterUsd,
+    [property: JsonPropertyName("priced")] bool Priced);
+
+/// <summary>The plan's cost. Totals count only what could be priced, so check for unpriced resources too.</summary>
+public sealed record CostSummary(
+    [property: JsonPropertyName("before_usd")] decimal BeforeUsd,
+    [property: JsonPropertyName("after_usd")] decimal AfterUsd,
+    [property: JsonPropertyName("resources")] IReadOnlyList<ResourceCostChange> Resources);
+
 /// <summary>The outcome of one review, as docs/contracts/review-result.schema.json defines it.</summary>
 public sealed record ReviewResult(
     [property: JsonPropertyName("version")] int Version,
@@ -174,6 +187,10 @@ public sealed record ReviewResult(
     [JsonPropertyName("omitted_docs")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<string>? OmittedDocs { get; init; }
+
+    [JsonPropertyName("cost")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CostSummary? Cost { get; init; }
 
     [JsonPropertyName("usage")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

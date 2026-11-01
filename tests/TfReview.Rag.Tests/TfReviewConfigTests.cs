@@ -24,6 +24,14 @@ public class TfReviewConfigTests
     }
 
     [Test]
+    public async Task Cost_is_opt_in_because_it_needs_a_secret()
+    {
+        var config = TfReviewConfig.Parse($"version: 1\nstandards:\n  repository: a/b\n  commit: {Sha}\nagents: [conventions, cost]\n");
+
+        await Assert.That(config.Agents).Contains("cost");
+    }
+
+    [Test]
     public async Task Reads_blocking_mode()
     {
         var config = TfReviewConfig.Parse($"version: 1\nstandards:\n  repository: a/b\n  commit: {Sha}\ngate:\n  mode: blocking\n");

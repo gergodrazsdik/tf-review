@@ -62,6 +62,54 @@ public class CommentRendererTests
     }
 
     [Test]
+    public async Task Shows_the_monthly_change()
+    {
+        var comment = CommentRenderer.Render(WithCost(new CostSummary(31.904m, 1141.696m, [])), Counts);
+
+        await Assert.That(comment).Contains("Monthly cost: **+$1,109.79** (from $31.90 to $1,141.70)");
+    }
+
+    [Test]
+    public async Task Shows_a_saving()
+    {
+        await Assert.That(CommentRenderer.Render(WithCost(new CostSummary(10m, 4m, [])), Counts)).Contains("**-$6.00**");
+    }
+
+    [Test]
+    public async Task Says_when_cost_doesnt_change()
+    {
+        await Assert.That(CommentRenderer.Render(WithCost(new CostSummary(10m, 10m, [])), Counts)).Contains("Monthly cost: no change");
+    }
+
+    [Test]
+    public async Task Says_nothing_about_cost_when_it_didnt_run()
+    {
+        await Assert.That(CommentRenderer.Render(NotReviewedResult(), Counts)).DoesNotContain("Monthly cost");
+    }
+
+    // An address comes from the PR, and an unknown price mustn't read as free.
+    [Test]
+    public async Task Names_what_couldnt_be_priced_as_inert_text()
+    {
+        var cost = new CostSummary(0m, 0m, [new ResourceCostChange("a.b[\"[x](https://evil.example)\"]", 0m, 0m, false)]);
+
+        var comment = CommentRenderer.Render(WithCost(cost), Counts);
+
+        await Assert.That(comment).Contains("Couldn't be priced, so not counted: `a.b[\"[x](https://evil.example)\"]`.");
+    }
+
+    [Test]
+    public async Task Limits_the_list_of_what_couldnt_be_priced()
+    {
+        var resources = Enumerable.Range(0, 12).Select(i => new ResourceCostChange($"a.r{i}", 0m, 0m, false)).ToList();
+
+        var comment = CommentRenderer.Render(WithCost(new CostSummary(0m, 0m, resources)), Counts);
+
+        await Assert.That(comment).Contains(" and 2 more.");
+        await Assert.That(comment).DoesNotContain("a.r11");
+    }
+
+    [Test]
     public async Task Links_a_cited_doc_at_the_pinned_commit()
     {
         var comment = CommentRenderer.Render(Linked("adr/ADR-002-tags.md"), Counts);
@@ -247,4 +295,7 @@ public class CommentRendererTests
             StandardsRepository = "owner/standards",
             DocPaths = new Dictionary<string, string> { ["ADR-002"] = path },
         };
+
+    private static ReviewResult WithCost(CostSummary cost) =>
+        new(1, Commit, Verdict.NoFindings, [], [], new Dictionary<string, int>()) { Cost = cost };
 }
