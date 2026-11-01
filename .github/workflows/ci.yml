@@ -40,3 +40,18 @@ jobs:
         run: dotnet test
       - name: Check formatting
         run: dotnet format --verify-no-changes
+
+  image:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
+        with:
+          dockerfile: Containerfile
+      - name: Build
+        run: docker build -t tf-review:ci -f Containerfile .
+      # The same constraints the workflow runs it under: non-root, read-only root filesystem.
+      - name: Smoke test
+        run: scripts/image-smoke.sh tf-review:ci

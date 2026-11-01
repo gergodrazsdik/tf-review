@@ -1,0 +1,60 @@
+---
+name: release
+
+# Consumers verify images against this workflow's identity at an image-v* tag. Renaming it or
+# changing the tag pattern breaks every pinned consumer workflow.
+on:
+  push:
+    tags: ["image-v*"]
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
+        with:
+          dockerfile: Containerfile
+      - name: Build
+        run: docker build -t "$IMAGE:$GITHUB_REF_NAME" -f Containerfile .
+      - name: Create the SBOM
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: ${{ env.IMAGE }}:${{ github.ref_name }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Scan
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+        with:
+          image: ${{ env.IMAGE }}:${{ github.ref_name }}
+          severity-cutoff: high
+          only-fixed: true
+          fail-build: true
+          output-format: table
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Push, sign and attest
+        env:
+          GH_ACTOR: ${{ github.actor }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io --username "$GH_ACTOR" --password-stdin
+          docker push "$IMAGE:$GITHUB_REF_NAME"
+          reference=$(docker inspect --format '{{index .RepoDigests 0}}' "$IMAGE:$GITHUB_REF_NAME")
+          # Keyless signing writes a permanent public Rekor entry, which is intended for this repo.
+          cosign sign --yes "$reference"
+          cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$reference"
+          echo "Pushed and signed \`$reference\`" >>"$GITHUB_STEP_SUMMARY"

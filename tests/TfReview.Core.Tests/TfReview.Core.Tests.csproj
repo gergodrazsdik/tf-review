@@ -8,5 +8,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="../../docs/contracts/examples/finding.json" Link="contracts/finding.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../docs/contracts/examples/review-result.json" Link="contracts/review-result.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

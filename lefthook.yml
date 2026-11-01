@@ -20,6 +20,9 @@ pre-commit:
     shellcheck:
       glob: "*.sh"
       run: shellcheck {staged_files}
+    hadolint:
+      glob: "Containerfile"
+      run: hadolint {staged_files}
     dotnet-format:
       glob: "*.cs"
       run: dotnet format whitespace --folder --verify-no-changes --include {staged_files}
