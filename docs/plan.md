@@ -236,7 +236,7 @@ tf-review/
 4. Corpus frontmatter schema: `id`, `type`, `status`, `superseded_by`, `applies_to`, `topics`, `severity`, `rego`
 5. Review result schema (M1): verdict, findings, `not_reviewed` slices and evidence-check drop counts
 
-During tandem development the demo repo calls the workflow at a feature branch (`@feat/x`) and repins to a tag after merge.
+During tandem development the demo repo calls the workflow at a release candidate tag on the feature branch (`v0.0.1-rc.1`), pinned by SHA, and repins to the release tag after merge. It can't use `@feat/x`, because `pinact` needs a SHA and a version comment, and the required check is `tf-review / plan`.
 
 ## Setup: repos, folders and dev workflow
 
@@ -483,7 +483,7 @@ Work runs in this order, so unknowns surface first and a real comment lands befo
 *3. Walking skeleton: first real comment*
 
 - [x] `tfreview` stub that posts counts only, no plan content; `Containerfile` with conftest and `just image`
-- [ ] `release.yml` and `dev-image.yml`; PR CI builds and smoke-tests the image without pushing. **You:** tag `image-v0.0.1`, make the package public once, merge the digest PR
+- [x] `release.yml` and `dev-image.yml`; PR CI builds and smoke-tests the image without pushing. **You:** tag `image-v0.0.2` (`image-v0.0.1` stopped at the Grype gate), make the package public once. `dev-image.yml` hasn't run yet
 - [ ] Reusable workflow v0 with both jobs, inline with no composite action (a called workflow's `./` resolves to the caller). **You:** tag `v0.0.1`
 - [ ] Demo: `plan.yml` becomes the caller, losing the raw plan comment and `--edit-last`, which would overwrite the sticky comment; add `.tf-review.yml`. **You:** re-apply the ruleset, because the required `plan` context likely gets renamed and would otherwise block every PR
 
