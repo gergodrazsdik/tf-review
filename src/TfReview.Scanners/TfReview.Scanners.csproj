@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../TfReview.Core/TfReview.Core.csproj" />
+  </ItemGroup>
+</Project>

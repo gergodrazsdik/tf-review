@@ -32,6 +32,18 @@ validate: bootstrap-validate infra-validate
     tflint --init
     tflint --recursive --config "$PWD/.tflint.hcl"
 
+# Build, then run each test project; dotnet test can't run from a recipe in the Claude sandbox, so only CI uses it
+[group('dev')]
+test:
+    dotnet build -m:1
+    dotnet run --project tests/TfReview.Core.Tests --no-build
+
+# Check C# formatting and style in a way that works in the Claude sandbox; CI runs the full dotnet format
+[group('dev')]
+lint-dotnet:
+    dotnet format whitespace --folder --verify-no-changes
+    dotnet build -m:1 --no-incremental -p:EnforceCodeStyleInBuild=true -warnaserror
+
 # Validate the contract examples against their JSON Schemas
 [group('dev')]
 contracts:

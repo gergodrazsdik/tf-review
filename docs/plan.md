@@ -264,7 +264,7 @@ gh repo edit gergodrazsdik/tf-standards --template
 
 1. Workflow token read-only by default: `gh api -X PUT repos/gergodrazsdik/<repo>/actions/permissions/workflow -f default_workflow_permissions=read`
 2. Settings → Actions: require approval for workflow runs from all outside contributors
-3. Ruleset on `main` kept in the repo as `.github/rulesets/main.json` (PR required, squash merges only, signed commits, required check `lint`, plus `plan` in `tf-review-demo`, the only repo with a plan job in M0), applied with `gh api repos/gergodrazsdik/<repo>/rulesets --input .github/rulesets/main.json`
+3. Ruleset on `main` kept in the repo as `.github/rulesets/main.json` (PR required, squash merges only, signed commits, required check `lint`, plus `test` in `tf-review` and `plan` in `tf-review-demo`, the only repo with a plan job in M0), applied with `gh api repos/gergodrazsdik/<repo>/rulesets --input .github/rulesets/main.json`
 4. `tf-review-demo` only: environment `prod` with you as required reviewer
 
 **justfile recipes** (`just` lists them; destructive ones carry `[confirm]`). Each recipe arrives with the milestone that first needs it: M0 has `claude`, `hooks`, `lint`, `contracts`, `bootstrap-*` and `policy-test`; `test`, `plan`, `cost`, `review`, `e2e` and `secrets-sync` come with M1 and M2.
@@ -307,7 +307,7 @@ claude *args:
 | actionlint, pinact | `.github/workflows/*` | `actionlint` and `pinact run --check` |
 | shellcheck | `*.sh` | `shellcheck {staged_files}` |
 | hadolint | `Containerfile` | `hadolint {staged_files}` |
-| dotnet format | `*.cs` | `dotnet format --verify-no-changes --include {staged_files}` |
+| dotnet format | `*.cs` | `dotnet format whitespace --folder --verify-no-changes --include {staged_files}` |
 | opa fmt | `*.rego` | `opa fmt --fail {staged_files}` |
 | gitleaks | everything staged | `gitleaks git --pre-commit --staged` |
 
@@ -476,7 +476,7 @@ Work runs in this order, so unknowns surface first and a real comment lands befo
 
 *2. Solution and contracts*
 
-- [ ] Solution skeleton: `global.json`, `.slnx` written by hand, central packages, `UseArtifactsOutput`; projects Core, Scanners, Rag, Agents, GitHub, Cli and their tests; `just test`, `just lint-dotnet`, a CI job running the full `dotnet test` and `dotnet format`
+- [x] Solution skeleton: `global.json`, `.slnx` written by hand, central packages, `UseArtifactsOutput`; projects Core, Scanners, Rag, Agents, GitHub and Cli, with test projects added alongside the code they test; `just test`, `just lint-dotnet`, a required CI `test` job running the full `dotnet test` and `dotnet format`
 - [ ] Contract PRs: address-keyed pointers and the corrected `finding.json` example (its `deterministic: true` needs a scanner-sourced finding); `topics` in corpus frontmatter, in both repos and on every existing doc; review result schema; config schema text and defaults for M1, where only `conventions` exists
 
 *3. Walking skeleton: first real comment*

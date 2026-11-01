@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TfReview.Agents/TfReview.Agents.csproj" />
+    <Project Path="src/TfReview.Cli/TfReview.Cli.csproj" />
+    <Project Path="src/TfReview.Core/TfReview.Core.csproj" />
+    <Project Path="src/TfReview.GitHub/TfReview.GitHub.csproj" />
+    <Project Path="src/TfReview.Rag/TfReview.Rag.csproj" />
+    <Project Path="src/TfReview.Scanners/TfReview.Scanners.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TfReview.Core.Tests/TfReview.Core.Tests.csproj" />
+  </Folder>
+</Solution>

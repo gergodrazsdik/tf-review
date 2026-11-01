@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="TUnit" />
+    <ProjectReference Include="../../src/TfReview.Core/TfReview.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../../docs/contracts/examples/finding.json" Link="contracts/finding.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
