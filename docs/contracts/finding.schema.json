@@ -14,16 +14,19 @@
       "minLength": 1
     },
     "severity": { "enum": ["low", "medium", "high"] },
-    "agent": { "enum": ["orchestrator", "security", "cost", "conventions", "arbiter"] },
+    "agent": {
+      "description": "Who reported it. scanner means no LLM agent did.",
+      "enum": ["orchestrator", "security", "cost", "conventions", "arbiter", "scanner"]
+    },
     "deterministic": {
-      "description": "True when a scanner (Checkov, conftest) produced it. Only deterministic high findings can block.",
+      "description": "True when a scanner (Checkov, conftest) found it, alone or as well as an agent. Code sets this, never a model. Only deterministic high findings can block.",
       "type": "boolean"
     },
     "title": { "type": "string", "minLength": 1 },
     "evidence": {
-      "description": "At least one plan pointer or accepted doc ID; the evidence check drops findings without a valid one.",
+      "description": "Every finding needs a plan pointer, and a finding no scanner backs also needs a doc ID. The evidence check then drops findings whose pointer doesn't resolve or whose doc isn't accepted.",
       "type": "array",
-      "minItems": 1,
+      "contains": { "required": ["plan_pointer"] },
       "items": {
         "oneOf": [
           {
@@ -32,9 +35,9 @@
             "required": ["plan_pointer"],
             "properties": {
               "plan_pointer": {
-                "description": "JSON Pointer into the condensed plan.",
+                "description": "JSON Pointer into the condensed plan, keyed by resource address, which stays stable across slices and re-pushes. Escape / as ~1 and ~ as ~0 in the address.",
                 "type": "string",
-                "pattern": "^/"
+                "pattern": "^/resource_changes/[^/]+\\.[^/]+(/[^/]+)*$"
               }
             }
           },
@@ -53,6 +56,15 @@
     "monthly_cost_delta_usd": {
       "description": "Cost agent only.",
       "type": "number"
+    }
+  },
+  "if": {
+    "properties": { "deterministic": { "const": false } },
+    "required": ["deterministic"]
+  },
+  "then": {
+    "properties": {
+      "evidence": { "contains": { "required": ["doc_id"] } }
     }
   }
 }

@@ -5,7 +5,7 @@
   "description": "Frontmatter of every Markdown doc in the standards corpus. Only accepted docs are retrievable.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "type", "status", "applies_to", "severity"],
+  "required": ["id", "type", "status", "applies_to", "topics", "severity"],
   "properties": {
     "id": { "type": "string", "pattern": "^(ADR|POL|DES)-[0-9]{3}$" },
     "type": { "enum": ["adr", "policy", "design"] },
@@ -17,6 +17,13 @@
       "minItems": 1,
       "uniqueItems": true,
       "items": { "type": "string", "pattern": "^(\\*|[a-z0-9_]+)$" }
+    },
+    "topics": {
+      "description": "What the doc is about. Each agent retrieves the topics it declares, so a storage policy doesn't reach the conventions agent.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "enum": ["naming", "tagging", "modules", "security", "network", "cost"] }
     },
     "severity": { "enum": ["low", "medium", "high"] },
     "rego": {

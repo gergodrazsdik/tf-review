@@ -54,6 +54,9 @@ contracts:
       docs/contracts/examples/finding.json
     {{ check_jsonschema }} --schemafile docs/contracts/corpus-frontmatter.schema.json \
       docs/contracts/examples/corpus-frontmatter.yml
+    {{ check_jsonschema }} --schemafile docs/contracts/review-result.schema.json \
+      docs/contracts/examples/review-result.json
+    uv run --quiet scripts/check_contract_cases.py
 
 # Validate the infra project without touching its backend
 [group('dev')]

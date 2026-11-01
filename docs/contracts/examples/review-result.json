@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "commit": "0123456789abcdef0123456789abcdef01234567",
+  "standards_commit": "89abcdef0123456789abcdef0123456789abcdef",
+  "verdict": "findings",
+  "findings": [
+    {
+      "resource_address": "azurerm_storage_account.logs",
+      "rule": "ADR-002",
+      "severity": "medium",
+      "agent": "conventions",
+      "deterministic": false,
+      "title": "Tag environment has a value ADR-002 doesn't allow",
+      "evidence": [
+        { "plan_pointer": "/resource_changes/azurerm_storage_account.logs/change/after/tags" },
+        { "doc_id": "ADR-002" }
+      ],
+      "suggestion": "Use dev, test or prod."
+    }
+  ],
+  "not_reviewed": [],
+  "evidence_drops": { "doc_not_retrieved": 1 },
+  "usage": { "input_tokens": 3120, "output_tokens": 410 }
+}
