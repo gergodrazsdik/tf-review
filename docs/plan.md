@@ -6,7 +6,7 @@ Nov 1, 2026 · @Drazsdik Gergő
 
 Build a multi-agent, RAG-backed review board that comments on OpenTofu (later also Terraform) pull requests, reusable by any repo through one reusable GitHub workflow, at roughly $5–30/month on Azure. Deterministic tools find issues; LLM agents explain them, rank them and tie them to the team's own standards. One container image runs the whole review: in the GitHub runner during M1–M2, in Azure Container Apps from M3.
 
-Status: v1, every decision taken (see the Decision log); M0 is in progress. This document now lives in `tf-review/docs/plan.md` and is maintained there.
+Status: v1, every decision taken (see the Decision log); M0's gate has passed and M1 is next. This document now lives in `tf-review/docs/plan.md` and is maintained there.
 
 **Goals**
 
@@ -251,7 +251,8 @@ gh repo edit gergodrazsdik/tf-standards --template
 | --- | --- | --- |
 | `just claude` | all | Starts Claude Code with the two sibling repos added and their CLAUDE.md loaded |
 | `just hooks` | all | `lefthook install` |
-| `just lint` | all | The pre-commit checks on every file; the CI `lint` job runs the same recipe |
+| `just lint` | all | The checks that need no plugins, on every file, so they work in the Claude sandbox; the CI `lint` job runs the same recipe |
+| `just validate` | `tf-review`, `tf-review-demo` | `tofu validate` and `tflint`, whose plugins can't start in the sandbox; the CI `lint` job runs it too |
 | `just test` | `tf-review` | `dotnet test` (TUnit) |
 | `just plan <dir>` | `tf-review`, `tf-review-demo` | `tofu init`, `plan -out`, `show -json`, then canonicalize and redact |
 | `just cost <plan.json>` | `tf-review`, `tf-review-demo` | `infracost scan <plan.json> --json` with the token read from pass for that run only and `SSH_AUTH_SOCK` unset |
@@ -386,7 +387,7 @@ A consumer repo adopts the reviewer with one `uses:` line; plan runs on every PR
 
 **Repo settings (public repos)**
 
-- Third-party actions pinned to full commit SHAs with `pinact`; a `lint` job runs `actionlint` and `just lint`
+- Third-party actions pinned to full commit SHAs with `pinact`; a `lint` job runs `just lint` (which includes `actionlint`) and, where a repo has OpenTofu code, `just validate`
 - Require approval for workflow runs from outside collaborators; never `pull_request_target`
 - No plan files as artifacts; mark sensitive variables `sensitive` so logs stay clean
 - Rulesets from `.github/rulesets/main.json` (see Setup); the review check stays advisory until M4
@@ -415,7 +416,7 @@ flowchart TB
 
 M1 is deliberately thin: one agent and one Azure resource (Foundry with gpt-5.4-mini), so the first real PR comment lands early and every later milestone has an eval baseline to beat. A milestone is done when its gate passes on a real PR, not when its tasks are ticked.
 
-**M0 · Foundations** (in progress)
+**M0 · Foundations** (done; gate passed 2026-11-01)
 
 - [x] Prerequisite tools installed and verified (setup doc step 41)
 - [x] Three repos created; demo and standards marked as templates
@@ -423,16 +424,8 @@ M1 is deliberately thin: one agent and one Azure resource (Foundry with gpt-5.4-
 - [x] `tf-review/docs/contracts/`: JSON Schemas for `.tf-review.yml`, findings, corpus frontmatter
 - [x] `tf-standards`: ADR-001 naming, ADR-002 required tags, POL-001 storage, with Rego and `conftest verify` tests
 - [x] Bootstrap: state storage, identities, GitHub variables and `prod` environment, budget; apply, then migrate state
-- [ ] Rulesets applied; fork-PR approval set in each repo
-- [ ] Gate: a demo PR plans, comments, and applies after approval
-
-Open items from the M0 scaffold:
-
-- [ ] Turn on the Claude Code sandbox in each repo: from a home-dir session add `tofu *` and `just bootstrap-*` to `excludedCommands` in user settings, because a sandboxed `tofu plan` can't read `~/.azure`; then set `.claude/settings.local.json` in each repo. The scaffold task above is ticked without this
-- [ ] From a home-dir session, add a `tofu fmt` branch for `.tf` files to `claude-lint-hook`; until then the hook uses `terraform fmt`, while lefthook and CI use `tofu fmt`
-- [x] Confirm the subscription's billing currency is EUR before `just bootstrap-apply`: the budget's 30 is in that currency (D15)
-- [ ] Add more platforms to `bootstrap/.terraform.lock.hcl` (`tofu providers lock`) if bootstrap ever runs off `linux_amd64`
-- [ ] Align `pinact`: CI pins 5.0.2, the local install is 5.0.0
+- [x] Rulesets applied; fork-PR approval set in each repo
+- [x] Gate: a demo PR plans, comments, and applies after approval (`tf-review-demo` PR #2, 2026-11-01)
 
 **M1 · MVP in the runner**
 
@@ -570,10 +563,10 @@ This plan is `tf-review/docs/plan.md`. Sessions update it in the same PR wheneve
 
 - **CLAUDE.md per repo**: purpose, which `just` recipes to run (`lint`, `test`, `plan`, `e2e`), pointer to the contracts; kept short
 - **`.claude/rules/` with path globs**: OpenTofu conventions for `**/*.tf`, C# for `src/**`, Rego for `**/*.rego`
-- **Sandbox on per repo** via `.claude/settings.local.json`, as in your other projects; `tofu init` needs `registry.opentofu.org`, so either allowlist it or add `tofu` to `excludedCommands` in user settings (project settings can't add exclusions)
+- **Sandbox on per repo** via `.claude/settings.local.json`, as in your other projects; user settings exclude `tofu`, `az` and `just bootstrap-*`, which need `~/.azure`, and allowlist `registry.opentofu.org`. Provider and TFLint plugins can't start in the sandbox, so `just validate` runs outside it, one approved command at a time
 - **Stop hook in `tf-review`** runs `just e2e`
 - **`permissions.deny`**: `tofu apply`, `terraform apply`, `tofu state rm`, `az * delete`; Claude plans, CI applies, and `just bootstrap-apply` and `just secrets-sync` stay yours
-- **Lint hook**: `claude-lint-hook` already runs `terraform fmt`; add a `tofu fmt` branch for `.tf` files so the agent and lefthook agree
+- **Lint hook**: `claude-lint-hook` runs `tofu fmt` on `.tf` files, so the agent, lefthook and CI agree
 - **Plan mode** for changes spanning two repos; the plan file survives compaction
 - **Worktrees** for parallel sessions (`gwt` to switch), e.g. agent prompts in one, demo fixtures in another
 - **`plugin/` in `tf-review`**: the OpenTofu conventions skill and hooks packaged so consumer repos get the same guardrails locally (M4)

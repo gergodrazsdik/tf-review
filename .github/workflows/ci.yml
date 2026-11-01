@@ -23,6 +23,6 @@ jobs:
           scripts/install-ci-tools.sh just actionlint pinact gitleaks tofu tflint
           uv tool install yamllint==1.38.0
       - name: Lint
-        run: just lint
+        run: just lint validate
         env:
           GITHUB_TOKEN: ${{ github.token }}
