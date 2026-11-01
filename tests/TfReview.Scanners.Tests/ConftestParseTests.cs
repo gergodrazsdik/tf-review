@@ -64,7 +64,7 @@ public class ConftestParseTests
     [Test]
     public async Task Merges_violations_into_one_finding_per_resource_and_rule()
     {
-        var findings = ((ConftestRan)ConftestRunner.Parse(TwoTagsMissing)).ToFindings();
+        var findings = ((ConftestRan)ConftestRunner.Parse(TwoTagsMissing)).ToFindings(Condensed());
 
         await Assert.That(findings.Count).IsEqualTo(2);
         await Assert.That(findings[1].Rule).IsEqualTo("ADR-002");
@@ -75,7 +75,7 @@ public class ConftestParseTests
     [Test]
     public async Task Findings_say_a_scanner_found_them_and_carry_both_kinds_of_evidence()
     {
-        var finding = ((ConftestRan)ConftestRunner.Parse(TwoTagsMissing)).ToFindings()[0];
+        var finding = ((ConftestRan)ConftestRunner.Parse(TwoTagsMissing)).ToFindings(Condensed())[0];
 
         await Assert.That(finding.Agent).IsEqualTo(Reporter.Scanner);
         await Assert.That(finding.Deterministic).IsTrue();
@@ -92,5 +92,89 @@ public class ConftestParseTests
     public async Task A_failure_a_policy_didnt_describe_properly_is_not_clean(string output)
     {
         await Assert.That(ConftestRunner.Parse(output)).IsEqualTo(new ConftestFailed(ConftestFailure.MalformedResult));
+    }
+
+    [Test]
+    public async Task Points_at_the_attribute_that_failed()
+    {
+        var findings = Findings("name");
+
+        await Assert.That(findings[0].Evidence[0].Value).IsEqualTo(new PlanEvidence("/resource_changes/a.a/change/after/name"));
+    }
+
+    // POL-001 fires on a missing attribute, which a pointer can't reach. Without this fallback, the
+    // evidence check would drop a real finding.
+    [Test]
+    public async Task Falls_back_to_the_planned_values_when_the_attribute_isnt_there()
+    {
+        var findings = Findings("min_tls_version");
+
+        await Assert.That(findings[0].Evidence[0].Value).IsEqualTo(new PlanEvidence("/resource_changes/a.a/change/after"));
+    }
+
+    [Test]
+    public async Task Falls_back_when_a_policy_doesnt_report_an_attribute()
+    {
+        var finding = ((ConftestRan)ConftestRunner.Parse(TwoTagsMissing)).ToFindings(Condensed())[0];
+
+        await Assert.That(finding.Evidence[0].Value).IsEqualTo(new PlanEvidence("/resource_changes/a.a/change/after"));
+    }
+
+    [Test]
+    public async Task Every_pointer_resolves_whatever_the_policy_reports()
+    {
+        var plan = Condensed();
+
+        foreach (var attribute in new[] { "name", "min_tls_version" })
+        {
+            var pointer = (PlanEvidence)Findings(attribute)[0].Evidence[0].Value!;
+            await Assert.That(plan.Resolves(pointer.PlanPointer)).IsTrue();
+        }
+    }
+
+    [Test]
+    public async Task Keeps_a_pointer_per_failed_attribute()
+    {
+        var outcome = (ConftestRan)ConftestRunner.Parse("""
+            [{"namespace":"pol001","failures":[
+              {"msg":"one","metadata":{"details":{"address":"a.a","doc_id":"POL-001","severity":"high","attribute":"tags"}}},
+              {"msg":"two","metadata":{"details":{"address":"a.a","doc_id":"POL-001","severity":"high","attribute":"name"}}}]}]
+            """);
+
+        var evidence = outcome.ToFindings(Condensed()).Single().Evidence;
+
+        await Assert.That(evidence.Count).IsEqualTo(3);
+        await Assert.That(evidence[0].Value).IsEqualTo(new PlanEvidence("/resource_changes/a.a/change/after/name"));
+        await Assert.That(evidence[1].Value).IsEqualTo(new PlanEvidence("/resource_changes/a.a/change/after/tags"));
+    }
+
+    [Test]
+    public async Task Rejects_an_attribute_that_could_change_the_pointer()
+    {
+        const string Output = """
+            [{"namespace":"x","failures":[{"msg":"m","metadata":{"details":
+            {"address":"a.a","doc_id":"ADR-001","severity":"low","attribute":"../../other"}}}]}]
+            """;
+
+        await Assert.That(ConftestRunner.Parse(Output)).IsEqualTo(new ConftestFailed(ConftestFailure.MalformedResult));
+    }
+
+    private static IReadOnlyList<Finding> Findings(string attribute)
+    {
+        var outcome = (ConftestRan)ConftestRunner.Parse($$$"""
+            [{"namespace":"adr001","failures":[{"msg":"m","metadata":{"details":
+            {"address":"a.a","doc_id":"ADR-001","severity":"low","attribute":"{{{attribute}}}" } } }]}]
+            """);
+        return outcome.ToFindings(Condensed());
+    }
+
+    private static CondensedPlan Condensed()
+    {
+        const string Plan = """
+            {"format_version":"1.2","resource_changes":[{"address":"a.a","type":"a","mode":"managed","change":{
+            "actions":["create"],"before":null,"after":{"name":"x","tags":null},"after_unknown":{},
+            "before_sensitive":false,"after_sensitive":{}}}]}
+            """;
+        return CondensedPlan.From(((Redacted)new PlanRedactor().Redact(Plan)).Plan);
     }
 }

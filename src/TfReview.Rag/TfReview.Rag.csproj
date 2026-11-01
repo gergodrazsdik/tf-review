@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="../TfReview.Core/TfReview.Core.csproj" />
+    <PackageReference Include="YamlDotNet" />
+    <InternalsVisibleTo Include="TfReview.Rag.Tests" />
   </ItemGroup>
 </Project>

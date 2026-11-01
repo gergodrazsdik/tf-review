@@ -52,6 +52,7 @@ public class ConftestRunnerTests
         var violations = await Violations(C6BadName);
 
         await Assert.That(violations.Single().DocId).IsEqualTo("ADR-001");
+        await Assert.That(violations.Single().Attribute).IsEqualTo("name");
     }
 
     [Test]

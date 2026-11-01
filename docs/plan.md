@@ -497,7 +497,8 @@ Work runs in this order, so unknowns surface first and a real comment lands befo
 
 *5. Agent and output*
 
-- [ ] `GitHubTarballSource` (size cap, path traversal guard) and `LocalDirSource`; `FileRetriever` with topics, `applies_to` and an 8k token cap that omits whole docs and reports them
+- [x] `GitHubTarballSource` (size, entry and download caps, path traversal guard, no links, only `.md` and `.rego`) and `TfReviewConfig`
+- [ ] `FileRetriever` with topics, `applies_to` and an 8k token cap that omits whole docs and reports them; a local directory source for the tests
 - [ ] Versioned prompts, with a test that fails if a prompt changes without a version bump; conventions agent, wire-to-finding mapping, the one-retry rule, and separate handling of 429, 5xx, content filter and timeout
 - [ ] `EvidenceChecker` and `RuleArbiter` behind `IArbiter`
 - [ ] Comment renderer and sanitiser, including "not reviewed"; tokens, cost and latency in the step summary (App Insights arrives in M3; no check run until M3)

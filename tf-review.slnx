@@ -10,6 +10,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/TfReview.Core.Tests/TfReview.Core.Tests.csproj" />
     <Project Path="tests/TfReview.GitHub.Tests/TfReview.GitHub.Tests.csproj" />
+    <Project Path="tests/TfReview.Rag.Tests/TfReview.Rag.Tests.csproj" />
     <Project Path="tests/TfReview.Scanners.Tests/TfReview.Scanners.Tests.csproj" />
   </Folder>
 </Solution>
