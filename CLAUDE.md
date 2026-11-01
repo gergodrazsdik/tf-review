@@ -4,7 +4,8 @@ Multi-agent, RAG-backed reviewer for OpenTofu pull requests. The plan, decisions
 
 ## Commands
 
-- `just lint`: every check the CI `lint` job runs
+- `just lint`: the checks that work in the Claude sandbox
+- `just validate`: `tofu validate` and `tflint`. Their plugins can't start in the sandbox, so run this with the sandbox disabled for that one command
 - `just contracts`: validate the contract examples against their schemas
 - `just bootstrap-validate`: validate `bootstrap/` without a backend
 - `just hooks`: install the git hooks

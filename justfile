@@ -1,3 +1,6 @@
+# uv run, not uvx: uvx writes to ~/.local/share/uv/tools, which is read-only in the Claude sandbox
+check_jsonschema := "uv run --no-project --with check-jsonschema==0.39.0 check-jsonschema"
+
 # List the recipes
 default:
     @just --list
@@ -13,27 +16,31 @@ claude *args:
 hooks:
     lefthook install
 
-# Run every pre-commit check on all files; the CI lint job runs this too
+# Run the checks that need no plugins, so they also work in the Claude sandbox; CI runs this too
 [group('dev')]
-lint: contracts bootstrap-validate
+lint: contracts
     tofu fmt -check -recursive .
-    tflint --init
-    tflint --recursive --config "$PWD/.tflint.hcl"
     yamllint --strict .
     actionlint
     pinact run --check
     shellcheck scripts/*.sh
     gitleaks git --no-banner
 
+# Run the checks that start provider or ruleset plugins, which can't run in the Claude sandbox; CI runs this too
+[group('dev')]
+validate: bootstrap-validate
+    tflint --init
+    tflint --recursive --config "$PWD/.tflint.hcl"
+
 # Validate the contract examples against their JSON Schemas
 [group('dev')]
 contracts:
-    uvx check-jsonschema@0.39.0 --check-metaschema docs/contracts/*.schema.json
-    uvx check-jsonschema@0.39.0 --schemafile docs/contracts/tf-review-config.schema.json \
+    {{ check_jsonschema }} --check-metaschema docs/contracts/*.schema.json
+    {{ check_jsonschema }} --schemafile docs/contracts/tf-review-config.schema.json \
       docs/contracts/examples/tf-review.yml
-    uvx check-jsonschema@0.39.0 --schemafile docs/contracts/finding.schema.json \
+    {{ check_jsonschema }} --schemafile docs/contracts/finding.schema.json \
       docs/contracts/examples/finding.json
-    uvx check-jsonschema@0.39.0 --schemafile docs/contracts/corpus-frontmatter.schema.json \
+    {{ check_jsonschema }} --schemafile docs/contracts/corpus-frontmatter.schema.json \
       docs/contracts/examples/corpus-frontmatter.yml
 
 # Validate the bootstrap project without touching its backend

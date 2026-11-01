@@ -251,7 +251,8 @@ gh repo edit gergodrazsdik/tf-standards --template
 | --- | --- | --- |
 | `just claude` | all | Starts Claude Code with the two sibling repos added and their CLAUDE.md loaded |
 | `just hooks` | all | `lefthook install` |
-| `just lint` | all | The pre-commit checks on every file; the CI `lint` job runs the same recipe |
+| `just lint` | all | The checks that need no plugins, on every file, so they work in the Claude sandbox; the CI `lint` job runs the same recipe |
+| `just validate` | `tf-review`, `tf-review-demo` | `tofu validate` and `tflint`, whose plugins can't start in the sandbox; the CI `lint` job runs it too |
 | `just test` | `tf-review` | `dotnet test` (TUnit) |
 | `just plan <dir>` | `tf-review`, `tf-review-demo` | `tofu init`, `plan -out`, `show -json`, then canonicalize and redact |
 | `just cost <plan.json>` | `tf-review`, `tf-review-demo` | `infracost scan <plan.json> --json` with the token read from pass for that run only and `SSH_AUTH_SOCK` unset |
@@ -386,7 +387,7 @@ A consumer repo adopts the reviewer with one `uses:` line; plan runs on every PR
 
 **Repo settings (public repos)**
 
-- Third-party actions pinned to full commit SHAs with `pinact`; a `lint` job runs `actionlint` and `just lint`
+- Third-party actions pinned to full commit SHAs with `pinact`; a `lint` job runs `just lint` (which includes `actionlint`) and, where a repo has OpenTofu code, `just validate`
 - Require approval for workflow runs from outside collaborators; never `pull_request_target`
 - No plan files as artifacts; mark sensitive variables `sensitive` so logs stay clean
 - Rulesets from `.github/rulesets/main.json` (see Setup); the review check stays advisory until M4
@@ -562,7 +563,7 @@ This plan is `tf-review/docs/plan.md`. Sessions update it in the same PR wheneve
 
 - **CLAUDE.md per repo**: purpose, which `just` recipes to run (`lint`, `test`, `plan`, `e2e`), pointer to the contracts; kept short
 - **`.claude/rules/` with path globs**: OpenTofu conventions for `**/*.tf`, C# for `src/**`, Rego for `**/*.rego`
-- **Sandbox on per repo** via `.claude/settings.local.json`, as in your other projects; user settings exclude `tofu`, `az` and `just bootstrap-*`, which need `~/.azure`, and allowlist `registry.opentofu.org` for the `tofu init` inside `just lint`
+- **Sandbox on per repo** via `.claude/settings.local.json`, as in your other projects; user settings exclude `tofu`, `az` and `just bootstrap-*`, which need `~/.azure`, and allowlist `registry.opentofu.org`. Provider and TFLint plugins can't start in the sandbox, so `just validate` runs outside it, one approved command at a time
 - **Stop hook in `tf-review`** runs `just e2e`
 - **`permissions.deny`**: `tofu apply`, `terraform apply`, `tofu state rm`, `az * delete`; Claude plans, CI applies, and `just bootstrap-apply` and `just secrets-sync` stay yours
 - **Lint hook**: `claude-lint-hook` runs `tofu fmt` on `.tf` files, so the agent, lefthook and CI agree
