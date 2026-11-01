@@ -5,3 +5,4 @@
 !Directory.Packages.props
 !src/
 !prompts/
+!tools/checkov/

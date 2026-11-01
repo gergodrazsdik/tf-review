@@ -62,7 +62,8 @@ internal sealed class FakeProcesses(string output) : IProcessRunner
     public async Task<ProcessResult?> RunAsync(
         string program, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken = default)
     {
-        PlanSeen = await File.ReadAllTextAsync(arguments[^1], cancellationToken);
+        // Conftest takes the plan last, and Checkov right after -f.
+        PlanSeen = await File.ReadAllTextAsync(arguments[0] == "-f" ? arguments[1] : arguments[^1], cancellationToken);
         return new ProcessResult(1, output);
     }
 }

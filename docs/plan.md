@@ -88,7 +88,7 @@ All 34 decisions are settled as of 2026-11-01; D19–D29 came from the M1 design
 | D29 | M1 gate | 3 of 3 fixture runs per case on C5, C6, C8, C9 and C10, plus one real PR | One run can pass by luck; 3 of 3 is still weak evidence, so M2's baseline replaces it |
 | D30 | Azure IDs in CI | Subscription, tenant and client IDs are Actions secrets; state and Foundry names stay variables | They aren't credentials, but Actions logs on public repos are public, and only secrets are masked there; state names are committed anyway, and masking the rest would add little |
 | D31 | Cost delta | Two `infracost scan` runs, over "before" and "after" plans rebuilt from the redacted plan's `resource_changes`; code computes the delta per resource | No main-branch baseline to store or let go stale, and no raw plan in the review job. `infracost diff` matches by file path, so it reports differently named files as one project removed and one added, and only its total is useful |
-| D32 | Scanner input | Checkov and Infracost read a plan rebuilt from the redacted one, and a scanner reporting no resources for a plan that has some counts as failed | Both exit 0 with an empty result on a plan without `planned_values`, which looks exactly like a clean scan. Scanners never see the raw plan, so a value marked sensitive can't be priced or checked |
+| D32 | Scanner input | Checkov and Infracost read a plan rebuilt from the redacted one. Infracost reporting no resources for a plan that has some counts as failed, and every Checkov scan includes a canary that always fails, whose absence counts as failed | Both exit 0 with an empty result on a plan they don't recognize, which looks exactly like a clean scan, and Checkov also needs `terraform_version`. Zero results is legitimate for Checkov on types with no checks, so only a canary can prove it ran. Scanners never see the raw plan, so a value marked sensitive can't be priced or checked |
 | D33 | C4 and C7 fixtures | Hand-built in `tests/fixtures/cases`, with no seeded PR | Both need an existing resource that a plan updates or replaces, and keeping a VM or database deployed for it would cost money. The other cases remain real seeded PRs |
 | D34 | Checkov findings | Only an allowlist of checks becomes findings, each with a severity set in code | One storage account failed 11 checks in the spike, and checks that look for related resources can't pass without `configuration`, so reporting everything would bury C1–C3 and fail C8 and C10 |
 
@@ -133,12 +133,12 @@ Only the arbiter talks back to GitHub, and only findings that carry evidence (a 
 | --- | --- | --- |
 | `tfreview` CLI, API and worker (.NET 11, one build) | Git tag | The review itself; the entry command decides the role |
 | conftest (bundled OPA), from M1 | Built from source at the commit behind v0.71.1, with go1.27.3, x/net 0.60.0 and go-jose 4.1.6, reported as `0.71.1-patched` | Runs the `tf-standards` Rego |
-| Checkov, from M2 | uv lockfile, installed into a venv | Security findings on the plan JSON |
+| Checkov, from M2 | `tools/checkov/uv.lock`, in a virtual environment with its own Python | Security findings on the plan JSON |
 | Infracost CLI v2 + terraform-plan and azure plugins, from M2 | CLI built from source at the commit behind v2.18.3 with x/net 0.60.0, reported as `2.18.3-patched`; plugins by version and checksum; `INFRACOST_CLI_PLUGIN_DIR` set in the image | Cost per resource; nothing downloads at run time |
 
 Not in the image: OpenTofu (the plan runs in the consumer workflow, next to its credentials and state), the Azure CLI, git, and the `tf-standards` content, which is fetched at review time as a commit tarball over HTTPS, at the commit named in the base branch's `.tf-review.yml`, so a policy change never needs an image rebuild.
 
-- Base: `mcr.microsoft.com/dotnet/aspnet:11.0-resolute` (Ubuntu 26.04), pinned by digest, plus Python for Checkov from M2; non-root user, read-only root filesystem
+- Base: `mcr.microsoft.com/dotnet/aspnet:11.0-resolute` (Ubuntu 26.04), pinned by digest, with Checkov's own Python added from M2; non-root user, read-only root filesystem
 - Built by `tf-review` CI on each `image-v*` tag (D23): hadolint, build, Syft SBOM, Grype scan (fails on high findings with a fix), cosign keyless signing with the workflow's OIDC identity (public Rekor entry, intended for a public repo), push by digest
 - The reusable workflow references the image by digest and runs `cosign verify` against `tf-review`'s release workflow identity before any PR code runs; the identity is hardcoded per package, not an input
 - Locally: `just image` builds it with podman; `just review plan.json` runs it
@@ -536,8 +536,9 @@ Work runs in this order, so the deterministic findings exist before the agents t
 
 *3. Security scanner*
 
-- [ ] Checkov from a uv lockfile in the image, with Python on the base image; check that Grype still passes
-- [ ] `CheckovRunner` and the allowlist (D34), with findings that cite the Checkov rule ID
+- [x] Checkov from `tools/checkov/uv.lock` in the image, with its own Python; Grype still passes
+- [x] `CheckovRunner` and the allowlist (D34), with findings that cite the Checkov rule ID; `security` as a config option, not on by default until its agent exists. Checkov 3.4.0 misses SSH from `0.0.0.0/0` and has no check for role assignments, so C1 and C3 need the policies in part 4
+- [x] A timed-out standards download now gets one retry and reports `standards_unavailable`; it used to crash the review command, which then reported nothing more specific than `unavailable`. Any other unexpected failure in that command also becomes a result, logging only the exception's type
 
 *4. Agents*
 

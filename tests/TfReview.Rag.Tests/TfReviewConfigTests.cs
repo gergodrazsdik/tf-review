@@ -47,7 +47,7 @@ public class TfReviewConfigTests
     [Arguments("version: 1\nstandards:\n  repository: a/b\n  commit: main\n")]
     [Arguments("version: 1\nstandards:\n  repository: a/b/../../c\n  commit: 0123456789abcdef0123456789abcdef01234567\n")]
     [Arguments("version: 1\nstandards:\n  repository: https://evil.example/x\n  commit: 0123456789abcdef0123456789abcdef01234567\n")]
-    [Arguments("version: 1\nstandards:\n  repository: a/b\n  commit: 0123456789abcdef0123456789abcdef01234567\nagents: [security]\n")]
+    [Arguments("version: 1\nstandards:\n  repository: a/b\n  commit: 0123456789abcdef0123456789abcdef01234567\nagents: [orchestrator]\n")]
     [Arguments("version: 1\nstandards:\n  repository: a/b\n  commit: 0123456789abcdef0123456789abcdef01234567\ngate:\n  mode: strict\n")]
     [Arguments("version: 1\nstandards:\n  repository: a/b\n  commit: 0123456789abcdef0123456789abcdef01234567\nunknown: true\n")]
     [Arguments("{not yaml: [")]

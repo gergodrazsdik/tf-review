@@ -19,15 +19,18 @@ public sealed record ReviewModel(IChatClient Chat, string Deployment);
 /// <param name="arbiter">Combines the findings. Rule-based unless given another.</param>
 /// <param name="log">Receives one line per model call, holding no prompt or answer text.</param>
 /// <param name="infracost">Prices the plan, or null when there's no token, which is reported as not reviewed.</param>
+/// <param name="checkov">Checks the plan, or null when it isn't available, which is reported as not reviewed.</param>
 public sealed class ReviewRunner(
     IStandardsSource standards,
     ConftestRunner conftest,
     ReviewModel? model = null,
     IArbiter? arbiter = null,
     Action<string>? log = null,
-    InfracostRunner? infracost = null)
+    InfracostRunner? infracost = null,
+    CheckovRunner? checkov = null)
 {
     private const string CostAgent = "cost";
+    private const string SecurityAgent = "security";
 
     private readonly IArbiter arbiter = arbiter ?? new RuleArbiter();
 
@@ -73,10 +76,18 @@ public sealed class ReviewRunner(
                 ? await RunCostAsync(redacted.Plan, cancellationToken)
                 : (null, null);
 
-            var check = EvidenceChecker.Check([.. policyFindings, .. conventions.Findings], plan, conventions.Docs);
+            var (securityFindings, securityNotReviewed) = config.Agents.Contains(SecurityAgent, StringComparer.Ordinal)
+                ? await RunCheckovAsync(redacted.Plan, plan, cancellationToken)
+                : ([], null);
+
+            var check = EvidenceChecker.Check([.. policyFindings, .. securityFindings, .. conventions.Findings], plan, conventions.Docs);
             var arbitration = await arbiter.ArbitrateAsync(check.Kept, plan, cancellationToken);
 
-            IReadOnlyList<NotReviewed> notReviewed = costNotReviewed is null ? conventions.NotReviewed : [.. conventions.NotReviewed, costNotReviewed];
+            IReadOnlyList<NotReviewed> notReviewed =
+            [
+                .. conventions.NotReviewed,
+                .. new[] { securityNotReviewed, costNotReviewed }.OfType<NotReviewed>(),
+            ];
             return new ReviewResult(1, commit, arbitration.Verdict, arbitration.Findings, notReviewed, check.Drops)
             {
                 Cost = cost,
@@ -120,6 +131,20 @@ public sealed class ReviewRunner(
             .ToDictionary(doc => doc.Id, doc => doc.Path, StringComparer.Ordinal);
 
         return paths.Count == 0 ? null : paths;
+    }
+
+    // A failed scan isn't a clean one, and it doesn't undo the rest of the review.
+    private async Task<(IReadOnlyList<Finding> Findings, NotReviewed? Failure)> RunCheckovAsync(
+        RedactedPlan redacted, CondensedPlan plan, CancellationToken cancellationToken)
+    {
+        if (checkov is null)
+        {
+            return ([], new NotReviewed(ReviewScope.Security, NotReviewedReason.Unavailable));
+        }
+
+        return await checkov.RunAsync(redacted, cancellationToken) is CheckovRan ran
+            ? (ran.ToFindings(plan), null)
+            : ([], new NotReviewed(ReviewScope.Security, NotReviewedReason.ScannerFailed));
     }
 
     // A cost failure stays separate: the policies and the conventions agent still count without it.

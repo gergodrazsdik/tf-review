@@ -13,9 +13,10 @@ public sealed class ConfigException(string message) : Exception(message);
 /// </summary>
 public sealed partial record TfReviewConfig(string Repository, string Commit, IReadOnlyList<string> Agents, bool Blocking)
 {
-    private static readonly string[] KnownAgents = ["conventions", "cost"];
+    private static readonly string[] KnownAgents = ["conventions", "cost", "security"];
 
-    // Cost needs a secret a repo has to set up first, so a repo opts in.
+    // Cost needs a secret a repo has to set up first, so a repo opts in. Security stays out of this list until
+    // its agent exists, because a repo's PRs would otherwise change without its config changing.
     private static readonly string[] DefaultAgents = ["conventions"];
 
     private static readonly IDeserializer Yaml = new DeserializerBuilder()

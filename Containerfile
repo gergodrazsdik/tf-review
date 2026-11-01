@@ -40,15 +40,26 @@ RUN for pin in \
       install -D -m 755 "$name" "/out/plugins/$name"; \
     done
 
+# Checkov and its own Python, pinned by tools/checkov/uv.lock. The paths match the final image, because a
+# virtual environment finds its Python by absolute path.
+FROM ghcr.io/astral-sh/uv:0.13.6-debian-slim@sha256:caa9f629fcb575ba2ed6ee160ec51e82e8444f6bdc3fc05c855b2636a5511eb8 AS checkov
+WORKDIR /tools/checkov
+COPY tools/checkov/ ./
+ENV UV_PYTHON_INSTALL_DIR=/opt/checkov/python UV_PROJECT_ENVIRONMENT=/opt/checkov/venv UV_LINK_MODE=copy
+RUN uv sync --frozen --no-install-project --managed-python --python 3.13
+
 FROM mcr.microsoft.com/dotnet/aspnet:11.0-resolute@sha256:bae0269049d5061ab7f49995cc1acebf54b75471c096c4a1f874e27661d44045
 ENV DOTNET_EnableDiagnostics=0 \
     INFRACOST_CLI_PLUGIN_DIR=/opt/infracost/plugins \
     INFRACOST_SKIP_UPDATE_CHECK=true \
-    INFRACOST_SKIP_AGENT_CHECK=true
+    INFRACOST_SKIP_AGENT_CHECK=true \
+    PATH=/opt/checkov/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    PYTHONDONTWRITEBYTECODE=1
 COPY --from=build /app /app
 COPY --from=conftest /out/conftest /usr/local/bin/conftest
 COPY --from=infracost /out/infracost /usr/local/bin/infracost
 COPY --from=infracost /out/plugins /opt/infracost/plugins
+COPY --from=checkov /opt/checkov /opt/checkov
 # The base image's APP_UID, as a number so a host can tell it isn't root without resolving it.
 USER 1654
 ENTRYPOINT ["/app/tfreview"]

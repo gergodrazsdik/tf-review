@@ -100,6 +100,40 @@ public class ReviewRunnerCostTests
         await Assert.That(parsed.Cost.Resources.Single().Priced).IsTrue();
     }
 
+    [Test]
+    public async Task Reports_what_checkov_found_with_the_policies()
+    {
+        const string Output = """
+            {"results":{"failed_checks":[
+            {"check_id":"CKV_AZURE_190","check_name":"Canary","resource":"azurerm_storage_account.tfreview_canary"},
+            {"check_id":"CKV_AZURE_190","check_name":"Public blobs","resource":"azurerm_linux_virtual_machine.main","check_result":{"evaluated_keys":["size"]}}
+            ]}}
+            """;
+
+        var result = await RunSecurity(new FakeProcesses(Output));
+
+        var finding = result.Findings.Single();
+        await Assert.That(finding.Rule).IsEqualTo("CKV_AZURE_190");
+        await Assert.That(finding.Deterministic).IsTrue();
+        await Assert.That(result.NotReviewed).IsEmpty();
+    }
+
+    // The false clean: it read nothing and exited 0.
+    [Test]
+    public async Task A_checkov_scan_that_saw_nothing_is_reported_and_not_called_clean()
+    {
+        var result = await RunSecurity(new FakeProcesses("""{"passed":0,"failed":0,"resource_count":0}"""));
+
+        await Assert.That(result.Verdict).IsEqualTo(Verdict.NoFindings);
+        await Assert.That(result.NotReviewed.Single()).IsEqualTo(new NotReviewed(ReviewScope.Security, NotReviewedReason.ScannerFailed));
+    }
+
+    private static Task<ReviewResult> RunSecurity(FakeProcesses checkov)
+    {
+        var config = WithoutCost.Replace("agents: []", "agents: [security]", StringComparison.Ordinal);
+        return new ReviewRunner(new EmptySource(), new ConftestRunner(new FakeProcesses(NoViolations)), checkov: new CheckovRunner(checkov)).RunAsync(Plan, config, Commit);
+    }
+
     private static Task<ReviewResult> Run(string config, FakeScans scans) =>
         new ReviewRunner(new EmptySource(), new ConftestRunner(new FakeProcesses(NoViolations)), infracost: new InfracostRunner(scans)).RunAsync(Plan, config, Commit);
 

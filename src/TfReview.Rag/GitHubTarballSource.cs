@@ -20,7 +20,7 @@ public sealed class GitHubTarballSource(HttpClient http) : IStandardsSource
 
     public async Task FetchAsync(TfReviewConfig config, string targetDirectory, CancellationToken cancellationToken = default)
     {
-        using var archive = await DownloadAsync(config, cancellationToken);
+        using var archive = await DownloadWithRetryAsync(config, cancellationToken);
         await UnpackAsync(archive, targetDirectory, cancellationToken);
     }
 
@@ -84,40 +84,58 @@ public sealed class GitHubTarballSource(HttpClient http) : IStandardsSource
         }
     }
 
+    private async Task<MemoryStream> DownloadWithRetryAsync(TfReviewConfig config, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await DownloadAsync(config, cancellationToken);
+        }
+        catch (Exception e) when (IsTransient(e, cancellationToken))
+        {
+            try
+            {
+                return await DownloadAsync(config, cancellationToken);
+            }
+            catch (Exception retry) when (IsTransient(retry, cancellationToken))
+            {
+                throw new StandardsFetchException("Downloading the standards failed.");
+            }
+        }
+    }
+
     private async Task<MemoryStream> DownloadAsync(TfReviewConfig config, CancellationToken cancellationToken)
     {
         // Both parts passed the config's patterns, and the commit is a full SHA, so this can't move.
         var url = $"{config.Repository}/tar.gz/{config.Commit}";
-        try
+        using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (!response.IsSuccessStatusCode)
         {
-            using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            if (!response.IsSuccessStatusCode)
+            throw new StandardsFetchException($"Downloading the standards failed with HTTP {(int)response.StatusCode}.");
+        }
+
+        await using var body = await response.Content.ReadAsStreamAsync(cancellationToken);
+        var archive = new MemoryStream();
+        var buffer = new byte[81_920];
+        int read;
+        while ((read = await body.ReadAsync(buffer, cancellationToken)) > 0)
+        {
+            if (archive.Length + read > MaxDownloadBytes)
             {
-                throw new StandardsFetchException($"Downloading the standards failed with HTTP {(int)response.StatusCode}.");
+                throw new StandardsFetchException("The standards download is too large.");
             }
 
-            await using var body = await response.Content.ReadAsStreamAsync(cancellationToken);
-            var archive = new MemoryStream();
-            var buffer = new byte[81_920];
-            int read;
-            while ((read = await body.ReadAsync(buffer, cancellationToken)) > 0)
-            {
-                if (archive.Length + read > MaxDownloadBytes)
-                {
-                    throw new StandardsFetchException("The standards download is too large.");
-                }
-
-                archive.Write(buffer, 0, read);
-            }
-
-            archive.Position = 0;
-            return archive;
+            archive.Write(buffer, 0, read);
         }
-        catch (HttpRequestException)
-        {
-            throw new StandardsFetchException("Downloading the standards failed.");
-        }
+
+        archive.Position = 0;
+        return archive;
     }
+
+    // A timeout is an OperationCanceledException that the caller didn't ask for, and the body can also fail
+    // part way through as an IOException. Any of these is worth one more try, and then a clear answer.
+    private static bool IsTransient(Exception exception, CancellationToken cancellationToken) =>
+        exception is HttpRequestException or IOException
+        || (exception is OperationCanceledException && !cancellationToken.IsCancellationRequested);
 
     /// <summary>Removes GitHub's top-level directory. Null for the directory itself and absolute or parent paths.</summary>
     private static string? RelativePath(string name)

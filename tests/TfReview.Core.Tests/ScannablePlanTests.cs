@@ -18,6 +18,28 @@ public class ScannablePlanTests
         await Assert.That(resource["values"]!["size"]!.GetValue<string>()).IsEqualTo("large");
     }
 
+    // Checkov exits 0 with nothing on a plan without this, which looks like a clean scan.
+    [Test]
+    public async Task Has_the_field_checkov_needs_to_recognize_a_plan()
+    {
+        var json = Parse(Scannable(PlanSide.After, Change(Vm, "update", "{}", "{}")));
+
+        await Assert.That(json["terraform_version"]).IsNotNull();
+    }
+
+    [Test]
+    public async Task The_canary_is_added_without_counting_as_one_of_the_plans_resources()
+    {
+        var plan = ScannablePlan.From(Redact(Change(Vm, "update", "{}", "{}")), PlanSide.After);
+
+        var json = Parse(plan.ToCanonicalJsonWithCanary());
+
+        await Assert.That(json["planned_values"]!["root_module"]!["resources"]!.AsArray().Count).IsEqualTo(2);
+        await Assert.That(json["resource_changes"]!.AsArray().Count).IsEqualTo(2);
+        await Assert.That(plan.Addresses).IsEquivalentTo([Vm]);
+        await Assert.That(plan.ToCanonicalJson()).DoesNotContain(ScannablePlan.CanaryAddress);
+    }
+
     [Test]
     public async Task Each_side_holds_its_own_values_as_a_create()
     {
