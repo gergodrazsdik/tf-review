@@ -59,6 +59,28 @@ e2e-live runs="3":
 fixtures:
     scripts/fixtures.sh
 
+# Price a plan JSON with the token from pass for this run only; pinentry may prompt
+[group('dev')]
+cost plan:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    unset SSH_AUTH_SOCK
+    INFRACOST_CLI_AUTHENTICATION_TOKEN="$(pass show tf-review/infracost/cli-token)"
+    export INFRACOST_CLI_AUTHENTICATION_TOKEN
+    infracost scan "{{ plan }}" --json --no-color --currency USD
+
+# Copy the Infracost token from pass into each onboarded repo's Actions secrets; yours to run, never an agent's
+[confirm('Copy the Infracost token into the Actions secrets of tf-review and tf-review-demo?')]
+[group('bootstrap')]
+secrets-sync:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    token="$(pass show tf-review/infracost/cli-token)"
+    for repo in gergodrazsdik/tf-review gergodrazsdik/tf-review-demo; do
+      gh secret set INFRACOST_CLI_AUTHENTICATION_TOKEN -R "$repo" <<<"$token"
+      echo "$repo: set"
+    done
+
 # Build the review image with podman; it can't run from a recipe in the Claude sandbox
 [group('dev')]
 image:

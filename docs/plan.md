@@ -285,13 +285,13 @@ gh repo edit gergodrazsdik/tf-standards --template
 | `just test` | `tf-review` | `dotnet build -m:1`, then `dotnet run --project <tests> --no-build` for each TUnit project; CI runs `dotnet test` |
 | `just lint-dotnet` | `tf-review` | `dotnet format whitespace --folder --verify-no-changes`, then `dotnet build -m:1 --no-incremental -p:EnforceCodeStyleInBuild=true -warnaserror`; CI runs the full `dotnet format --verify-no-changes` |
 | `just plan <dir>` | `tf-review`, `tf-review-demo` | `tofu init`, `plan -out`, `show -json`, then canonicalize and redact |
-| `just cost <plan.json>` | `tf-review`, `tf-review-demo` | `infracost scan <plan.json> --json` with the token read from pass for that run only and `SSH_AUTH_SOCK` unset |
+| `just cost <plan.json>` | `tf-review` | `infracost scan <plan.json> --json` with the token read from pass for that run only and `SSH_AUTH_SOCK` unset |
 | `just review <plan.json>` | `tf-review` | Runs the reviewer console app locally on one plan |
 | `just e2e` | `tf-review` | Replays recorded model responses over the committed fixtures and asserts the expected findings; offline, no Azure and no token spend, so the Claude Code Stop hook can run it |
 | `just e2e-live` | `tf-review` | Runs the committed fixtures against the real model N times and asserts on the review result; manual, and the `e2e-live` workflow runs it on PRs that change the agent, its prompts or the fixtures |
 | `just fixtures` | `tf-review` | Takes the redacted plan each seeded branch's review already made, replaces every GUID with zeros, and writes it to `tests/fixtures/cases/`, so no raw plan reaches a laptop and no Azure login is needed |
 | `just bootstrap-plan` / `bootstrap-apply` / `bootstrap-migrate` | `tf-review` | The bootstrap project with your `az login`; apply and migrate ask first |
-| `just secrets-sync` | `tf-review` | Copies pass entries into Actions secrets and Key Vault; you run it, never an agent |
+| `just secrets-sync` | `tf-review` | Copies the Infracost token from pass into each onboarded repo's Actions secrets, and into Key Vault from M3; you run it, never an agent |
 | `just policy-test` | `tf-standards` | `opa fmt --fail`, `conftest verify`, frontmatter schema check |
 
 The `claude` recipe in `tf-review` (the other repos list their own two siblings):
@@ -532,7 +532,7 @@ Work runs in this order, so the deterministic findings exist before the agents t
 - [x] `ScannablePlan`, rebuilt from a `RedactedPlan`, with one side per scan; the no-resources check (D32)
 - [x] Infracost CLI and pinned plugins in the image, on a read-only filesystem. The CLI is a source build with x/net 0.60.0, and the plan parser plugin has one narrow Grype exception (D28)
 - [x] `InfracostRunner` and the per-resource delta; a type Infracost can't price is reported as unknown rather than as free; a test with recorded scan output, so nothing needs the token
-- [ ] `just cost` and `just secrets-sync`, and the token secret in the review job. **You:** `just secrets-sync`
+- [x] `just cost` and `just secrets-sync`, the token secret in the review job, and `cost` as a config option, which a repo opts into because it needs that secret; the monthly change in the comment. A cost failure is reported as not reviewed and leaves the other findings standing. Checked on 2026-11-01 through the real `redact` and `review` commands in a local image, with a hand-built plan: an update, a module address, a free type, an unknown type and a delete all came out right. **You:** `just secrets-sync`
 
 *3. Security scanner*
 

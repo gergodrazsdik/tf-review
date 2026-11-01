@@ -18,13 +18,17 @@ public sealed record ReviewModel(IChatClient Chat, string Deployment);
 /// <param name="model">The model, or null when none is configured, which is reported as not reviewed.</param>
 /// <param name="arbiter">Combines the findings. Rule-based unless given another.</param>
 /// <param name="log">Receives one line per model call, holding no prompt or answer text.</param>
+/// <param name="infracost">Prices the plan, or null when there's no token, which is reported as not reviewed.</param>
 public sealed class ReviewRunner(
     IStandardsSource standards,
     ConftestRunner conftest,
     ReviewModel? model = null,
     IArbiter? arbiter = null,
-    Action<string>? log = null)
+    Action<string>? log = null,
+    InfracostRunner? infracost = null)
 {
+    private const string CostAgent = "cost";
+
     private readonly IArbiter arbiter = arbiter ?? new RuleArbiter();
 
     public async Task<ReviewResult> RunAsync(
@@ -65,11 +69,17 @@ public sealed class ReviewRunner(
                 ? await RunConventionsAsync(plan, policyFindings, corpus, cancellationToken)
                 : ConventionsPass.Skipped;
 
+            var (cost, costNotReviewed) = config.Agents.Contains(CostAgent, StringComparer.Ordinal)
+                ? await RunCostAsync(redacted.Plan, cancellationToken)
+                : (null, null);
+
             var check = EvidenceChecker.Check([.. policyFindings, .. conventions.Findings], plan, conventions.Docs);
             var arbitration = await arbiter.ArbitrateAsync(check.Kept, plan, cancellationToken);
 
-            return new ReviewResult(1, commit, arbitration.Verdict, arbitration.Findings, conventions.NotReviewed, check.Drops)
+            IReadOnlyList<NotReviewed> notReviewed = costNotReviewed is null ? conventions.NotReviewed : [.. conventions.NotReviewed, costNotReviewed];
+            return new ReviewResult(1, commit, arbitration.Verdict, arbitration.Findings, notReviewed, check.Drops)
             {
+                Cost = cost,
                 StandardsCommit = config.Commit,
                 StandardsRepository = config.Repository,
                 DocPaths = DocPaths(arbitration.Findings, corpus),
@@ -110,6 +120,28 @@ public sealed class ReviewRunner(
             .ToDictionary(doc => doc.Id, doc => doc.Path, StringComparer.Ordinal);
 
         return paths.Count == 0 ? null : paths;
+    }
+
+    // A cost failure stays separate: the policies and the conventions agent still count without it.
+    private async Task<(CostSummary? Cost, NotReviewed? Failure)> RunCostAsync(RedactedPlan plan, CancellationToken cancellationToken)
+    {
+        if (infracost is null)
+        {
+            return (null, new NotReviewed(ReviewScope.Cost, NotReviewedReason.Unavailable));
+        }
+
+        if (await infracost.RunAsync(plan, cancellationToken) is not InfracostRan ran)
+        {
+            return (null, new NotReviewed(ReviewScope.Cost, NotReviewedReason.ScannerFailed));
+        }
+
+        var priced = ran.Costs.Where(cost => cost.Priced).ToList();
+        return (
+            new CostSummary(
+                priced.Sum(cost => cost.Before),
+                priced.Sum(cost => cost.After),
+                [.. ran.Costs.Select(cost => new ResourceCostChange(cost.Address, cost.Before, cost.After, cost.Priced))]),
+            null);
     }
 
     private async Task<ConventionsPass> RunConventionsAsync(

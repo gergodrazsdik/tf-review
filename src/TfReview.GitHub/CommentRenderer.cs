@@ -14,6 +14,7 @@ public static partial class CommentRenderer
     public const string Marker = "<!-- tf-review -->";
 
     private const int MaxRows = 50;
+    private const int MaxUnpriced = 10;
     private const int MaxTextLength = 300;
 
     public static string Render(ReviewResult result, PlanCounts? counts)
@@ -27,6 +28,11 @@ public static partial class CommentRenderer
         if (counts is not null)
         {
             comment.AppendLine().AppendLine(Summarize(counts));
+        }
+
+        if (result.Cost is { } cost)
+        {
+            AppendCost(comment, cost);
         }
 
         if (result.Findings.Count > 0)
@@ -85,6 +91,27 @@ public static partial class CommentRenderer
         var padded = clean.StartsWith('`') || clean.EndsWith('`') ? $" {clean} " : clean;
         return $"{fence}{padded.Replace("|", "\\|", StringComparison.Ordinal)}{fence}";
     }
+
+    private static void AppendCost(StringBuilder comment, CostSummary cost)
+    {
+        var delta = cost.AfterUsd - cost.BeforeUsd;
+        comment.AppendLine().AppendLine(delta == 0
+            ? "Monthly cost: no change at list prices, without usage-based charges."
+            : $"Monthly cost: **{Signed(delta)}** (from {Money(cost.BeforeUsd)} to {Money(cost.AfterUsd)}), at list prices, without usage-based charges.");
+
+        // A resource that couldn't be priced isn't free, and the line above would otherwise suggest it.
+        var unpriced = cost.Resources.Where(resource => !resource.Priced).Select(resource => resource.ResourceAddress).ToList();
+        if (unpriced.Count > 0)
+        {
+            var shown = string.Join(", ", unpriced.Take(MaxUnpriced).Select(Code));
+            var more = unpriced.Count > MaxUnpriced ? $" and {unpriced.Count - MaxUnpriced} more" : string.Empty;
+            comment.AppendLine().AppendLine($"Couldn't be priced, so not counted: {shown}{more}.");
+        }
+    }
+
+    private static string Money(decimal amount) => amount.ToString("$#,##0.00", CultureInfo.InvariantCulture);
+
+    private static string Signed(decimal amount) => (amount < 0 ? "-" : "+") + Money(Math.Abs(amount));
 
     private static void AppendFindings(StringBuilder comment, ReviewResult result)
     {

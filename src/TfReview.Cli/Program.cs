@@ -62,7 +62,12 @@ static async Task<int> Review(string redactedPath, string configPath, string out
             new GitHubTarballSource(http),
             new ConftestRunner(new ProcessRunner()),
             ModelFromEnvironment(),
-            log: Console.WriteLine);
+            log: Console.WriteLine,
+
+            // Without a token a scan waits forever for a login.
+            infracost: string.IsNullOrEmpty(Environment.GetEnvironmentVariable("INFRACOST_CLI_AUTHENTICATION_TOKEN"))
+                ? null
+                : new InfracostRunner(new ProcessRunner()));
         result = await runner.RunAsync(redacted, config, commit);
     }
 

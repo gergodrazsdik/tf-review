@@ -77,6 +77,30 @@
       "type": "object",
       "additionalProperties": { "type": "integer", "minimum": 1 }
     },
+    "cost": {
+      "description": "What the plan costs a month in US dollars at list prices, without usage-based charges. Absent when cost isn't enabled or couldn't be worked out. Totals count only priced resources.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["before_usd", "after_usd", "resources"],
+      "properties": {
+        "before_usd": { "type": "number" },
+        "after_usd": { "type": "number" },
+        "resources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["resource_address", "before_usd", "after_usd", "priced"],
+            "properties": {
+              "resource_address": { "type": "string", "minLength": 1 },
+              "before_usd": { "type": "number" },
+              "after_usd": { "type": "number" },
+              "priced": { "description": "False for a type Infracost can't price, which isn't the same as free.", "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
     "usage": {
       "description": "Totals across the review's LLM calls, for the cost metrics.",
       "type": "object",
