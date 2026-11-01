@@ -504,6 +504,7 @@ Work runs in this order, so unknowns surface first and a real comment lands befo
 - [x] Comment renderer and sanitiser, including "not reviewed": untrusted text goes in inline code spans, where GitHub parses no markdown, mentions or links
 - [x] Wire redaction, conftest and the comment into the CLI, so a PR gets real policy findings before the agent exists; the review job re-runs the redactor on the untrusted artifact
 - [x] Tokens, cost and latency in the step summary (App Insights arrives in M3; no check run until M3). Cost is an estimate from third-party listings of the Data Zone rate, $0.825 in, $0.0825 cached and $4.95 out per million, until M2 measures it
+- [x] First real run (`tf-review-demo` PR #8, 2026-11-01, one run, not the gate): all five cases in one plan came out right, with C9 found by the model alone and C8 and C10 clean, for about $0.003, 2,136 input and 231 output tokens. The comment and log were checked; the rendered step summary wasn't
 
 *6. Evaluation and gate*
 
