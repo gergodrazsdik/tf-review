@@ -42,7 +42,8 @@ Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET S
 
 - [x] Convert the Azure trial to Pay-As-You-Go, then check Azure OpenAI quota in Germany West Central
 - [x] Delete the resource group the Foundry portal auto-created in Sweden Central
-- [ ] Before M2: request quota for a stronger model (gpt-5.4 or gpt-5.5, Data Zone Standard)
+- [ ] Before M2: request Data Zone Standard quota for gpt-6.1-sol and gpt-6-luna
+- [ ] Before gpt-5.4-mini retires (2027-09-21): move to a newer small model through the eval suite
 - [ ] After .NET 11 GA (scheduled 2026-11-10): install the GA SDK through `update-sources`, pin `global.json` to `11.0.100` without `allowPrerelease`, and re-pin the base image digest
 - [ ] After a CSharpier release that parses C# 15 (1.3.0 fails on `union`): add it back to the prerequisites and decide where it runs; until then `dotnet format` is the only C# formatter
 - [x] Infracost v2: create a personal access token, store it as `pass insert tf-review/infracost/cli-token`, clear any cached `infracost auth login` session
@@ -50,14 +51,14 @@ Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET S
 
 ## Decision log
 
-All 18 decisions are settled as of 2026-11-01. Changing one means editing its row and the sections it affects in the same commit.
+All 29 decisions are settled as of 2026-11-01; D19–D29 came from the M1 design council. Changing one means editing its row and the sections it affects in the same commit.
 
 | # | Decision | Choice | Why |
 | --- | --- | --- | --- |
 | D1 | IaC tool | OpenTofu 1.13 first; Terraform via a `tool` workflow input in M2 | Native state encryption; Terraform support doubles the test matrix, so it waits |
 | D2 | Agent runtime | C# 15 on .NET 11, Microsoft Agent Framework, `IChatClient` from Microsoft.Extensions.AI over the OpenAI SDK's `OpenAIClient` | Strongest stack; the provider stays swappable; unions and closed hierarchies fit findings and agent outcomes; support should end about when .NET 10's does (November 2028); Agent Framework dropped `Azure.AI.OpenAI` in 1.21 |
 | D3 | Where the review runs | One container image: the workflow runs it in M1–M2, Container Apps runs it from M3 | Identical binaries and tool versions locally, in CI and in Azure |
-| D4 | LLM | Azure OpenAI in Foundry, Data Zone Standard (EU): gpt-5.4-mini for every agent; gpt-5.4 or gpt-5.5 requested for security and arbiter before M2; model set per agent in config | Quota checked 2026-10-31; EU processing from day one |
+| D4 | LLM | Azure OpenAI in Foundry, Data Zone Standard (EU): gpt-5.4-mini `2026-03-17` for every agent; gpt-6.1-sol `2026-09-29` for security and arbiter from M2, and gpt-6-luna `2026-09-22` as a small-model candidate, both once quota is granted; text-embedding-3-small `1` from M3; versions pinned and models set per agent in config | gpt-5.4-mini is the only chat model with quota (checked 2026-11-01); gpt-6.1-sol is reportedly cheaper than gpt-5.4 and gpt-5.5 and retires later; Luna must beat mini on the evals, not just on price; EU processing from day one |
 | D5 | Retrieval | Metadata filter plus whole docs in M1–M2; Cosmos DB free tier with vectors in M3 | The baseline shows whether vectors actually help |
 | D6 | Repo visibility | Public | Free Actions minutes and environment approvals; portfolio value |
 | D7 | Repos | `tf-review`, `tf-review-demo`, `tf-standards` (created 2026-11-01) | Standards have their own owner and lifecycle in production |
@@ -72,6 +73,17 @@ All 18 decisions are settled as of 2026-11-01. Changing one means editing its ro
 | D16 | Hosting | Azure Container Apps, consumption-only: API app + event-driven job, scale to zero | An App Service B1 plan costs $12.41/month idle (priced with Infracost on 2026-11-01) and has no job model |
 | D17 | Image registry | GitHub Container Registry, public image, cosign-signed, consumers pin by digest | Free for public images; no registry bill in Azure |
 | D18 | Infracost | CLI v2 with checksum-pinned plugins; token in pass locally, in Key Vault for the service | v0.10 is being retired; plugins are unsigned, so they're pinned |
+| D19 | M1 scanner and model role | conftest moves to M1 and its results are the conventions agent's input; the gate adds a case Rego misses | Matches the agent design, so the baseline carries into M2; without the extra case the gate wouldn't test the LLM |
+| D20 | M1 arbiter | Rule-based behind `IArbiter` (severity sort, verdict); LLM arbiter in M2 | With one agent there's nothing to arbitrate, and it halves the LLM calls |
+| D21 | LLM credentials | Two jobs: the plan job runs PR code and uploads only a redacted plan; the review job runs no PR code and uses its own identity, federated on `environment:review` | `tofu plan` runs code a PR controls, which could otherwise mint the LLM credentials; this doesn't stop someone who can edit the workflow |
+| D22 | Evidence pointers | Address-keyed: `/resource_changes/<escaped address>/...`, composed by code and checked against `resource_address` | Array indexes shift with slices and no-op drops, and would break M4's cached findings |
+| D23 | Image pinning | Two tags: `image-v*` builds and signs, a PR pins the digest on `main`, `v*` publishes the workflow; dev images are a separate signed package passed through an `image` input | A tag's workflow can't contain its own image digest; `main` always holds a valid one |
+| D24 | Reviewer infra | `tf-review` joins bootstrap's `repos` map, CI applies `infra/` behind `prod` approval, and bootstrap grants the LLM role at resource group scope | The apply identity's Contributor can't assign roles; a new repo stays one map entry |
+| D25 | Redaction policy | Tofu's sensitive marks plus an attribute-name denylist, with marked values swept wherever else they appear; malformed input refuses the review; other values pass | The model keeps its context; unmarked secrets under ordinary names remain a known risk |
+| D26 | Corpus metadata | `topics` enum in corpus frontmatter; agents declare the topics they retrieve | The schema can't express "naming, tags" today, so POL-001 would reach the conventions agent |
+| D27 | Config source | `.tf-review.yml` is read from the PR's base commit | A PR can't disable its own review or swap the standards corpus; config changes apply after merge |
+| D28 | Release pipeline | The full pipeline from M1; Grype fails only on high findings that have a fix | Unpatched base image issues can't stall a release |
+| D29 | M1 gate | 3 of 3 fixture runs per case on C5, C6, C8, C9 and C10, plus one real PR | One run can pass by luck; 3 of 3 is still weak evidence, so M2's baseline replaces it |
 
 ## Architecture
 
@@ -106,22 +118,22 @@ flowchart LR
   class COSMOS,AOAI data
 ```
 
-Only the arbiter talks back to GitHub, and only findings that carry evidence (a plan pointer or an accepted doc ID) survive it. The consumer workflow does the one step that needs cloud credentials, `tofu plan`; everything after it runs from the `tf-review` container image, so scanners, agents and their versions are identical on your machine, in CI and in Azure.
+Only the arbiter talks back to GitHub, and only findings that carry evidence (a plan pointer and an accepted doc ID) survive it. The consumer workflow does the one step that needs cloud credentials, `tofu plan`; everything after it runs from the `tf-review` container image, so scanners, agents and their versions are identical on your machine, in CI and in Azure.
 
 **Review container image** (`ghcr.io/gergodrazsdik/tf-review`)
 
 | Component | Pinned by | Why it's in the image |
 | --- | --- | --- |
 | `tfreview` CLI, API and worker (.NET 11, one build) | Git tag | The review itself; the entry command decides the role |
-| Checkov | uv lockfile, installed into a venv | Security findings on the plan JSON |
-| conftest (bundled OPA) | Version + checksum | Runs the `tf-standards` Rego |
-| Infracost CLI v2 + terraform-plan and azure plugins | Version + checksums; `INFRACOST_CLI_PLUGIN_DIR` set in the image | Cost per resource; nothing downloads at run time |
+| conftest (bundled OPA), from M1 | Version + checksum | Runs the `tf-standards` Rego |
+| Checkov, from M2 | uv lockfile, installed into a venv | Security findings on the plan JSON |
+| Infracost CLI v2 + terraform-plan and azure plugins, from M2 | Version + checksums; `INFRACOST_CLI_PLUGIN_DIR` set in the image | Cost per resource; nothing downloads at run time |
 
-Not in the image: OpenTofu (the plan runs in the consumer workflow, next to its credentials and state), the Azure CLI, git, and the `tf-standards` content, which is fetched at review time at the commit named in `.tf-review.yml` so a policy change never needs an image rebuild.
+Not in the image: OpenTofu (the plan runs in the consumer workflow, next to its credentials and state), the Azure CLI, git, and the `tf-standards` content, which is fetched at review time as a commit tarball over HTTPS, at the commit named in the base branch's `.tf-review.yml`, so a policy change never needs an image rebuild.
 
-- Base: `mcr.microsoft.com/dotnet/aspnet:11.0-resolute` (Ubuntu 26.04), pinned by digest, plus Python for Checkov; non-root user, read-only root filesystem
-- Built by `tf-review` CI on each `v*` tag: hadolint, build, Syft SBOM, Grype scan (fails on high), cosign keyless signing with the workflow's OIDC identity (public Rekor entry, intended for a public repo), push by digest
-- Consumers reference the image by digest and run `cosign verify` against `tf-review`'s release workflow identity before using it
+- Base: `mcr.microsoft.com/dotnet/aspnet:11.0-resolute` (Ubuntu 26.04), pinned by digest, plus Python for Checkov from M2; non-root user, read-only root filesystem
+- Built by `tf-review` CI on each `image-v*` tag (D23): hadolint, build, Syft SBOM, Grype scan (fails on high findings with a fix), cosign keyless signing with the workflow's OIDC identity (public Rekor entry, intended for a public repo), push by digest
+- The reusable workflow references the image by digest and runs `cosign verify` against `tf-review`'s release workflow identity before any PR code runs; the identity is hardcoded per package, not an input
 - Locally: `just image` builds it with podman; `just review plan.json` runs it
 - Size (a few hundred MB with Python and plugins) doesn't matter: the review is asynchronous
 
@@ -133,28 +145,30 @@ Not in the image: OpenTofu (the plan runs in the consumer workflow, next to its 
 4. The job condenses and canonicalizes the plan, runs Checkov, conftest and Infracost, then the orchestrator, the specialist agents and the arbiter
 5. The GitHub App updates the PR's sticky comment and sets the `tf-review` check run
 
-In M1–M2 steps 1–3 collapse into one: the workflow runs `tfreview review plan.json` from the same image and posts with `GITHUB_TOKEN`.
+In M1–M2 steps 1–3 collapse into the workflow's two jobs (D21): the plan job runs `tfreview redact`, and the review job runs `tfreview review` from the same image and posts with `GITHUB_TOKEN`.
 
 ## Agents and prompts
 
-Five LLM roles, each a Microsoft Agent Framework agent with a versioned prompt file, structured JSON output against the finding schema, and its model set in config.
+Five LLM roles by M2 (M1 has only the conventions agent, D19–D20), each a Microsoft Agent Framework agent with a versioned prompt file, structured JSON output against a flat wire schema, and its model set in config. Code maps that output to the finding contract and sets `rule`, `severity`, `agent`, `deterministic` and `evidence`: Azure's strict mode rejects parts of `finding.schema.json`, and a model must never be able to claim `deterministic: true`.
 
 | Agent | Gets | Retrieves | Model (v1) | Returns |
 | --- | --- | --- | --- | --- |
 | Orchestrator | Condensed diff: addresses, types, actions | Nothing | gpt-5.4-mini | Resource-to-agent routing, skipped agents, risk order (deletes, replacements, IAM, network first) |
 | Security | Its slice plus the Checkov and conftest results for it | Accepted policies and ADRs whose `applies_to` matches the slice | Stronger model once granted; gpt-5.4-mini until then | Findings |
 | Cost | Its slice plus Infracost per-resource cost and delta | ADRs tagged as cost guidance | gpt-5.4-mini | Findings with monthly delta |
-| Conventions | Its slice plus conftest naming and tag results | ADRs and policies on naming, tags, modules | gpt-5.4-mini | Findings |
-| Arbiter | All surviving findings plus the condensed diff | Nothing | Stronger model once granted; gpt-5.4-mini until then | Ranked, deduplicated findings and a verdict |
+| Conventions | Its slice plus conftest naming and tag results | Accepted docs with its topics (`naming`, `tagging`) whose `applies_to` matches | gpt-5.4-mini | Findings |
+| Arbiter (from M2; rule-based in M1) | All surviving findings plus the condensed diff | Nothing | Stronger model once granted; gpt-5.4-mini until then | Ranked, deduplicated findings and a verdict |
 
 **Rules every agent run follows**
 
 - Prompts live in `tf-review/prompts/<agent>.md` with a version header; the version is logged per call and is part of the result-cache key
 - Invalid JSON gets one retry; after that, the agent's slice is reported as "not reviewed" instead of guessed
-- A deterministic evidence check runs before the arbiter: each finding must point at a plan path that exists in the diff, or at a doc ID whose status is accepted; failures are dropped and counted
+- A deterministic evidence check runs before the arbiter: each finding needs both a plan pointer that resolves and matches its `resource_address`, and a doc ID that is accepted, was retrieved for this prompt and applies to that resource type; failures are dropped and counted by reason, and never retried
 - Deduplication key: resource address plus rule (doc ID or scanner rule ID); the highest severity wins and the evidence is merged
 - Only deterministic high findings (Checkov, conftest) can block, and only when a repo opts in (D9); LLM-only findings never block
-- Agents never see secrets: redaction happens before the plan is loaded, and the image holds no credentials beyond its own managed identity
+- Agents see only redacted plans: only the redactor reads the raw plan, and `CondensedPlan` is the only plan type the agents accept. Redaction can't catch unmarked secrets under ordinary attribute names (D25)
+- Plan text is untrusted: it goes in a fenced user message with `<>&` escaped, agents have no tools, and code renders the PR comment, escaping free text, stripping URLs, mentions and the sticky marker, and building doc links from `doc_id` only
+- "No findings" never means approval, and the comment says so; any failure posts "not reviewed" for that commit instead of leaving an older result standing
 
 ## Review service internals
 
@@ -179,7 +193,7 @@ Containerfile
 - **C# 15 usage**: unions and `closed` records for internal models such as `Evidence` and agent outcomes; the JSON contracts don't change. `Evidence` uses `JsonUnionTypeStructuralClassifier`, because the default classifier can't tell two object cases apart. The schema generated from a union is looser than `finding.schema.json`, so findings are still validated against the contract
 - **Auth**: `DefaultAzureCredential` everywhere: `az login` locally, OIDC in CI, managed identity in Azure; key auth disabled on Foundry and Cosmos
 - **LLM client**: `OpenAIClient` with `BearerTokenPolicy` (scope `https://ai.azure.com/.default`) on the resource's `/openai/v1/` endpoint, exposed as `IChatClient`; no `Azure.AI.OpenAI` package. That constructor is experimental, so `OPENAI001` is suppressed for it
-- **Config**: `appsettings.json` and environment for the service; `.tf-review.yml` per repo for enabled agents, thresholds, gate mode and the `tf-standards` commit
+- **Config**: `appsettings.json` and environment for the service; `.tf-review.yml` per repo for enabled agents, thresholds, gate mode and the `tf-standards` commit, read from the PR's base commit (D27)
 - **Observability**: OpenTelemetry traces and metrics to App Insights: tokens, cached tokens, latency and cost per agent call, findings per agent, evidence-check drops
 - **PR output**: one sticky comment per PR (hidden marker), rewritten on each push: verdict line, monthly cost delta, a table by severity, collapsible details per resource with links to the cited `tf-standards` docs at the pinned commit
 - **Check run** `tf-review`: neutral in advisory mode, failure only for opted-in blocking findings; a failed review reports itself with a link to the logs and never blocks in advisory mode
@@ -190,7 +204,7 @@ Three public repos under `gergodrazsdik`, developed side by side; the reviewer o
 
 | Repo | Role | Key contents |
 | --- | --- | --- |
-| `tf-review` | The product: reviewer service, agents, reusable workflow, its own infra | `src/`, `action/`, `.github/workflows/tf-review.yml`, `infra/`, `bootstrap/`, `test/fixtures/`, `plugin/` |
+| `tf-review` | The product: reviewer service, agents, reusable workflow, its own infra | `src/`, `.github/workflows/tf-review.yml`, `infra/`, `bootstrap/`, `tests/fixtures/`, `plugin/` |
 | `tf-review-demo` | GitHub template repo for any TF project adopting the reviewer | Sample TF, `.tf-review.yml`, plan/apply workflows, `docs/adr/`, seeded bad-PR branches |
 | `tf-standards` | Org standards corpus for RAG and policy enforcement | ADRs, policies (Markdown + Rego side by side), design docs, indexing workflow |
 
@@ -201,22 +215,24 @@ tf-review/
   src/                # .NET 11 solution: CLI, API, worker
   tests/              # TUnit projects; tests/fixtures: plan JSON + expected findings
   prompts/            # versioned agent prompts
-  action/             # composite action: plan, verify image, review or submit
   plugin/             # Claude Code plugin: conventions skill + hooks (M4)
   docs/               # plan.md, contracts/ (JSON Schemas)
   Containerfile
   .github/workflows/
     tf-review.yml     # on: workflow_call
     ci.yml            # lint, test, e2e
-    release.yml       # image build, scan, sign, push on v* tags
+    release.yml       # image build, scan, sign, push on image-v* tags
+    dev-image.yml     # signed tf-review-dev image, on dispatch
+    infra.yml         # plan infra/ on PR, apply on main behind prod
 ```
 
 **Contracts owned by `tf-review`** (versioned with tags, JSON Schema where possible)
 
-1. Reusable workflow inputs and outputs (`tool`, `working-directory`, `config-path`, `mode`)
+1. Reusable workflow inputs and outputs (`working-directory`, `config-path`, `image`; `tool` from M2; gate mode comes from the config's `gate.mode`)
 2. `.tf-review.yml` schema: enabled agents, severity thresholds, gate mode, standards source
-3. Finding schema: resource address, severity, evidence (plan pointer or doc ID), suggestion, agent
-4. Corpus frontmatter schema: `id`, `type`, `status`, `superseded_by`, `applies_to`, `severity`, `rego`
+3. Finding schema: resource address, severity, evidence (an address-keyed plan pointer and a doc ID), suggestion, agent
+4. Corpus frontmatter schema: `id`, `type`, `status`, `superseded_by`, `applies_to`, `topics`, `severity`, `rego`
+5. Review result schema (M1): verdict, findings, `not_reviewed` slices and evidence-check drop counts
 
 During tandem development the demo repo calls the workflow at a feature branch (`@feat/x`) and repins to a tag after merge.
 
@@ -263,7 +279,9 @@ gh repo edit gergodrazsdik/tf-standards --template
 | `just plan <dir>` | `tf-review`, `tf-review-demo` | `tofu init`, `plan -out`, `show -json`, then canonicalize and redact |
 | `just cost <plan.json>` | `tf-review`, `tf-review-demo` | `infracost scan <plan.json> --json` with the token read from pass for that run only and `SSH_AUTH_SOCK` unset |
 | `just review <plan.json>` | `tf-review` | Runs the reviewer console app locally on one plan |
-| `just e2e` | `tf-review` | Plans the demo fixtures, reviews them, asserts the expected findings; the Claude Code Stop hook runs it |
+| `just e2e` | `tf-review` | Replays recorded model responses over the committed fixtures and asserts the expected findings; offline, no Azure and no token spend, so the Claude Code Stop hook can run it |
+| `just e2e-live` | `tf-review` | Runs the committed fixtures against the real model N times and asserts on `review-result.json`; manual and CI only |
+| `just fixtures` | `tf-review` | Plans each seeded branch in a worktree and commits only the redacted output to `tests/fixtures/`; you run it |
 | `just bootstrap-plan` / `bootstrap-apply` / `bootstrap-migrate` | `tf-review` | The bootstrap project with your `az login`; apply and migrate ask first |
 | `just secrets-sync` | `tf-review` | Copies pass entries into Actions secrets and Key Vault; you run it, never an agent |
 | `just policy-test` | `tf-standards` | `opa fmt --fail`, `conftest verify`, frontmatter schema check |
@@ -296,7 +314,7 @@ claude *args:
 
 | pass entry | Used locally by | Reaches CI or Azure via |
 | --- | --- | --- |
-| `tf-review/infracost/cli-token` | `just cost` runs, exported as `INFRACOST_CLI_AUTHENTICATION_TOKEN` | M1–M2: `just secrets-sync` → Actions secret per onboarded repo; M3: Key Vault, repo secrets removed |
+| `tf-review/infracost/cli-token` | `just cost` runs, exported as `INFRACOST_CLI_AUTHENTICATION_TOKEN` | M2: `just secrets-sync` → Actions secret per onboarded repo; M3: Key Vault, repo secrets removed |
 | `tf-review/github/bootstrap-token` | `just bootstrap-*` (github provider: Actions variables, `prod` environment) | Never leaves the machine |
 | `tf-review/github-app/private-key` (M3) | Local runs of the review service | `just secrets-sync` → Key Vault |
 
@@ -319,14 +337,15 @@ One storage account holds every repo's state, created once by a bootstrap projec
 | --- | --- | --- |
 | Plan | `repo:<owner>@<owner-id>/<repo>@<repo-id>:pull_request` | Reader on the target scope, Blob Data Contributor on its own state container |
 | Apply | `repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:prod` | Write on the target scope, gated by environment approval |
+| Review (M1–M2) | `repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:review` | Cognitive Services OpenAI User on the Foundry resource group; nothing else (D21, D24) |
 | Reviewer submit (M3) | Customised subject incl. `job_workflow_ref` | Call the review API only |
 
 **Reviewer infrastructure** (`tf-review/infra`; Foundry from M1, the rest from M3)
 
 | Resource | Purpose | Tier | From |
 | --- | --- | --- | --- |
-| Azure OpenAI in Foundry | gpt-5.4-mini Data Zone deployment; later the stronger model and `text-embedding-3-small` | Pay-as-you-go, key auth disabled | M1 |
-| Role assignments | Cognitive Services OpenAI User for each onboarded repo's plan identity (M1–M2) and the service identity (M3) | — | M1 |
+| Azure OpenAI in Foundry | gpt-5.4-mini Data Zone deployment; later gpt-6.1-sol and `text-embedding-3-small` | Pay-as-you-go, key auth disabled | M1 |
+| Role assignments (in bootstrap, D24) | Cognitive Services OpenAI User at resource group scope for each onboarded repo's review identity (M1–M2) and the service identity (M3) | — | M1 |
 | Cosmos DB for NoSQL | Vectors, review history, result cache, feedback | Free tier (1,000 RU/s, 25 GB), key auth disabled | M3 |
 | Storage account | Review queue and redacted plans (lifecycle rule deletes after 7 days) | Standard LRS | M3 |
 | Container Apps | Review API (scale to zero) and the queue-scaled review job | Consumption-only environment, public ingress | M3 |
@@ -354,7 +373,7 @@ Retrieval filters on metadata first and uses vectors second; every prompt is cut
 
 **Retrieval per agent**
 
-1. Filter by `applies_to` (resource types in the agent's slice), `status` and `scope`
+1. Filter by the agent's `topics`, `applies_to` (resource types in the agent's slice), `status` and `scope`
 2. M1–M2: include whole matching docs; M3: vector or hybrid ranking within the filtered set
 3. Stop at a per-agent token cap, deduplicated by doc ID
 
@@ -366,8 +385,8 @@ Retrieval filters on metadata first and uses vectors second; every prompt is cut
 
 **Caching**
 
-- Prompt layout, most static first: common preamble → condensed diff → agent instructions → retrieved chunks → scanner findings
-- The orchestrator runs first and warms the cache; the specialist agents then run in parallel
+- Prompt layout, most static first: system message with the common preamble, agent instructions and retrieved chunks; user message with scanner findings and the condensed diff, which keeps untrusted text out of the instructions
+- The specialist agents run in parallel after the orchestrator; prefixes are shared per agent across re-pushes, because slices differ between agents
 - Canonical JSON, deterministic redaction placeholders, chunks sorted by doc ID, no timestamps or IDs in the prefix
 - Result cache in Cosmos keyed on `hash(resource change + agent + prompt version + corpus_version)`; unchanged resources are skipped on re-push
 - Log `cached_tokens` per agent call to App Insights
@@ -378,12 +397,22 @@ A consumer repo adopts the reviewer with one `uses:` line; plan runs on every PR
 
 **Reusable workflow `tf-review.yml` (PR path)**
 
-1. `azure/login` via OIDC with the repo's plan identity
-2. `setup-opentofu` at the version in `.tf-review.yml` (or Terraform per D1); provider cache keyed on `.terraform.lock.hcl`; `init -lockfile=readonly`
-3. `plan -out`, then `show -json`
-4. Pull the review image by digest and `cosign verify` it against `tf-review`'s release workflow identity
-5. M1–M2: run `tfreview review plan.json` from the image (redaction, Checkov, conftest, Infracost, agents) and post the sticky comment with `GITHUB_TOKEN`; the plan identity holds Cognitive Services OpenAI User on the Foundry resource
-6. M3: run `tfreview submit plan.json` instead; the API answers `202`, and the GitHub App posts the comment and the check run
+Both jobs skip fork PRs inside the reusable workflow, so the guard can't be lost in a caller. The caller grants `contents: read`, `id-token: write` and `pull-requests: write`; only the review job uses the last one. A `concurrency` group per PR cancels superseded reviews.
+
+Plan job (runs PR code, holds the plan identity):
+
+1. Pull the review image by digest and `cosign verify` it, before any PR code runs
+2. Azure auth via OIDC with the repo's plan identity
+3. `setup-opentofu` at the version in `.tf-review.yml` (or Terraform per D1); provider cache keyed on `.terraform.lock.hcl`; `init -lockfile=readonly`
+4. `plan -out`, then `show -json`
+5. `tfreview redact plan.json`, upload only the redacted plan (1-day retention), and delete the raw JSON
+
+Review job (no PR code, `review` environment, holds the review identity; not a required check, with `timeout-minutes` set):
+
+1. Download the redacted plan and treat it as untrusted; read `.tf-review.yml` from the base commit
+2. M1–M2: run `tfreview review` from the image (conftest, agents; Checkov and Infracost from M2) with a GitHub OIDC token mounted for `DefaultAzureCredential`, since the image has no `az`
+3. `tfreview publish` posts the sticky comment and the step summary with `GITHUB_TOKEN`, including "not reviewed" when anything failed
+4. M3: run `tfreview submit` instead; the API answers `202`, and the GitHub App posts the comment and the check run
 
 **Apply path (consumer workflow)**
 
@@ -395,11 +424,11 @@ A consumer repo adopts the reviewer with one `uses:` line; plan runs on every PR
 
 - Third-party actions pinned to full commit SHAs with `pinact`; a `lint` job runs `just lint` (which includes `actionlint`) and, where a repo has OpenTofu code, `just validate`
 - Require approval for workflow runs from outside collaborators; never `pull_request_target`
-- No plan files as artifacts; mark sensitive variables `sensitive` so logs stay clean
+- No raw plan files as artifacts or in PR comments; the only plan artifact is the redacted one with 1-day retention (D21); mark sensitive variables `sensitive` so logs stay clean
 - Rulesets from `.github/rulesets/main.json` (see Setup); the review check stays advisory until M4
 - `tf-review-demo` and `tf-standards` are template repositories
 - Repos are public, so other repos call `tf-review`'s reusable workflow without extra access settings
-- Infracost: in M1–M2 the token reaches each onboarded repo as the `INFRACOST_CLI_AUTHENTICATION_TOKEN` secret via `just secrets-sync`; from M3 only the service holds it (Key Vault) and the repo secrets are removed. Plugins are baked into the image, so nothing downloads at run time
+- Infracost: in M2 the token reaches each onboarded repo as the `INFRACOST_CLI_AUTHENTICATION_TOKEN` secret via `just secrets-sync`; from M3 only the service holds it (Key Vault) and the repo secrets are removed. Plugins are baked into the image, so nothing downloads at run time
 
 ## Milestones
 
@@ -407,10 +436,10 @@ A consumer repo adopts the reviewer with one `uses:` line; plan runs on every PR
 flowchart TB
   M0["M0 · Foundations<br/>repos, scaffolding, bootstrap, state, OIDC"]
   G0{{"Gate: a demo PR applies after approval"}}
-  M1["M1 · MVP in the runner<br/>redaction, conventions agent + arbiter,<br/>Foundry + gpt-5.4-mini, image on GHCR"]
-  G1{{"Gate: C5 and C6 found, C8 clean"}}
+  M1["M1 · MVP in the runner<br/>redaction, conftest, conventions agent,<br/>Foundry + gpt-5.4-mini, image on GHCR"]
+  G1{{"Gate: C5, C6, C9 found, C8, C10 clean, 3 of 3"}}
   M2["M2 · Full board<br/>orchestrator, security + cost agents,<br/>Checkov, conftest, Infracost, eval suite in CI"]
-  G2{{"Gate: C1–C8 run in CI, baseline recorded"}}
+  G2{{"Gate: C1–C10 run in CI, baseline recorded"}}
   M3["M3 · Central service<br/>Cosmos, queue, Container Apps, Key Vault,<br/>GitHub App, async API"]
   G3{{"Gate: demo reviewed via the service"}}
   M4["M4 · Hardening<br/>result cache, map-reduce, feedback loop,<br/>opt-in blocking, Claude Code plugin"]
@@ -435,25 +464,57 @@ M1 is deliberately thin: one agent and one Azure resource (Foundry with gpt-5.4-
 
 **M1 · MVP in the runner**
 
-- [ ] `TfReview.Core`: condense, canonicalize, redact, with a redaction fixture full of fake secrets
-- [ ] `infra/` v0: Foundry resource (key auth off), gpt-5.4-mini Data Zone deployment, role for the demo's plan identity
-- [ ] `Containerfile` and `just image`; `release.yml` builds, scans, signs and pushes to GHCR
-- [ ] Reusable workflow v0: plan, verify image, `tfreview review`, sticky comment
-- [ ] Conventions agent and arbiter; `FileRetriever` over `tf-standards` at a pinned commit; evidence check
-- [ ] Seeded cases C5, C6, C8 as branches in `tf-review-demo`; their plan fixtures in `tf-review`
-- [ ] `just e2e` and the Claude Code Stop hook
-- [ ] Gate: C5 and C6 found with citations, C8 stays clean
+Work runs in this order, so unknowns surface first and a real comment lands before the agent exists. Steps marked **you** can only be run by you.
+
+*1. Prove the unknowns*
+
+- [x] **You:** check the `Microsoft.CognitiveServices` provider registration, the gpt-5.4-mini model version, and that the bootstrap token reaches `tf-review` (2026-11-01)
+- [ ] Bootstrap PR: `tf-review` map entry, review identity and `review` environment per repo, LLM role at resource group scope, endpoint and deployment variables, deployer data access to repo state containers if `just plan` needs it. **You:** `bootstrap-plan`, `bootstrap-apply`
+- [ ] `infra/` v0 and `infra.yml`: Foundry resource (key auth off), gpt-5.4-mini `2026-03-17` Data Zone deployment with low TPM as the hard spend cap. **You:** approve `prod`
+- [ ] Live smoke test: a real call through `OpenAIClient` with the flat strict schema, and the same from inside a container with a federated token file. If either fails, revisit the wire schema or auth before building on them
+
+*2. Solution and contracts*
+
+- [ ] Solution skeleton: `global.json`, `.slnx` written by hand, central packages, `UseArtifactsOutput`; projects Core, Scanners, Rag, Agents, GitHub, Cli and their tests; `just test`, `just lint-dotnet`, a CI job running the full `dotnet test` and `dotnet format`
+- [ ] Contract PRs: address-keyed pointers and the corrected `finding.json` example (its `deterministic: true` needs a scanner-sourced finding); `topics` in corpus frontmatter, in both repos and on every existing doc; review result schema; config schema text and defaults for M1, where only `conventions` exists
+
+*3. Walking skeleton: first real comment*
+
+- [ ] `tfreview` stub that posts counts only, no plan content; `Containerfile` with conftest and `just image`
+- [ ] `release.yml` and `dev-image.yml`; PR CI builds and smoke-tests the image without pushing. **You:** tag `image-v0.0.1`, make the package public once, merge the digest PR
+- [ ] Reusable workflow v0 with both jobs, inline with no composite action (a called workflow's `./` resolves to the caller). **You:** tag `v0.0.1`
+- [ ] Demo: `plan.yml` becomes the caller, losing the raw plan comment and `--edit-last`, which would overwrite the sticky comment; add `.tf-review.yml`. **You:** re-apply the ruleset, because the required `plan` context likely gets renamed and would otherwise block every PR
+
+*4. Deterministic core*
+
+- [ ] `TfReview.Core`: canonical JSON (ordinal key sort, raw number text, duplicate keys refused, `timestamp` dropped)
+- [ ] Redaction fixtures with canaries built at test time and a manifest of location classes, then `PlanRedactor` (D25): keep only `resource_changes` and `output_changes`; apply marks and the name denylist; sweep marked values from every raw section, including base64 and URL forms; re-scan and refuse on a hit. Per-resource ordinal placeholders. Disabling any layer must fail a test
+- [ ] `PlanCondenser` and pointers: sort by address, drop no-ops, prune to top-level attributes but keep changed ones whole, and always keep `name`, `tags` and nulls, or C8 looks tag-less and C5's pointer dies
+- [ ] `TfReview.Scanners`: conftest runner over the redacted, uncondensed plan, with `--all-namespaces` and a failure if results show only `main`, since otherwise it reports a clean run without evaluating anything; a test that conftest denies match on raw and redacted C5, C6 and C8
+
+*5. Agent and output*
+
+- [ ] `GitHubTarballSource` (size cap, path traversal guard) and `LocalDirSource`; `FileRetriever` with topics, `applies_to` and an 8k token cap that omits whole docs and reports them
+- [ ] Versioned prompts, with a test that fails if a prompt changes without a version bump; conventions agent, wire-to-finding mapping, the one-retry rule, and separate handling of 429, 5xx, content filter and timeout
+- [ ] `EvidenceChecker` and `RuleArbiter` behind `IArbiter`
+- [ ] Comment renderer and sanitiser, including "not reviewed"; tokens, cost and latency in the step summary (App Insights arrives in M3; no check run until M3)
+
+*6. Evaluation and gate*
+
+- [ ] Seeded branches as draft PRs, each changing one thing so they stay mergeable: `seed/c5-missing-tags`, `seed/c6-bad-name`, `seed/c8-tag-value`, `seed/c9-bad-environment`, `seed/c10-subnet`. C5 and C6 add new resources, because renaming an existing one likely forces replacement. **You:** `just fixtures`, committing redacted output only
+- [ ] `just e2e` (replay, and **you** add it as the Stop hook, because `.claude/settings.json` is write-protected) and `just e2e-live`
+- [ ] Gate: 3 of 3 `just e2e-live` runs per case: C5, C6 and C9 found with exact address, rule and citation; C8 and C10 `reviewed` with no findings, where `not_reviewed` fails; plus one real PR with a sticky comment. Agent findings are asserted before any conftest backstop
 
 **M2 · Full board**
 
 - [ ] One-day spike: cost delta via Infracost v2's diff against a main-branch baseline vs pricing `prior_state` ourselves; decide on case C4
-- [ ] Orchestrator, security and cost agents; Checkov, conftest and Infracost inside the image
-- [ ] Dedupe and severity rules in code; structured output enforced
+- [ ] Orchestrator, security and cost agents, and the LLM arbiter (D20); Checkov and Infracost inside the image
+- [ ] Dedupe rules in code
 - [ ] Prompt-cache layout; `cached_tokens` logged per call
 - [ ] Seeded cases C1–C4 and C7; eval suite in CI with the baseline recorded
-- [ ] Stronger model deployed if quota is granted; models set per agent
+- [ ] gpt-6.1-sol deployed for security and arbiter, and gpt-6-luna compared with gpt-5.4-mini on the eval suite, if quota is granted; each new model first passes the structured output smoke test, because Microsoft's supported list stops at the GPT-5.1 generation; models set per agent
 - [ ] Terraform support through the `tool` input (D1)
-- [ ] Gate: C1–C8 run in CI, baseline recorded
+- [ ] Gate: C1–C10 run in CI, baseline recorded
 
 **M3 · Central service**
 
@@ -498,11 +559,13 @@ A catalogue of seeded bad changes in `tf-review-demo` is both the template's tea
 | C6 | Resource name breaks the naming convention | Low: cites the naming ADR | Conventions |
 | C7 | Change forces replacement of a database | High: destructive change flagged first | Orchestrator + arbiter |
 | C8 | Clean change (tag value update) | No findings | All |
+| C9 | `environment = "production"`, which ADR-002 forbids but the Rego doesn't catch | Medium: cites the tagging ADR, found by the LLM alone | Conventions |
+| C10 | New `azurerm_subnet`, a near miss with no `tags` | No findings | All |
 
 **Metrics tracked per run**
 
-- Recall per agent on C1–C7; false-positive count on C8
-- Share of findings with valid evidence (plan pointer or accepted doc ID)
+- Recall per agent on C1–C7 and C9; false-positive count on C8 and C10
+- Share of findings with valid evidence (plan pointer and accepted doc ID)
 - Tokens, cost and latency per PR; cache hit rate per agent
 - M3 only: vector retrieval vs metadata-only baseline on the same cases
 
@@ -525,7 +588,7 @@ Expected spend is about $5–30/month at roughly 100 PRs, almost all of it LLM t
 
 | Risk | Mitigation |
 | --- | --- |
-| No model quota after PAYG conversion | Checked: Data Zone gpt-5.4-mini (200K TPM) and text-embedding-3-small are available; request a stronger model before M2 |
+| No model quota after PAYG conversion | Checked: Data Zone gpt-5.4-mini (200K TPM) and text-embedding-3-small are available; request gpt-6.1-sol and gpt-6-luna before M2 |
 | Hallucinated findings | Evidence required per finding; arbiter drops unsupported ones; never blocks on LLM output alone |
 | Secrets leaking via plan JSON or public logs | Redact before any LLM call; no plan artifacts; `sensitive` variables |
 | Large PRs blow context and cost | Diff-only input, per-agent slices, token caps, map-reduce with risk-first ordering |
@@ -538,6 +601,11 @@ Expected spend is about $5–30/month at roughly 100 PRs, almost all of it LLM t
 | Policy tests pass but enforcement differs | Rego unit tests run in `conftest verify`, the same OPA build that enforces them; tofu, conftest and Checkov pinned to the same versions locally and in CI. Standalone `opa` runs only `opa fmt` and `opa check` and can be ahead of conftest's bundled OPA (1.22.0 vs 1.21.1 on 2026-11-01) |
 | .NET 11 is an STS release, and M1 starts on an RC | GA is scheduled for 2026-11-10; SDK and base image are pinned and moved together after GA; move to the next LTS before support ends |
 | Dependencies not built for .NET 11 | Agent Framework, Microsoft.Extensions.AI, Azure.Identity, TUnit and others ship no `net11.0` assets yet and run from their `net10.0` builds. A spike passed on 2026-11-01, but with a stub chat client, so the first real model call in M1 must confirm it, including that Azure accepts the generated schema |
+| Unmarked secret reaches the model or a public comment | D25 only catches marked values and denylisted names, so a secret under an ordinary name passes. Comments render only code-controlled fields and escaped text; tighten the policy if a real miss appears, accepting new prompts and goldens |
+| Branch push equals the plan identity | PR code in the plan job can mint its token and overwrite state, because that identity has Blob Data Contributor. D21 keeps LLM credentials away from it, but anyone who can edit the workflow gets both. Fork PRs are skipped; repos document who has write access |
+| Prompt injection in plan text | A tag value can suppress a finding or plant text. Agents have no tools, severity is set by code, conftest backstops the Rego-covered cases, and the comment is sanitised; the comment states that no finding isn't approval |
+| Foundry outage, quota or retired model | The review job isn't a required check, has a timeout and posts "not reviewed" for that commit; the model version is pinned |
+| M1 gate passes by luck | 3 of 3 is weak evidence: a model with mediocre recall can pass. C9 and C10 make it harder to fake, and M2's baseline replaces it before anything depends on the numbers |
 | Scope creep | Milestone gates above; anything else goes to a later backlog |
 
 **Sources**
@@ -578,7 +646,7 @@ This plan is `tf-review/docs/plan.md`. Sessions update it in the same PR wheneve
 - **CLAUDE.md per repo**: purpose, which `just` recipes to run (`lint`, `test`, `plan`, `e2e`), pointer to the contracts; kept short
 - **`.claude/rules/` with path globs**: OpenTofu conventions for `**/*.tf`, C# for `src/**`, Rego for `**/*.rego`
 - **Sandbox on per repo** via `.claude/settings.local.json`, as in your other projects; user settings exclude `tofu`, `az` and `just bootstrap-*`, which need `~/.azure`, and allowlist `registry.opentofu.org`. Provider and TFLint plugins can't start in the sandbox, so `just validate` runs outside it, one approved command at a time. `dotnet test` and workspace `dotnet format` can't run inside it either: typed bare they run outside with a prompt, but piped or started from a recipe they fail. A plain `dotnet build` of a solution also hangs inside it on SDK 11, so sandboxed recipes pass `-m:1`
-- **Stop hook in `tf-review`** runs `just e2e`
+- **Stop hook in `tf-review`** runs `just e2e`, the offline replay: it fires every turn, so a live run could cost tens of dollars a month and send Claude chasing flakes
 - **`permissions.deny`**: `tofu apply`, `terraform apply`, `tofu state rm`, `az * delete`; Claude plans, CI applies, and `just bootstrap-apply` and `just secrets-sync` stay yours
 - **Lint hook**: `claude-lint-hook` runs `tofu fmt` on `.tf` files, so the agent, lefthook and CI agree
 - **Plan mode** for changes spanning two repos; the plan file survives compaction
