@@ -11,5 +11,18 @@
       "Bash(just bootstrap-migrate*)",
       "Bash(just secrets-sync*)"
     ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && { jq -e .stop_hook_active >/dev/null && exit 0; just e2e >&2 || exit 2; }",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
   }
 }
