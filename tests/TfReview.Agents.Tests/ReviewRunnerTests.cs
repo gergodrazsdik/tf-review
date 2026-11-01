@@ -60,7 +60,9 @@ public class ReviewRunnerTests
             {"msg":"high","metadata":{"details":{"address":"a.z","doc_id":"POL-001","severity":"high"}}}]}]
             """;
 
-        var result = await Run(Plan, Config, Output);
+        var plan = TestPlans.Json(TestPlans.Create("a.a", "a", """{"name":"x"}"""), TestPlans.Create("a.z", "a", """{"name":"y"}"""));
+
+        var result = await Run(plan, Config, Output);
 
         await Assert.That(result.Findings[0].Severity).IsEqualTo(Severity.High);
     }
@@ -169,17 +171,5 @@ public class ReviewRunnerTests
     {
         public Task FetchAsync(TfReviewConfig config, string targetDirectory, CancellationToken cancellationToken = default) =>
             throw new StandardsFetchException("Downloading the standards failed.");
-    }
-
-    private sealed class FakeProcesses(string output) : IProcessRunner
-    {
-        public string? PlanSeen { get; private set; }
-
-        public async Task<ProcessResult?> RunAsync(
-            string program, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken = default)
-        {
-            PlanSeen = await File.ReadAllTextAsync(arguments[^1], cancellationToken);
-            return new ProcessResult(1, output);
-        }
     }
 }

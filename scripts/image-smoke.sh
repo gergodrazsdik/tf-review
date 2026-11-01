@@ -35,6 +35,16 @@ jq -e --arg commit "$commit" --arg pointer "$pointer" '
   and .not_reviewed[0].scope == "conventions"
 ' "$work/result.json"
 
+# With a model configured that can't be reached, the prompt still has to load from the image and the
+# real corpus has to parse, and the failure has to become a "not reviewed" next to the policy findings.
+run -e TF_REVIEW_OPENAI_ENDPOINT=https://127.0.0.1:9/openai/v1/ -e TF_REVIEW_OPENAI_DEPLOYMENT=smoke -e HOME=/tmp \
+  "$image" review /work/redacted.json /work/config.yml /work/no-model-result.json "$commit"
+jq -e '
+  .verdict == "findings"
+  and .findings[0].agent == "scanner"
+  and .not_reviewed[0] == {"scope": "conventions", "reason": "unavailable"}
+' "$work/no-model-result.json"
+
 # A plan the redactor refused has to come out as a refusal, not a clean result.
 echo '{"refused":true}' >"$work/refused.json"
 chmod 666 "$work/refused.json"

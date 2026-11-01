@@ -136,6 +136,18 @@ public sealed record TokenUsage(
     [JsonPropertyName("cached_input_tokens")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public long? CachedInputTokens { get; init; }
+
+    [JsonPropertyName("model")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Model { get; init; }
+
+    [JsonPropertyName("calls")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Calls { get; init; }
+
+    [JsonPropertyName("latency_ms")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? LatencyMs { get; init; }
 }
 
 /// <summary>The outcome of one review, as docs/contracts/review-result.schema.json defines it.</summary>
@@ -150,6 +162,18 @@ public sealed record ReviewResult(
     [JsonPropertyName("standards_commit")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? StandardsCommit { get; init; }
+
+    [JsonPropertyName("standards_repository")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? StandardsRepository { get; init; }
+
+    [JsonPropertyName("doc_paths")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyDictionary<string, string>? DocPaths { get; init; }
+
+    [JsonPropertyName("omitted_docs")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? OmittedDocs { get; init; }
 
     [JsonPropertyName("usage")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

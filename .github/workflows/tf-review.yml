@@ -23,6 +23,8 @@ on:
     secrets:
       AZURE_CLIENT_ID_PLAN:
         required: true
+      AZURE_CLIENT_ID_REVIEW:
+        required: true
       AZURE_TENANT_ID:
         required: true
       AZURE_SUBSCRIPTION_ID:
@@ -137,6 +139,7 @@ jobs:
       cancel-in-progress: true
     permissions:
       contents: read
+      id-token: write
       pull-requests: write
     env:
       COMMIT: ${{ github.event.pull_request.head.sha }}
@@ -160,12 +163,32 @@ jobs:
           mkdir -p "$work"
           gh api -H 'Accept: application/vnd.github.raw+json' \
             "repos/$GITHUB_REPOSITORY/contents/$CONFIG_PATH?ref=$BASE_SHA" >"$work/config.yml"
+      # The image has no az, so DefaultAzureCredential uses workload identity through this file. If this
+      # fails, the agent reports "not reviewed" and the policy findings still get posted.
+      - name: Get a federated token
+        continue-on-error: true
+        run: |
+          install -m 600 /dev/null "$RUNNER_TEMP/federated-token"
+          token=$(curl -fsS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r .value)
+          echo "::add-mask::$token"
+          printf '%s' "$token" >"$RUNNER_TEMP/federated-token"
       - name: Review
         continue-on-error: true
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID_REVIEW }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          TF_REVIEW_OPENAI_ENDPOINT: ${{ vars.TF_REVIEW_OPENAI_ENDPOINT }}
+          TF_REVIEW_OPENAI_DEPLOYMENT: ${{ vars.TF_REVIEW_OPENAI_DEPLOYMENT }}
         run: |
           work="$RUNNER_TEMP/tf-review"
           mkdir -p "$work"
+          touch "$RUNNER_TEMP/federated-token"
           docker run --rm --read-only --tmpfs /tmp --user "$(id -u):$(id -g)" -v "$work:/work" \
+            -e HOME=/tmp -e AZURE_CLIENT_ID -e AZURE_TENANT_ID \
+            -e AZURE_FEDERATED_TOKEN_FILE=/run/federated-token \
+            -e TF_REVIEW_OPENAI_ENDPOINT -e TF_REVIEW_OPENAI_DEPLOYMENT \
+            -v "$RUNNER_TEMP/federated-token:/run/federated-token:ro" \
             "$IMAGE" review /work/redacted.json /work/config.yml /work/result.json "$COMMIT"
       - name: Publish
         if: ${{ !cancelled() }}
@@ -177,4 +200,8 @@ jobs:
           mkdir -p "$work"
           docker run --rm --read-only --tmpfs /tmp --user "$(id -u):$(id -g)" -v "$work:/work" \
             -e GITHUB_TOKEN -e GITHUB_REPOSITORY -e GITHUB_API_URL -e PR_NUMBER \
+            -e GITHUB_STEP_SUMMARY=/work/summary.md \
             "$IMAGE" publish /work/result.json /work/redacted.json "$COMMIT"
+          if [ -f "$work/summary.md" ]; then
+            cat "$work/summary.md" >>"$GITHUB_STEP_SUMMARY"
+          fi

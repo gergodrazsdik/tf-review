@@ -234,7 +234,7 @@ tf-review/
 2. `.tf-review.yml` schema: enabled agents, severity thresholds, gate mode, standards source
 3. Finding schema: resource address, severity, evidence (an address-keyed plan pointer, and a doc ID when no scanner backs the finding), suggestion, agent (`scanner` when no LLM agent reported it)
 4. Corpus frontmatter schema: `id`, `type`, `status`, `superseded_by`, `applies_to`, `topics`, `severity`, `rego`
-5. Review result schema (M1): verdict, findings, `not_reviewed` slices and evidence-check drop counts
+5. Review result schema (M1): verdict, findings, `not_reviewed` slices, evidence-check drop counts, docs left out by the token cap, and the paths comments link to
 
 During tandem development the demo repo calls the workflow at a release candidate tag on the feature branch (`v0.0.1-rc.1`), pinned by SHA, and repins to the release tag after merge. It can't use `@feat/x`, because `pinact` needs a SHA and a version comment, and the required check is `tf-review / plan`.
 
@@ -503,7 +503,7 @@ Work runs in this order, so unknowns surface first and a real comment lands befo
 - [x] `EvidenceChecker` and `RuleArbiter` behind `IArbiter`
 - [x] Comment renderer and sanitiser, including "not reviewed": untrusted text goes in inline code spans, where GitHub parses no markdown, mentions or links
 - [x] Wire redaction, conftest and the comment into the CLI, so a PR gets real policy findings before the agent exists; the review job re-runs the redactor on the untrusted artifact
-- [ ] Tokens, cost and latency in the step summary (App Insights arrives in M3; no check run until M3)
+- [x] Tokens, cost and latency in the step summary (App Insights arrives in M3; no check run until M3). Cost is an estimate from third-party listings of the Data Zone rate, $0.825 in, $0.0825 cached and $4.95 out per million, until M2 measures it
 
 *6. Evaluation and gate*
 

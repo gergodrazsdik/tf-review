@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using TfReview.Core;
 
 namespace TfReview.GitHub;
@@ -8,7 +9,7 @@ namespace TfReview.GitHub;
 /// Renders the PR comment. Everything from a plan or a finding is shown through <see cref="Code"/>, because
 /// that text comes from the PR: a resource name could otherwise hold an image, a link or a mention.
 /// </summary>
-public static class CommentRenderer
+public static partial class CommentRenderer
 {
     public const string Marker = "<!-- tf-review -->";
 
@@ -31,12 +32,17 @@ public static class CommentRenderer
         if (result.Findings.Count > 0)
         {
             comment.AppendLine();
-            AppendFindings(comment, result.Findings);
+            AppendFindings(comment, result);
         }
 
         foreach (var missing in result.NotReviewed)
         {
             comment.AppendLine().AppendLine($"Not reviewed: {Name(missing.Scope)} ({Name(missing.Reason)}).");
+        }
+
+        if (result.OmittedDocs is { Count: > 0 } omitted)
+        {
+            comment.AppendLine().AppendLine($"Not checked, too large for the prompt: {string.Join(", ", omitted.Select(Code))}.");
         }
 
         return comment
@@ -80,20 +86,39 @@ public static class CommentRenderer
         return $"{fence}{padded.Replace("|", "\\|", StringComparison.Ordinal)}{fence}";
     }
 
-    private static void AppendFindings(StringBuilder comment, IReadOnlyList<Finding> findings)
+    private static void AppendFindings(StringBuilder comment, ReviewResult result)
     {
-        comment.AppendLine("| Severity | Resource | Rule | Finding | Source |");
-        comment.AppendLine("| --- | --- | --- | --- | --- |");
+        var findings = result.Findings;
+        comment.AppendLine("| Severity | Resource | Rule | Finding | Suggestion | Source |");
+        comment.AppendLine("| --- | --- | --- | --- | --- | --- |");
         foreach (var finding in findings.Take(MaxRows))
         {
+            var suggestion = finding.Suggestion is null ? string.Empty : Code(finding.Suggestion);
             comment.AppendLine(
-                $"| {Name(finding.Severity)} | {Code(finding.ResourceAddress)} | {Code(finding.Rule)} | {Code(finding.Title)} | {Source(finding)} |");
+                $"| {Name(finding.Severity)} | {Code(finding.ResourceAddress)} | {Rule(finding, result)} | {Code(finding.Title)} | {suggestion} | {Source(finding)} |");
         }
 
         if (findings.Count > MaxRows)
         {
             comment.AppendLine().AppendLine($"{findings.Count - MaxRows} more finding(s) aren't shown.");
         }
+    }
+
+    /// <summary>
+    /// A link to the cited doc at the pinned commit, built only from values that match strict patterns,
+    /// so nothing from a plan can shape it. Anything else stays plain text in a code span.
+    /// </summary>
+    private static string Rule(Finding finding, ReviewResult result)
+    {
+        if (DocId().IsMatch(finding.Rule)
+            && result.StandardsRepository is { } repository && Repository().IsMatch(repository)
+            && result.StandardsCommit is { } commit && CommitSha().IsMatch(commit)
+            && result.DocPaths?.GetValueOrDefault(finding.Rule) is { } path && DocPath().IsMatch(path) && !path.Contains("..", StringComparison.Ordinal))
+        {
+            return $"[{finding.Rule}](https://github.com/{repository}/blob/{commit}/{path})";
+        }
+
+        return Code(finding.Rule);
     }
 
     private static string Headline(ReviewResult result) => result.Verdict switch
@@ -114,7 +139,12 @@ public static class CommentRenderer
         return $"Plan: {counts.ResourceChanges} resource change(s) ({string.Join(", ", actions)}).";
     }
 
-    private static string Source(Finding finding) => finding.Deterministic ? "policy" : "model";
+    private static string Source(Finding finding) => finding switch
+    {
+        { Deterministic: false } => "model",
+        { Agent: Reporter.Scanner } => "policy",
+        _ => "policy and model",
+    };
 
     private static string Name(Severity severity) => severity switch
     {
@@ -162,4 +192,16 @@ public static class CommentRenderer
 
         return longest;
     }
+
+    [GeneratedRegex("^(ADR|POL|DES)-[0-9]{3}$")]
+    private static partial Regex DocId();
+
+    [GeneratedRegex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")]
+    private static partial Regex Repository();
+
+    [GeneratedRegex("^[0-9a-f]{40}$")]
+    private static partial Regex CommitSha();
+
+    [GeneratedRegex("^[A-Za-z0-9_-][A-Za-z0-9_./-]*$")]
+    private static partial Regex DocPath();
 }
