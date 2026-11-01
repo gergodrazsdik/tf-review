@@ -4,4 +4,3 @@
 !Directory.Build.props
 !Directory.Packages.props
 !src/
-!scripts/install-ci-tools.sh

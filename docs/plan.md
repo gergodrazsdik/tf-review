@@ -45,6 +45,7 @@ Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET S
 - [ ] Before M2: get Data Zone Standard quota for gpt-6.1-sol and gpt-6-luna. The subscription is on Free Tier (checked 2026-11-01); Microsoft's Tier 1 table lists 100K TPM for both, and tiers rise automatically with usage and payment history, so re-check quota after M1's usage before filing the request form
 - [ ] Before gpt-5.4-mini retires (2027-09-21): move to a newer small model through the eval suite
 - [ ] After .NET 11 GA (scheduled 2026-11-10): install the GA SDK through `update-sources`, pin `global.json` to `11.0.100` without `allowPrerelease`, and re-pin the base image digest
+- [ ] After a conftest release that fixes the go1.27.1, x/net and go-jose findings (v0.71.1 and `main` don't, checked 2026-11-01): go back to the release binary in the `Containerfile`, which also ends the difference described under "Policy tests pass but enforcement differs"
 - [ ] After a CSharpier release that parses C# 15 (1.3.0 fails on `union`): add it back to the prerequisites and decide where it runs; until then `dotnet format` is the only C# formatter
 - [x] Infracost v2: create a personal access token, store it as `pass insert tf-review/infracost/cli-token`, clear any cached `infracost auth login` session
 - [ ] M3: create the GitHub App and store its private key as `pass insert -m tf-review/github-app/private-key`
@@ -126,7 +127,7 @@ Only the arbiter talks back to GitHub, and only findings that carry evidence (a 
 | Component | Pinned by | Why it's in the image |
 | --- | --- | --- |
 | `tfreview` CLI, API and worker (.NET 11, one build) | Git tag | The review itself; the entry command decides the role |
-| conftest (bundled OPA), from M1 | Version + checksum | Runs the `tf-standards` Rego |
+| conftest (bundled OPA), from M1 | Built from source at the commit behind v0.71.1, with go1.27.3, x/net 0.60.0 and go-jose 4.1.6, reported as `0.71.1-patched` | Runs the `tf-standards` Rego |
 | Checkov, from M2 | uv lockfile, installed into a venv | Security findings on the plan JSON |
 | Infracost CLI v2 + terraform-plan and azure plugins, from M2 | Version + checksums; `INFRACOST_CLI_PLUGIN_DIR` set in the image | Cost per resource; nothing downloads at run time |
 
@@ -599,7 +600,7 @@ Expected spend is about $5–30/month at roughly 100 PRs, almost all of it LLM t
 | Infracost v2 plugins run unverified | Plugins pinned by checksum in `INFRACOST_CLI_PLUGIN_DIR` locally and in CI; no signatures exist, so this stays a known gap; CLI updates only through the setup doc, never `infracost update` |
 | Infracost v2 telemetry cannot be disabled | Every scan sends command, flags, install ID, org, repo URL and branch; fine for these public repos, but for client repos either accept it, use self-hosted pricing mode, or drop the cost agent |
 | Infracost free-tier run limit | The free tier reportedly counts pricing runs (about 1,000 a month); the result cache skips unchanged plans |
-| Policy tests pass but enforcement differs | Rego unit tests run in `conftest verify`, the same OPA build that enforces them; tofu, conftest and Checkov pinned to the same versions locally and in CI. Standalone `opa` runs only `opa fmt` and `opa check` and can be ahead of conftest's bundled OPA (1.22.0 vs 1.21.1 on 2026-11-01) |
+| Policy tests pass but enforcement differs | Rego unit tests run in `conftest verify`, the same OPA build that enforces them; tofu, conftest and Checkov pinned to the same versions locally and in CI. Standalone `opa` runs only `opa fmt` and `opa check` and can be ahead of conftest's bundled OPA (1.22.0 vs 1.21.1 on 2026-11-01). For now the image's conftest is a source build of the same version with patched Go and dependencies, while `tf-standards` CI tests with the release binary; both bundle OPA 1.21.1, and all 21 policy tests pass on the image's build |
 | .NET 11 is an STS release, and M1 starts on an RC | GA is scheduled for 2026-11-10; SDK and base image are pinned and moved together after GA; move to the next LTS before support ends |
 | Dependencies not built for .NET 11 | Agent Framework, Microsoft.Extensions.AI, Azure.Identity, TUnit and others ship no `net11.0` assets yet and run from their `net10.0` builds. A spike with a stub chat client and the live smoke test both passed on 2026-11-01, the latter with real gpt-5.4-mini calls on the RC3 SDK; re-run `llm-smoke.yml` after the GA re-pin and for each new model |
 | Unmarked secret reaches the model or a public comment | D25 only catches marked values and denylisted names, so a secret under an ordinary name passes. Comments render only code-controlled fields and escaped text; tighten the policy if a real miss appears, accepting new prompts and goldens |
