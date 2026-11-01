@@ -1,7 +1,33 @@
 {
   "format_version": "1.2",
   "resource_changes": [
-    { "address": "azurerm_virtual_network.a", "change": { "actions": ["create"] } },
-    { "address": "azurerm_resource_group.b", "change": { "actions": ["no-op"] } }
+    {
+      "address": "azurerm_virtual_network.a",
+      "mode": "managed",
+      "type": "azurerm_virtual_network",
+      "name": "a",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": { "name": "vnet-smoke-prod", "tags": null, "password": "smoke-canary-value" },
+        "after_unknown": {},
+        "before_sensitive": false,
+        "after_sensitive": {}
+      }
+    },
+    {
+      "address": "azurerm_resource_group.b",
+      "mode": "managed",
+      "type": "azurerm_resource_group",
+      "name": "b",
+      "change": {
+        "actions": ["no-op"],
+        "before": { "name": "rg-smoke-prod" },
+        "after": { "name": "rg-smoke-prod" },
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": {}
+      }
+    }
   ]
 }

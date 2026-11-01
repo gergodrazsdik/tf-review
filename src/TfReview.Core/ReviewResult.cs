@@ -93,6 +93,15 @@ public enum NotReviewedReason
 
     [JsonStringEnumMemberName("timeout")]
     Timeout,
+
+    [JsonStringEnumMemberName("invalid_config")]
+    InvalidConfig,
+
+    [JsonStringEnumMemberName("standards_unavailable")]
+    StandardsUnavailable,
+
+    [JsonStringEnumMemberName("scanner_failed")]
+    ScannerFailed,
 }
 
 public sealed record Finding(

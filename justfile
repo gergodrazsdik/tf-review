@@ -36,6 +36,7 @@ validate: bootstrap-validate infra-validate
 [group('dev')]
 test:
     dotnet build -m:1
+    dotnet run --project tests/TfReview.Agents.Tests --no-build
     dotnet run --project tests/TfReview.Core.Tests --no-build
     dotnet run --project tests/TfReview.GitHub.Tests --no-build
     dotnet run --project tests/TfReview.Rag.Tests --no-build

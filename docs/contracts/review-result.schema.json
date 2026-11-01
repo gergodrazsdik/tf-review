@@ -47,7 +47,10 @@
               "content_filter",
               "rate_limited",
               "unavailable",
-              "timeout"
+              "timeout",
+              "invalid_config",
+              "standards_unavailable",
+              "scanner_failed"
             ]
           }
         }
