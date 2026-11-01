@@ -14,6 +14,32 @@ resource "azurerm_cognitive_account" "foundry" {
   custom_subdomain_name = "ais-tf-review-prod"
   local_auth_enabled    = false
 
+  # Projects need both of these. Turning project management off again replaces the account.
+  project_management_enabled = true
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  tags = {
+    owner       = "gergodrazsdik"
+    environment = "prod"
+    project     = "tf-review"
+  }
+}
+
+# The new Foundry portal opens an account through a project. The review doesn't use it: it calls
+# the account's endpoint directly.
+resource "azurerm_cognitive_account_project" "main" {
+  name                 = "proj-tf-review-prod"
+  cognitive_account_id = azurerm_cognitive_account.foundry.id
+  location             = data.azurerm_resource_group.target.location
+  display_name         = "tf-review"
+
+  identity {
+    type = "SystemAssigned"
+  }
+
   tags = {
     owner       = "gergodrazsdik"
     environment = "prod"
