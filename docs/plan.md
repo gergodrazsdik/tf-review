@@ -310,8 +310,8 @@ One storage account holds every repo's state, created once by a bootstrap projec
 
 | Identity | Federated subject | Rights |
 | --- | --- | --- |
-| Plan | `repo:<owner>/<repo>:pull_request` | Reader on the target scope, Blob Data Contributor on its own state container |
-| Apply | `repo:<owner>/<repo>:environment:prod` | Write on the target scope, gated by environment approval |
+| Plan | `repo:<owner>@<owner-id>/<repo>@<repo-id>:pull_request` | Reader on the target scope, Blob Data Contributor on its own state container |
+| Apply | `repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:prod` | Write on the target scope, gated by environment approval |
 | Reviewer submit (M3) | Customised subject incl. `job_workflow_ref` | Call the review API only |
 
 **Reviewer infrastructure** (`tf-review/infra`; Foundry from M1, the rest from M3)
