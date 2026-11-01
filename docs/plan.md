@@ -6,7 +6,7 @@ Nov 1, 2026 · @Drazsdik Gergő
 
 Build a multi-agent, RAG-backed review board that comments on OpenTofu (later also Terraform) pull requests, reusable by any repo through one reusable GitHub workflow, at roughly $5–30/month on Azure. Deterministic tools find issues; LLM agents explain them, rank them and tie them to the team's own standards. One container image runs the whole review: in the GitHub runner during M1–M2, in Azure Container Apps from M3.
 
-Status: v1, every decision taken (see the Decision log); M0's gate has passed and M1 is next. This document now lives in `tf-review/docs/plan.md` and is maintained there.
+Status: v1, every decision taken (see the Decision log); M0's and M1's gates have passed and M2 is next. This document now lives in `tf-review/docs/plan.md` and is maintained there.
 
 **Goals**
 
@@ -465,7 +465,7 @@ M1 is deliberately thin: one agent and one Azure resource (Foundry with gpt-5.4-
 - [x] Rulesets applied; fork-PR approval set in each repo
 - [x] Gate: a demo PR plans, comments, and applies after approval (`tf-review-demo` PR #2, 2026-11-01)
 
-**M1 · MVP in the runner**
+**M1 · MVP in the runner** (gate passed 2026-11-01)
 
 Work runs in this order, so unknowns surface first and a real comment lands before the agent exists. Steps marked **you** can only be run by you.
 
@@ -511,7 +511,7 @@ Work runs in this order, so unknowns surface first and a real comment lands befo
 - [x] Seeded branches as draft PRs (`tf-review-demo` #10–14), each changing one thing so they stay mergeable: `seed/c5-missing-tags`, `seed/c6-bad-name`, `seed/c8-tag-value`, `seed/c9-bad-environment`, `seed/c10-subnet`. C5 and C6 add new resources, because renaming an existing one likely forces replacement. `just fixtures` commits their redacted plans with every GUID zeroed, because resource IDs hold the subscription ID
 - [x] `just e2e` (replay, also in CI's `test` job) and `just e2e-live` (real model, and the `e2e-live` workflow on PRs that change the agent, its prompts or the fixtures). Measured on 2026-11-01: prompt v1 failed C8 in 2 of 3 runs, because it judged an update's unchanged name and read examples as limits. Prompt v2 with the unchanged-attribute check fixed that but failed C5 in 3 of 3, reporting a valid name, and low reasoning effort then took all five cases to 3 of 3 at about $0.02 for the 15 runs
 - [ ] **You:** add `just e2e` as the Stop hook, because `.claude/settings.json` is write-protected
-- [ ] Gate: 3 of 3 `just e2e-live` runs per case: C5, C6 and C9 found with exact address, rule and citation; C8 and C10 `reviewed` with no findings, where `not_reviewed` fails; plus one real PR with a sticky comment. Agent findings are asserted before any conftest backstop
+- [x] Gate: 3 of 3 `just e2e-live` runs per case: C5, C6 and C9 found with exact address, rule and citation; C8 and C10 `reviewed` with no findings, where `not_reviewed` fails; plus one real PR with a sticky comment. Agent findings are asserted before any conftest backstop. Passed 2026-11-01 on prompt v2: three samples of 15 runs passed in a row, the last on the code in `image-v0.0.5`, and `tf-review-demo` PR #15 is the real PR. 3 of 3 is weak evidence, and these samples came straight after tuning on the same five cases, so M2's baseline still has to confirm it. The rendered step summary hasn't been checked
 
 **M2 · Full board**
 
