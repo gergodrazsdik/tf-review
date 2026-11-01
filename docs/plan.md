@@ -36,13 +36,15 @@ Installed and verified on 2026-11-01 (setup doc step 41): OpenTofu 1.13.2, conft
 | TFLint + azurerm ruleset | Provider-aware lint in the pre-commit hook | Release binary, SLSA attestation; ruleset fetched by `tflint --init` | M0, optional |
 | tofu-ls | OpenTofu language server for Neovim and the `dg-lsp` plugin Source build at a pinned tag (`go mod download` + `go build`, because `go install` rejects its `replace` directive), checked against Go's checksum database | Optional |
 
-Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET SDK 10 with TUnit templates and `csharpier`, `podman`, `actionlint`, `pinact`, `yamllint`/`yamlfmt`, `shellcheck`, `hadolint`, `gitleaks`, `cosign`/`syft`/`grype`, `jq`/`yq`, `ijhttp`, Claude Code. Terraform stays installed for the D1 Terraform input in M2.
+Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET SDK 11 (RC3 until GA) with TUnit templates, `podman`, `actionlint`, `pinact`, `yamllint`/`yamlfmt`, `shellcheck`, `hadolint`, `gitleaks`, `cosign`/`syft`/`grype`, `jq`/`yq`, `ijhttp`, Claude Code. Terraform stays installed for the D1 Terraform input in M2.
 
 **Accounts and one-off setup**
 
 - [x] Convert the Azure trial to Pay-As-You-Go, then check Azure OpenAI quota in Germany West Central
 - [x] Delete the resource group the Foundry portal auto-created in Sweden Central
 - [ ] Before M2: request quota for a stronger model (gpt-5.4 or gpt-5.5, Data Zone Standard)
+- [ ] After .NET 11 GA (scheduled 2026-11-10): install the GA SDK through `update-sources`, pin `global.json` to `11.0.100` without `allowPrerelease`, and re-pin the base image digest
+- [ ] After a CSharpier release that parses C# 15 (1.3.0 fails on `union`): add it back to the prerequisites and decide where it runs; until then `dotnet format` is the only C# formatter
 - [x] Infracost v2: create a personal access token, store it as `pass insert tf-review/infracost/cli-token`, clear any cached `infracost auth login` session
 - [ ] M3: create the GitHub App and store its private key as `pass insert -m tf-review/github-app/private-key`
 
@@ -53,7 +55,7 @@ All 18 decisions are settled as of 2026-11-01. Changing one means editing its ro
 | # | Decision | Choice | Why |
 | --- | --- | --- | --- |
 | D1 | IaC tool | OpenTofu 1.13 first; Terraform via a `tool` workflow input in M2 | Native state encryption; Terraform support doubles the test matrix, so it waits |
-| D2 | Agent runtime | C# on .NET 10, Microsoft Agent Framework, `IChatClient` from Microsoft.Extensions.AI | Strongest stack; the provider stays swappable |
+| D2 | Agent runtime | C# 15 on .NET 11, Microsoft Agent Framework, `IChatClient` from Microsoft.Extensions.AI over the OpenAI SDK's `OpenAIClient` | Strongest stack; the provider stays swappable; unions and closed hierarchies fit findings and agent outcomes; support should end about when .NET 10's does (November 2028); Agent Framework dropped `Azure.AI.OpenAI` in 1.21 |
 | D3 | Where the review runs | One container image: the workflow runs it in M1–M2, Container Apps runs it from M3 | Identical binaries and tool versions locally, in CI and in Azure |
 | D4 | LLM | Azure OpenAI in Foundry, Data Zone Standard (EU): gpt-5.4-mini for every agent; gpt-5.4 or gpt-5.5 requested for security and arbiter before M2; model set per agent in config | Quota checked 2026-10-31; EU processing from day one |
 | D5 | Retrieval | Metadata filter plus whole docs in M1–M2; Cosmos DB free tier with vectors in M3 | The baseline shows whether vectors actually help |
@@ -110,14 +112,14 @@ Only the arbiter talks back to GitHub, and only findings that carry evidence (a 
 
 | Component | Pinned by | Why it's in the image |
 | --- | --- | --- |
-| `tfreview` CLI, API and worker (.NET 10, one build) | Git tag | The review itself; the entry command decides the role |
+| `tfreview` CLI, API and worker (.NET 11, one build) | Git tag | The review itself; the entry command decides the role |
 | Checkov | uv lockfile, installed into a venv | Security findings on the plan JSON |
 | conftest (bundled OPA) | Version + checksum | Runs the `tf-standards` Rego |
 | Infracost CLI v2 + terraform-plan and azure plugins | Version + checksums; `INFRACOST_CLI_PLUGIN_DIR` set in the image | Cost per resource; nothing downloads at run time |
 
 Not in the image: OpenTofu (the plan runs in the consumer workflow, next to its credentials and state), the Azure CLI, git, and the `tf-standards` content, which is fetched at review time at the commit named in `.tf-review.yml` so a policy change never needs an image rebuild.
 
-- Base: `mcr.microsoft.com/dotnet/aspnet:10.0` plus Python for Checkov; non-root user, read-only root filesystem
+- Base: `mcr.microsoft.com/dotnet/aspnet:11.0-resolute` (Ubuntu 26.04), pinned by digest, plus Python for Checkov; non-root user, read-only root filesystem
 - Built by `tf-review` CI on each `v*` tag: hadolint, build, Syft SBOM, Grype scan (fails on high), cosign keyless signing with the workflow's OIDC identity (public Rekor entry, intended for a public repo), push by digest
 - Consumers reference the image by digest and run `cosign verify` against `tf-review`'s release workflow identity before using it
 - Locally: `just image` builds it with podman; `just review plan.json` runs it
@@ -156,7 +158,7 @@ Five LLM roles, each a Microsoft Agent Framework agent with a versioned prompt f
 
 ## Review service internals
 
-One .NET 10 solution produces the CLI, the API and the worker from shared libraries, so the M3 move changes hosting, not logic.
+One .NET 11 solution produces the CLI, the API and the worker from shared libraries, so the M3 move changes hosting, not logic.
 
 ```
 src/
@@ -173,7 +175,10 @@ prompts/               versioned agent prompts
 Containerfile
 ```
 
+- **SDK and language**: `global.json` pins `11.0.100-rc.3.26522.148` with `allowPrerelease` until GA; C# 15 is the `net11.0` default, so no `LangVersion` override
+- **C# 15 usage**: unions and `closed` records for internal models such as `Evidence` and agent outcomes; the JSON contracts don't change. `Evidence` uses `JsonUnionTypeStructuralClassifier`, because the default classifier can't tell two object cases apart. The schema generated from a union is looser than `finding.schema.json`, so findings are still validated against the contract
 - **Auth**: `DefaultAzureCredential` everywhere: `az login` locally, OIDC in CI, managed identity in Azure; key auth disabled on Foundry and Cosmos
+- **LLM client**: `OpenAIClient` with `BearerTokenPolicy` (scope `https://ai.azure.com/.default`) on the resource's `/openai/v1/` endpoint, exposed as `IChatClient`; no `Azure.AI.OpenAI` package. That constructor is experimental, so `OPENAI001` is suppressed for it
 - **Config**: `appsettings.json` and environment for the service; `.tf-review.yml` per repo for enabled agents, thresholds, gate mode and the `tf-standards` commit
 - **Observability**: OpenTelemetry traces and metrics to App Insights: tokens, cached tokens, latency and cost per agent call, findings per agent, evidence-check drops
 - **PR output**: one sticky comment per PR (hidden marker), rewritten on each push: verdict line, monthly cost delta, a table by severity, collapsible details per resource with links to the cited `tf-standards` docs at the pinned commit
@@ -193,7 +198,7 @@ Three public repos under `gergodrazsdik`, developed side by side; the reviewer o
 tf-review/
   bootstrap/          # state storage, identities, onboarding map, budget
   infra/              # Foundry (M1); Cosmos, queue, Container Apps, Key Vault (M3)
-  src/                # .NET 10 solution: CLI, API, worker
+  src/                # .NET 11 solution: CLI, API, worker
   tests/              # TUnit projects; tests/fixtures: plan JSON + expected findings
   prompts/            # versioned agent prompts
   action/             # composite action: plan, verify image, review or submit
@@ -253,7 +258,8 @@ gh repo edit gergodrazsdik/tf-standards --template
 | `just hooks` | all | `lefthook install` |
 | `just lint` | all | The checks that need no plugins, on every file, so they work in the Claude sandbox; the CI `lint` job runs the same recipe |
 | `just validate` | `tf-review`, `tf-review-demo` | `tofu validate` and `tflint`, whose plugins can't start in the sandbox; the CI `lint` job runs it too |
-| `just test` | `tf-review` | `dotnet test` (TUnit) |
+| `just test` | `tf-review` | `dotnet build -m:1`, then `dotnet run --project <tests> --no-build` for each TUnit project; CI runs `dotnet test` |
+| `just lint-dotnet` | `tf-review` | `dotnet format whitespace --folder --verify-no-changes`, then `dotnet build -m:1 --no-incremental -p:EnforceCodeStyleInBuild=true -warnaserror`; CI runs the full `dotnet format --verify-no-changes` |
 | `just plan <dir>` | `tf-review`, `tf-review-demo` | `tofu init`, `plan -out`, `show -json`, then canonicalize and redact |
 | `just cost <plan.json>` | `tf-review`, `tf-review-demo` | `infracost scan <plan.json> --json` with the token read from pass for that run only and `SSH_AUTH_SOCK` unset |
 | `just review <plan.json>` | `tf-review` | Runs the reviewer console app locally on one plan |
@@ -530,6 +536,8 @@ Expected spend is about $5–30/month at roughly 100 PRs, almost all of it LLM t
 | Infracost v2 telemetry cannot be disabled | Every scan sends command, flags, install ID, org, repo URL and branch; fine for these public repos, but for client repos either accept it, use self-hosted pricing mode, or drop the cost agent |
 | Infracost free-tier run limit | The free tier reportedly counts pricing runs (about 1,000 a month); the result cache skips unchanged plans |
 | Policy tests pass but enforcement differs | Rego unit tests run in `conftest verify`, the same OPA build that enforces them; tofu, conftest and Checkov pinned to the same versions locally and in CI. Standalone `opa` runs only `opa fmt` and `opa check` and can be ahead of conftest's bundled OPA (1.22.0 vs 1.21.1 on 2026-11-01) |
+| .NET 11 is an STS release, and M1 starts on an RC | GA is scheduled for 2026-11-10; SDK and base image are pinned and moved together after GA; move to the next LTS before support ends |
+| Dependencies not built for .NET 11 | Agent Framework, Microsoft.Extensions.AI, Azure.Identity, TUnit and others ship no `net11.0` assets yet and run from their `net10.0` builds. A spike passed on 2026-11-01, but with a stub chat client, so the first real model call in M1 must confirm it, including that Azure accepts the generated schema |
 | Scope creep | Milestone gates above; anything else goes to a later backlog |
 
 **Sources**
@@ -550,6 +558,12 @@ Expected spend is about $5–30/month at roughly 100 PRs, almost all of it LLM t
 * [Infracost CLI v2 commands and CI token](https://www.infracost.io/docs/features/cli_commands/)
 * [Infracost: cost a plan JSON with CLI v2](https://www.infracost.io/resources/blog/terraform-plan-output-support-cli-v2)
 
+- [What's new in C# 15](https://learn.microsoft.com/en-us/dotnet/csharp/whats-new/csharp-15)
+- [What's new in .NET 11 libraries: union serialization](https://learn.microsoft.com/en-us/dotnet/core/whats-new/dotnet-11/libraries)
+- [.NET STS releases supported for 24 months](https://devblogs.microsoft.com/dotnet/dotnet-sts-releases-supported-for-24-months/)
+- [Agent Framework PR #7986: remove Azure.AI.OpenAI](https://github.com/microsoft/agent-framework/pull/7986)
+- [Azure OpenAI v1 API](https://learn.microsoft.com/en-us/azure/foundry/openai/api-version-lifecycle)
+
 ## Working with Claude Code
 
 Start every session with `just claude` in the repo the task is mainly about; it adds the two siblings, and `just e2e` gates every cross-repo change.
@@ -563,7 +577,7 @@ This plan is `tf-review/docs/plan.md`. Sessions update it in the same PR wheneve
 
 - **CLAUDE.md per repo**: purpose, which `just` recipes to run (`lint`, `test`, `plan`, `e2e`), pointer to the contracts; kept short
 - **`.claude/rules/` with path globs**: OpenTofu conventions for `**/*.tf`, C# for `src/**`, Rego for `**/*.rego`
-- **Sandbox on per repo** via `.claude/settings.local.json`, as in your other projects; user settings exclude `tofu`, `az` and `just bootstrap-*`, which need `~/.azure`, and allowlist `registry.opentofu.org`. Provider and TFLint plugins can't start in the sandbox, so `just validate` runs outside it, one approved command at a time
+- **Sandbox on per repo** via `.claude/settings.local.json`, as in your other projects; user settings exclude `tofu`, `az` and `just bootstrap-*`, which need `~/.azure`, and allowlist `registry.opentofu.org`. Provider and TFLint plugins can't start in the sandbox, so `just validate` runs outside it, one approved command at a time. `dotnet test` and workspace `dotnet format` can't run inside it either: typed bare they run outside with a prompt, but piped or started from a recipe they fail. A plain `dotnet build` of a solution also hangs inside it on SDK 11, so sandboxed recipes pass `-m:1`
 - **Stop hook in `tf-review`** runs `just e2e`
 - **`permissions.deny`**: `tofu apply`, `terraform apply`, `tofu state rm`, `az * delete`; Claude plans, CI applies, and `just bootstrap-apply` and `just secrets-sync` stay yours
 - **Lint hook**: `claude-lint-hook` runs `tofu fmt` on `.tf` files, so the agent, lefthook and CI agree
