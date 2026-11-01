@@ -14,7 +14,8 @@ internal enum RedactionLayers
     Names = 2,
     Sweep = 4,
     Verifier = 8,
-    All = Marks | Names | Sweep | Verifier,
+    Guids = 16,
+    All = Marks | Names | Sweep | Verifier | Guids,
 }
 
 /// <summary>
@@ -24,9 +25,12 @@ internal enum RedactionLayers
 /// <item>Keeps only allowlisted sections and fields, so anything unexpected is dropped rather than passed on.</item>
 /// <item>Replaces marked values, and values under secret-like names, with placeholders.</item>
 /// <item>Sweeps harvested values out of everything else, including keys and base64 or URL-encoded forms.</item>
+/// <item>Replaces GUIDs in changes, because resource IDs hold subscription and tenant IDs, and this plan
+/// reaches a public artifact and could be quoted in a public comment.</item>
 /// <item>Re-scans the result, and refuses the plan if any harvested value survived.</item>
 /// </list>
-/// Anything malformed refuses the plan. Known gap: an unmarked secret under an ordinary name passes.
+/// Anything malformed refuses the plan. Known gaps: an unmarked secret under an ordinary name passes, and so
+/// does a GUID in a resource address, which identifies the resource and has to stay unique.
 /// Running it on its own output changes nothing, so a job that receives a redacted plan can re-run it
 /// on what is untrusted input.
 /// </summary>
@@ -41,6 +45,9 @@ public sealed class PlanRedactor
     private const string Change = "change";
 
     private static readonly Regex Placeholder = new(@"^\[redacted:\d+\]$", RegexOptions.Compiled);
+
+    private static readonly Regex Guid = new(
+        @"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", RegexOptions.Compiled);
 
     private static readonly string[] SecretNames =
     [
@@ -364,7 +371,8 @@ public sealed class PlanRedactor
             result[marks] = mark?.DeepClone();
         }
 
-        return (JsonObject)SweepTree(result, forms, scope)!;
+        var swept = (JsonObject)SweepTree(result, forms, scope)!;
+        return layers.HasFlag(RedactionLayers.Guids) ? (JsonObject)MaskGuids(swept, scope)! : swept;
     }
 
     private JsonNode? RedactValue(JsonNode? value, JsonNode? mark, Scope scope, string location)
@@ -459,6 +467,41 @@ public sealed class PlanRedactor
                 return IsString(node, out var text) ? JsonValue.Create(Sweep(text, forms, scope)) : node;
         }
     }
+
+    // Marks and unknowns are masked too, because a map keyed by a GUID has to keep matching its marks.
+    private static JsonNode? MaskGuids(JsonNode? node, Scope scope)
+    {
+        switch (node)
+        {
+            case JsonObject value:
+                var result = new JsonObject();
+                foreach (var (key, child) in value)
+                {
+                    var masked = MaskGuids(key, scope);
+                    if (result.ContainsKey(masked))
+                    {
+                        throw new RefusalException(RefusalRule.MalformedPlan, "/");
+                    }
+
+                    result[masked] = MaskGuids(child?.DeepClone(), scope);
+                }
+
+                return result;
+            case JsonArray value:
+                var list = new JsonArray();
+                foreach (var child in value)
+                {
+                    list.Add(MaskGuids(child?.DeepClone(), scope));
+                }
+
+                return list;
+            default:
+                return IsString(node, out var text) ? JsonValue.Create(MaskGuids(text, scope)) : node;
+        }
+    }
+
+    private static string MaskGuids(string text, Scope scope) =>
+        Guid.Replace(text, match => scope.PlaceholderFor(match.Value.ToLowerInvariant()));
 
     private string Sweep(string text, List<SecretForm> forms, Scope scope)
     {

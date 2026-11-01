@@ -381,6 +381,89 @@ public class PlanRedactorTests
         await Assert.That(outcome is Refused { Rule: RefusalRule.SecretSurvived }).IsTrue();
     }
 
+    private const string SubscriptionId = "12345678-90ab-cdef-1234-567890abcdef";
+
+    private static string PlanWithId(string address = "a.b", string before = "null") => $$"""
+        {"address":"{{address}}","type":"a","change":{"actions":["update"],
+        "before":{{before}},
+        "after":{"id":"/subscriptions/{{SubscriptionId}}/resourceGroups/rg/x","tenant_id":"AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE","name":"keep-me"},
+        "after_unknown":{},"before_sensitive":{},"after_sensitive":{} } }
+        """;
+
+    private static string PlanOf(params string[] resources) =>
+        $$"""{"format_version":"1.2","resource_changes":[{{string.Join(',', resources)}}]}""";
+
+    private static string RedactedJson(string plan) =>
+        ((Redacted)new PlanRedactor().Redact(plan)).Plan.ToCanonicalJson();
+
+    // Subscription IDs sit inside resource IDs, and this plan reaches a public artifact (D30).
+    [Test]
+    public async Task Masks_guids_inside_values_in_any_case()
+    {
+        var json = RedactedJson(PlanOf(PlanWithId()));
+
+        await Assert.That(json).DoesNotContain(SubscriptionId);
+        await Assert.That(json).DoesNotContain("AAAAAAAA");
+        await Assert.That(json).Contains("/subscriptions/[redacted:");
+        await Assert.That(json).Contains("/resourceGroups/rg/x");
+        await Assert.That(json).Contains("keep-me");
+    }
+
+    // Otherwise an unchanged ID would look like a change.
+    [Test]
+    public async Task An_unchanged_guid_gets_the_same_placeholder_on_both_sides()
+    {
+        var before = $$"""{"id":"/subscriptions/{{SubscriptionId}}/resourceGroups/rg/x"}""";
+
+        var change = JsonNode.Parse(RedactedJson(PlanOf(PlanWithId(before: before))))!["resource_changes"]![0]!["change"]!;
+
+        await Assert.That(change["before"]!["id"]!.GetValue<string>()).IsEqualTo(change["after"]!["id"]!.GetValue<string>());
+    }
+
+    [Test]
+    public async Task Masks_a_map_key_and_its_marks_alike()
+    {
+        var plan = PlanOf($$"""
+            {"address":"a.b","type":"a","change":{"actions":["create"],"before":null,
+            "after":{"map":{"{{SubscriptionId}}":"secret-value"} },"after_unknown":{},
+            "before_sensitive":false,"after_sensitive":{"map":{"{{SubscriptionId}}":true} } } }
+            """);
+
+        var json = RedactedJson(plan);
+
+        await Assert.That(json).DoesNotContain(SubscriptionId);
+        await Assert.That(json).DoesNotContain("secret-value");
+    }
+
+    // Addresses are how findings point at a resource, and two for_each instances must stay distinct.
+    [Test]
+    public async Task Leaves_a_guid_in_an_address_so_instances_stay_distinct()
+    {
+        var first = "a.b[\"11111111-1111-1111-1111-111111111111\"]".Replace("\"", "\\\"", StringComparison.Ordinal);
+        var second = "a.b[\"22222222-2222-2222-2222-222222222222\"]".Replace("\"", "\\\"", StringComparison.Ordinal);
+
+        var json = RedactedJson(PlanOf(PlanWithId(first), PlanWithId(second)));
+
+        await Assert.That(json).Contains("11111111-1111-1111-1111-111111111111");
+        await Assert.That(json).Contains("22222222-2222-2222-2222-222222222222");
+    }
+
+    [Test]
+    public async Task Masking_guids_is_stable_when_run_again()
+    {
+        var once = RedactedJson(PlanOf(PlanWithId()));
+
+        await Assert.That(RedactedJson(once)).IsEqualTo(once);
+    }
+
+    [Test]
+    public async Task Turning_the_guid_layer_off_leaves_them_in()
+    {
+        var outcome = new PlanRedactor(RedactionLayers.All & ~RedactionLayers.Guids).Redact(PlanOf(PlanWithId()));
+
+        await Assert.That(((Redacted)outcome).Plan.ToCanonicalJson()).Contains(SubscriptionId);
+    }
+
     [Test]
     public async Task Reports_what_it_did_without_any_values()
     {

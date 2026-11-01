@@ -8,6 +8,7 @@ on:
     paths:
       - "prompts/**"
       - "src/TfReview.Agents/**"
+      - "src/TfReview.Core/**"
       - "tests/TfReview.Eval/**"
       - "tests/fixtures/cases/**"
       - ".github/workflows/e2e-live.yml"
