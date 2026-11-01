@@ -1,6 +1,12 @@
 locals {
   github_oidc_issuer = "https://token.actions.githubusercontent.com"
 
+  # GitHub's immutable OIDC subject: numeric IDs keep a re-registered name from matching.
+  github_oidc_subject = {
+    for repo in keys(var.repos) :
+    repo => "repo:${var.github_owner}@${data.github_user.owner.id}/${repo}@${data.github_repository.repo[repo].repo_id}"
+  }
+
   # Variable name => value, per repo.
   repo_variables = merge([
     for repo in keys(var.repos) : {
@@ -62,7 +68,7 @@ resource "azurerm_federated_identity_credential" "plan" {
   user_assigned_identity_id = azurerm_user_assigned_identity.plan[each.key].id
   audience                  = ["api://AzureADTokenExchange"]
   issuer                    = local.github_oidc_issuer
-  subject                   = "repo:${var.github_owner}/${each.key}:pull_request"
+  subject                   = "${local.github_oidc_subject[each.key]}:pull_request"
 }
 
 resource "azurerm_federated_identity_credential" "apply" {
@@ -72,7 +78,7 @@ resource "azurerm_federated_identity_credential" "apply" {
   user_assigned_identity_id = azurerm_user_assigned_identity.apply[each.key].id
   audience                  = ["api://AzureADTokenExchange"]
   issuer                    = local.github_oidc_issuer
-  subject                   = "repo:${var.github_owner}/${each.key}:environment:prod"
+  subject                   = "${local.github_oidc_subject[each.key]}:environment:prod"
 }
 
 resource "azurerm_role_assignment" "plan_target" {
@@ -117,6 +123,12 @@ resource "github_actions_variable" "repo" {
 
 data "github_user" "owner" {
   username = var.github_owner
+}
+
+data "github_repository" "repo" {
+  for_each = var.repos
+
+  full_name = "${var.github_owner}/${each.key}"
 }
 
 resource "github_repository_environment" "prod" {
