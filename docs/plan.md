@@ -42,7 +42,7 @@ Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET S
 
 - [x] Convert the Azure trial to Pay-As-You-Go, then check Azure OpenAI quota in Germany West Central
 - [x] Delete the resource group the Foundry portal auto-created in Sweden Central
-- [ ] Before M2: get Data Zone Standard quota for gpt-6.1-sol and gpt-6-luna. The subscription is on Free Tier (checked 2026-11-01); Microsoft's Tier 1 table lists 100K TPM for both, and tiers rise automatically with usage and payment history, so re-check quota after M1's usage before filing the request form
+- [ ] Get Data Zone Standard quota for gpt-6.1-sol and gpt-6-luna; this doesn't block M2, which can start on gpt-5.4-mini. A request on 2026-11-01 was declined for lack of resources. The same day Microsoft emailed that the subscription moved to Tier 1, which can take 3–4 days to activate, and Microsoft's Tier 1 table lists 100K TPM for both models. Re-check from 2026-11-05. If the decline was about regional capacity rather than the tier, Tier 1 may not change it. Available today: gpt-5.4-mini, Mistral-Large-3 and text-embedding-3-small
 - [ ] Before gpt-5.4-mini retires (2027-09-21): move to a newer small model through the eval suite
 - [ ] After .NET 11 GA (scheduled 2026-11-10): install the GA SDK through `update-sources`, pin `global.json` to `11.0.100` without `allowPrerelease`, and re-pin the base image digest
 - [ ] After a conftest release that fixes the go1.27.1, x/net and go-jose findings (v0.71.1 and `main` don't, checked 2026-11-01): go back to the release binary in the `Containerfile`, which also ends the difference described under "Policy tests pass but enforcement differs"
@@ -59,7 +59,7 @@ All 30 decisions are settled as of 2026-11-01; D19–D29 came from the M1 design
 | D1 | IaC tool | OpenTofu 1.13 first; Terraform via a `tool` workflow input in M2 | Native state encryption; Terraform support doubles the test matrix, so it waits |
 | D2 | Agent runtime | C# 15 on .NET 11, Microsoft Agent Framework, `IChatClient` from Microsoft.Extensions.AI over the OpenAI SDK's `OpenAIClient` | Strongest stack; the provider stays swappable; unions and closed hierarchies fit findings and agent outcomes; support should end about when .NET 10's does (November 2028); Agent Framework dropped `Azure.AI.OpenAI` in 1.21 |
 | D3 | Where the review runs | One container image: the workflow runs it in M1–M2, Container Apps runs it from M3 | Identical binaries and tool versions locally, in CI and in Azure |
-| D4 | LLM | Azure OpenAI in Foundry, Data Zone Standard (EU): gpt-5.4-mini `2026-03-17` for every agent, at low reasoning effort because its default of none failed valid names on the evals; gpt-6.1-sol `2026-09-29` for security and arbiter from M2, and gpt-6-luna `2026-09-22` as a small-model candidate, both once quota is granted; text-embedding-3-small `1` from M3; versions pinned and models set per agent in config | gpt-5.4-mini is the only chat model with quota (checked 2026-11-01); gpt-6.1-sol is reportedly cheaper than gpt-5.4 and gpt-5.5 and retires later; Luna must beat mini on the evals, not just on price; EU processing from day one |
+| D4 | LLM | Azure OpenAI in Foundry, Data Zone Standard (EU): gpt-5.4-mini `2026-03-17` for every agent, at low reasoning effort because its default of none failed valid names on the evals; gpt-6.1-sol `2026-09-29` for security and arbiter from M2, and gpt-6-luna `2026-09-22` as a small-model candidate, both once quota is granted; text-embedding-3-small `1` from M3; versions pinned and models set per agent in config | gpt-5.4-mini is the only OpenAI chat model with quota (checked 2026-11-01); gpt-6.1-sol is reportedly cheaper than gpt-5.4 and gpt-5.5 and retires later; Luna must beat mini on the evals, not just on price; EU processing from day one |
 | D5 | Retrieval | Metadata filter plus whole docs in M1–M2; Cosmos DB free tier with vectors in M3 | The baseline shows whether vectors actually help |
 | D6 | Repo visibility | Public | Free Actions minutes and environment approvals; portfolio value |
 | D7 | Repos | `tf-review`, `tf-review-demo`, `tf-standards` (created 2026-11-01) | Standards have their own owner and lifecycle in production |
@@ -596,7 +596,7 @@ Expected spend is about $5–30/month at roughly 100 PRs, almost all of it LLM t
 
 | Risk | Mitigation |
 | --- | --- |
-| No model quota after PAYG conversion | Checked: Data Zone gpt-5.4-mini (200K TPM) and text-embedding-3-small are available; request gpt-6.1-sol and gpt-6-luna before M2 |
+| No model quota after PAYG conversion | Checked: Data Zone gpt-5.4-mini (200K TPM) and text-embedding-3-small are available; a request for gpt-6.1-sol and gpt-6-luna was declined on 2026-11-01, and M2 can start on gpt-5.4-mini while it's retried after the move to Tier 1 |
 | Hallucinated findings | Evidence required per finding; arbiter drops unsupported ones; never blocks on LLM output alone |
 | Secrets leaking via plan JSON or public logs | Redact before any LLM call; no plan artifacts; `sensitive` variables |
 | Large PRs blow context and cost | Diff-only input, per-agent slices, token caps, map-reduce with risk-first ordering |
