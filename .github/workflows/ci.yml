@@ -33,11 +33,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # The conftest tests run the real policies. A policy change reaches here by moving this commit.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: gergodrazsdik/tf-standards
+          ref: 8def462242838d3c56ca88d1082def3a6fa15360
+          path: standards
+          persist-credentials: false
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
+      - name: Install conftest
+        run: scripts/install-ci-tools.sh conftest
       - name: Test
         run: dotnet test
+        env:
+          TF_STANDARDS_DIR: ${{ github.workspace }}/standards
       - name: Check formatting
         run: dotnet format --verify-no-changes
 

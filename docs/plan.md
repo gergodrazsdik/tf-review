@@ -493,7 +493,7 @@ Work runs in this order, so unknowns surface first and a real comment lands befo
 - [x] `TfReview.Core`: canonical JSON (ordinal key sort, raw number text, duplicate keys refused, `timestamp` dropped)
 - [x] Redaction fixtures with a real plan holding canaries, plus hand-built cases for what a create-only plan cannot show, then `PlanRedactor` (D25): keep only `resource_changes` and `output_changes`; apply marks and the name denylist; sweep marked values from every raw section, including base64 and URL forms; re-scan and refuse on a hit. Per-resource ordinal placeholders. Disabling any layer must fail a test
 - [x] `PlanCondenser` and pointers: sort by address, drop no-ops, prune to top-level attributes but keep changed ones whole, and always keep `name`, `tags` and nulls, or C8 looks tag-less and C5's pointer dies
-- [ ] `TfReview.Scanners`: conftest runner over the redacted, uncondensed plan, with `--all-namespaces` and a failure if results show only `main`, since otherwise it reports a clean run without evaluating anything; a test that conftest denies match on raw and redacted C5, C6 and C8
+- [x] `TfReview.Scanners`: conftest runner over the redacted, uncondensed plan, with `--all-namespaces` and a failure if results show only `main`, since otherwise it reports a clean run without evaluating anything. Only valid JSON counts as a run, because exit 1 means both "policies failed" and "conftest errored". A test against the real policies shows denies match on raw and redacted C5, C6, C8 and a resource with a redacted attribute
 
 *5. Agent and output*
 
