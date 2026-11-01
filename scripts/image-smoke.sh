@@ -45,6 +45,25 @@ jq -e '
   and .not_reviewed[0] == {"scope": "conventions", "reason": "unavailable"}
 ' "$work/no-model-result.json"
 
+# The real Checkov on a read-only filesystem: the storage account has to be reported, and the canary not.
+cat >"$work/storage.json" <<'JSON'
+{"format_version":"1.2","resource_changes":[{"address":"azurerm_storage_account.smoke","mode":"managed",
+"type":"azurerm_storage_account","name":"smoke","provider_name":"registry.opentofu.org/hashicorp/azurerm",
+"change":{"actions":["create"],"before":null,"after":{"name":"stsmokeprod","location":"germanywestcentral",
+"resource_group_name":"rg","account_tier":"Standard","account_replication_type":"LRS",
+"allow_nested_items_to_be_public":true,"tags":{"owner":"a","environment":"prod","project":"b"}},
+"after_unknown":{},"before_sensitive":false,"after_sensitive":{}}}]}
+JSON
+{ cat tests/fixtures/tf-review-smoke.yml; echo 'agents: [security]'; } >"$work/security.yml"
+chmod 666 "$work/storage.json" "$work/security.yml"
+run "$image" redact /work/storage.json /work/storage-redacted.json
+run -e HOME=/tmp "$image" review /work/storage-redacted.json /work/security.yml /work/security-result.json "$commit"
+jq -e '
+  .not_reviewed == []
+  and any(.findings[]; .rule == "CKV_AZURE_190" and .deterministic == true)
+  and all(.findings[]; (.resource_address | contains("canary")) | not)
+' "$work/security-result.json"
+
 # A plan the redactor refused has to come out as a refusal, not a clean result.
 echo '{"refused":true}' >"$work/refused.json"
 chmod 666 "$work/refused.json"
@@ -53,6 +72,7 @@ jq -e '.verdict == "not_reviewed" and .not_reviewed[0].reason == "redaction_refu
 
 run --entrypoint conftest "$image" --version
 run --entrypoint infracost -e HOME=/tmp "$image" --version
+run --entrypoint checkov -e HOME=/tmp "$image" --version
 run --entrypoint test "$image" -x /opt/infracost/plugins/infracost-parser-terraform-plan
 run --entrypoint test "$image" -x /opt/infracost/plugins/infracost-provider-azure
 

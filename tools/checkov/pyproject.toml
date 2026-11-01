@@ -1,0 +1,6 @@
+# Pins Checkov and everything it depends on, for the review image. Change it with `uv lock`.
+[project]
+name = "tf-review-checkov"
+version = "0"
+requires-python = "==3.13.*"
+dependencies = ["checkov==3.4.0"]

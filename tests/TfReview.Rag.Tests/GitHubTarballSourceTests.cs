@@ -126,6 +126,59 @@ public class GitHubTarballSourceTests
         await Assert.That(() => Source(handler).FetchAsync(Config, target.Path)).Throws<StandardsFetchException>();
     }
 
+    // The bug this pins: a timeout wasn't caught, so the review crashed instead of saying what went wrong.
+    [Test]
+    public async Task Tries_once_more_after_a_timeout()
+    {
+        var handler = new FailingHandler(failures: 1, new TaskCanceledException("Timed out."), Tarball(("top/adr/ADR-001.md", "doc")));
+        using var target = new TargetDirectory();
+
+        await new GitHubTarballSource(new HttpClient(handler) { BaseAddress = new Uri("https://codeload.example.test/") }).FetchAsync(Config, target.Path);
+
+        await Assert.That(handler.Calls).IsEqualTo(2);
+        await Assert.That(File.Exists(Path.Combine(target.Path, "adr/ADR-001.md"))).IsTrue();
+    }
+
+    [Test]
+    public async Task Reports_a_timeout_that_keeps_happening_as_a_failed_fetch()
+    {
+        await AssertFailedFetch(new TaskCanceledException("Timed out."));
+    }
+
+    [Test]
+    public async Task Reports_a_network_failure_that_keeps_happening_as_a_failed_fetch()
+    {
+        await AssertFailedFetch(new HttpRequestException("No route."));
+    }
+
+    [Test]
+    public async Task Reports_a_broken_connection_as_a_failed_fetch()
+    {
+        await AssertFailedFetch(new IOException("Connection reset."));
+    }
+
+    [Test]
+    public async Task The_callers_cancellation_isnt_a_failed_fetch()
+    {
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+        using var target = new TargetDirectory();
+        var handler = new FailingHandler(failures: 2, new TaskCanceledException("Cancelled."), []);
+        var source = new GitHubTarballSource(new HttpClient(handler) { BaseAddress = new Uri("https://codeload.example.test/") });
+
+        await Assert.That(async () => { await source.FetchAsync(Config, target.Path, cancelled.Token); }).Throws<OperationCanceledException>();
+    }
+
+    private static async Task AssertFailedFetch(Exception failure)
+    {
+        var handler = new FailingHandler(failures: 2, failure, []);
+        using var target = new TargetDirectory();
+        var source = new GitHubTarballSource(new HttpClient(handler) { BaseAddress = new Uri("https://codeload.example.test/") });
+
+        await Assert.That(async () => { await source.FetchAsync(Config, target.Path); }).Throws<StandardsFetchException>();
+        await Assert.That(handler.Calls).IsEqualTo(2);
+    }
+
     private static GitHubTarballSource Source(byte[] body) => Source(new FakeHandler(body));
 
     private static GitHubTarballSource Source(FakeHandler handler) =>
@@ -155,6 +208,19 @@ public class GitHubTarballSourceTests
         }
 
         return output.ToArray();
+    }
+
+    private sealed class FailingHandler(int failures, Exception failure, byte[] body) : HttpMessageHandler
+    {
+        public int Calls { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Calls++;
+            return Calls <= failures
+                ? Task.FromException<HttpResponseMessage>(failure)
+                : Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(body) });
+        }
     }
 
     private sealed class FakeHandler(byte[] body) : HttpMessageHandler

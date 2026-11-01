@@ -57,7 +57,8 @@ static async Task<int> Review(string redactedPath, string configPath, string out
     }
     else
     {
-        using var http = new HttpClient { BaseAddress = new Uri("https://codeload.github.com/") };
+        // A short timeout: the download gets one retry, and the job has other work to fit in its 10 minutes.
+        using var http = new HttpClient { BaseAddress = new Uri("https://codeload.github.com/"), Timeout = TimeSpan.FromSeconds(30) };
         var runner = new ReviewRunner(
             new GitHubTarballSource(http),
             new ConftestRunner(new ProcessRunner()),
@@ -67,8 +68,19 @@ static async Task<int> Review(string redactedPath, string configPath, string out
             // Without a token a scan waits forever for a login.
             infracost: string.IsNullOrEmpty(Environment.GetEnvironmentVariable("INFRACOST_CLI_AUTHENTICATION_TOKEN"))
                 ? null
-                : new InfracostRunner(new ProcessRunner()));
-        result = await runner.RunAsync(redacted, config, commit);
+                : new InfracostRunner(new ProcessRunner()),
+            checkov: new CheckovRunner(new ProcessRunner()));
+        try
+        {
+            result = await runner.RunAsync(redacted, config, commit);
+        }
+        catch (Exception e)
+        {
+            // Nothing else writes a result, and the PR has to get one. Only the type is logged, because a
+            // message could quote the plan or a model's answer, and these logs are public.
+            Console.Error.WriteLine($"The review failed: {e.GetType().Name}.");
+            result = ReviewResult.Failed(commit, ReviewScope.Plan, NotReviewedReason.Unavailable);
+        }
     }
 
     await File.WriteAllTextAsync(outputPath, JsonSerializer.Serialize(result));
