@@ -1,0 +1,56 @@
+---
+name: llm-smoke
+
+on:
+  pull_request:
+    paths:
+      - "scripts/llm-smoke.cs"
+      - ".github/workflows/llm-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    # Fork PRs get no OIDC token or secrets, so they can't reach the model.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    environment: review
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The image has no az, so DefaultAzureCredential uses workload identity through this file.
+      - name: Get a federated token
+        run: |
+          token=$(curl -fsS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r .value)
+          echo "::add-mask::$token"
+          install -m 600 /dev/null "$RUNNER_TEMP/federated-token"
+          printf '%s' "$token" > "$RUNNER_TEMP/federated-token"
+      # The same constraints as the review image: non-root, read-only root filesystem.
+      # Build, then exec: `dotnet run` never exits here, because it stays alive with the idle
+      # compiler server, and turning that server off hangs the build instead.
+      - name: Call the model from a container
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID_REVIEW }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          TF_REVIEW_OPENAI_ENDPOINT: ${{ vars.TF_REVIEW_OPENAI_ENDPOINT }}
+          TF_REVIEW_OPENAI_DEPLOYMENT: ${{ vars.TF_REVIEW_OPENAI_DEPLOYMENT }}
+          SDK_IMAGE: mcr.microsoft.com/dotnet/sdk:11.0-resolute
+          SDK_DIGEST: sha256:3a9175b6c54b2f076817af1360f691c9994447b192faa48a1a1f112a516844c7
+        run: |
+          docker run --rm --read-only --tmpfs /tmp:exec --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp -e DOTNET_EnableDiagnostics=0 -e DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+            -e AZURE_CLIENT_ID -e AZURE_TENANT_ID \
+            -e AZURE_FEDERATED_TOKEN_FILE=/run/federated-token \
+            -e TF_REVIEW_OPENAI_ENDPOINT -e TF_REVIEW_OPENAI_DEPLOYMENT \
+            -v "$RUNNER_TEMP/federated-token:/run/federated-token:ro" \
+            -v "$PWD/scripts/llm-smoke.cs:/smoke/llm-smoke.cs:ro" \
+            "$SDK_IMAGE@$SDK_DIGEST" \
+            sh -c 'dotnet build /smoke/llm-smoke.cs -o /tmp/out -v:m && exec /tmp/out/llm-smoke'
