@@ -344,7 +344,7 @@ One storage account holds every repo's state, created once by a bootstrap projec
 
 | Resource | Purpose | Tier | From |
 | --- | --- | --- | --- |
-| Azure OpenAI in Foundry | gpt-5.4-mini Data Zone deployment; later gpt-6.1-sol and `text-embedding-3-small` | Pay-as-you-go, key auth disabled | M1 |
+| Azure OpenAI in Foundry | gpt-5.4-mini Data Zone deployment; later gpt-6.1-sol and `text-embedding-3-small`; a project so the new portal can open the account, which the review itself doesn't use | Pay-as-you-go, key auth disabled | M1 |
 | Role assignments (in bootstrap, D24) | Cognitive Services OpenAI User at resource group scope for each onboarded repo's review identity (M1–M2) and the service identity (M3) | — | M1 |
 | Cosmos DB for NoSQL | Vectors, review history, result cache, feedback | Free tier (1,000 RU/s, 25 GB), key auth disabled | M3 |
 | Storage account | Review queue and redacted plans (lifecycle rule deletes after 7 days) | Standard LRS | M3 |
@@ -470,7 +470,7 @@ Work runs in this order, so unknowns surface first and a real comment lands befo
 
 - [x] **You:** check the `Microsoft.CognitiveServices` provider registration, the gpt-5.4-mini model version, and that the bootstrap token reaches `tf-review` (2026-11-01)
 - [x] Bootstrap PR: `tf-review` map entry, review identity and `review` environment per repo, LLM role at resource group scope, endpoint and deployment variables, deployer data access to repo state containers. **You:** `bootstrap-plan`, `bootstrap-apply` (2026-11-01)
-- [ ] `infra/` v0 and `infra.yml`: Foundry resource (key auth off), gpt-5.4-mini `2026-03-17` Data Zone deployment at 30K TPM, which limits how fast a runaway loop can spend but isn't a budget. **You:** approve `prod`
+- [x] `infra/` v0 and `infra.yml`: Foundry resource (key auth off), gpt-5.4-mini `2026-03-17` Data Zone deployment at 30K TPM, which limits how fast a runaway loop can spend but isn't a budget. **You:** approve `prod` (2026-11-01)
 - [ ] Live smoke test: a real call through `OpenAIClient` with the flat strict schema, and the same from inside a container with a federated token file. If either fails, revisit the wire schema or auth before building on them
 
 *2. Solution and contracts*
