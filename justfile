@@ -28,7 +28,7 @@ lint: contracts
 
 # Run the checks that start provider or ruleset plugins, which can't run in the Claude sandbox; CI runs this too
 [group('dev')]
-validate: bootstrap-validate
+validate: bootstrap-validate infra-validate
     tflint --init
     tflint --recursive --config "$PWD/.tflint.hcl"
 
@@ -42,6 +42,12 @@ contracts:
       docs/contracts/examples/finding.json
     {{ check_jsonschema }} --schemafile docs/contracts/corpus-frontmatter.schema.json \
       docs/contracts/examples/corpus-frontmatter.yml
+
+# Validate the infra project without touching its backend
+[group('dev')]
+infra-validate:
+    tofu -chdir=infra init -backend=false -lockfile=readonly -input=false
+    tofu -chdir=infra validate
 
 # Validate the bootstrap project without touching its backend
 [group('bootstrap')]

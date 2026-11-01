@@ -469,8 +469,8 @@ Work runs in this order, so unknowns surface first and a real comment lands befo
 *1. Prove the unknowns*
 
 - [x] **You:** check the `Microsoft.CognitiveServices` provider registration, the gpt-5.4-mini model version, and that the bootstrap token reaches `tf-review` (2026-11-01)
-- [ ] Bootstrap PR: `tf-review` map entry, review identity and `review` environment per repo, LLM role at resource group scope, endpoint and deployment variables, deployer data access to repo state containers if `just plan` needs it. **You:** `bootstrap-plan`, `bootstrap-apply`
-- [ ] `infra/` v0 and `infra.yml`: Foundry resource (key auth off), gpt-5.4-mini `2026-03-17` Data Zone deployment with low TPM as the hard spend cap. **You:** approve `prod`
+- [x] Bootstrap PR: `tf-review` map entry, review identity and `review` environment per repo, LLM role at resource group scope, endpoint and deployment variables, deployer data access to repo state containers. **You:** `bootstrap-plan`, `bootstrap-apply` (2026-11-01)
+- [ ] `infra/` v0 and `infra.yml`: Foundry resource (key auth off), gpt-5.4-mini `2026-03-17` Data Zone deployment at 30K TPM, which limits how fast a runaway loop can spend but isn't a budget. **You:** approve `prod`
 - [ ] Live smoke test: a real call through `OpenAIClient` with the flat strict schema, and the same from inside a container with a federated token file. If either fails, revisit the wire schema or auth before building on them
 
 *2. Solution and contracts*
