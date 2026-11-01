@@ -10,7 +10,7 @@ public sealed class StandardsFetchException(string message) : Exception(message)
 /// from a config, so the archive is treated as hostile: it can't write outside the target directory, can't
 /// create links, and can't exhaust the disk or memory. Only documents and policies are unpacked.
 /// </summary>
-public sealed class GitHubTarballSource(HttpClient http)
+public sealed class GitHubTarballSource(HttpClient http) : IStandardsSource
 {
     private const long MaxDownloadBytes = 20 * 1024 * 1024;
     private const long MaxUnpackedBytes = 50 * 1024 * 1024;

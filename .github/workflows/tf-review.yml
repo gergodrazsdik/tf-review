@@ -114,12 +114,12 @@ jobs:
           mkdir -p "$work"
           tofu -chdir="$PROJECT" show -json "$RUNNER_TEMP/out.tfplan" >"$work/plan.json"
           docker run --rm --read-only --tmpfs /tmp --user "$(id -u):$(id -g)" -v "$work:/work" \
-            "$IMAGE" redact /work/plan.json /work/counts.json
+            "$IMAGE" redact /work/plan.json /work/redacted.json
           rm -f "$work/plan.json" "$RUNNER_TEMP/out.tfplan"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: tf-review-counts
-          path: ${{ runner.temp }}/tf-review/counts.json
+          name: tf-review-plan
+          path: ${{ runner.temp }}/tf-review/redacted.json
           retention-days: 1
           if-no-files-found: error
 
@@ -147,15 +147,26 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         continue-on-error: true
         with:
-          name: tf-review-counts
+          name: tf-review-plan
           path: ${{ runner.temp }}/tf-review
+      - name: Read the config from the base commit
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CONFIG_PATH: ${{ inputs.config-path }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          work="$RUNNER_TEMP/tf-review"
+          mkdir -p "$work"
+          gh api -H 'Accept: application/vnd.github.raw+json' \
+            "repos/$GITHUB_REPOSITORY/contents/$CONFIG_PATH?ref=$BASE_SHA" >"$work/config.yml"
       - name: Review
         continue-on-error: true
         run: |
           work="$RUNNER_TEMP/tf-review"
           mkdir -p "$work"
           docker run --rm --read-only --tmpfs /tmp --user "$(id -u):$(id -g)" -v "$work:/work" \
-            "$IMAGE" review /work/counts.json /work/result.json "$COMMIT"
+            "$IMAGE" review /work/redacted.json /work/config.yml /work/result.json "$COMMIT"
       - name: Publish
         if: ${{ !cancelled() }}
         env:
@@ -166,4 +177,4 @@ jobs:
           mkdir -p "$work"
           docker run --rm --read-only --tmpfs /tmp --user "$(id -u):$(id -g)" -v "$work:/work" \
             -e GITHUB_TOKEN -e GITHUB_REPOSITORY -e GITHUB_API_URL -e PR_NUMBER \
-            "$IMAGE" publish /work/result.json /work/counts.json "$COMMIT"
+            "$IMAGE" publish /work/result.json /work/redacted.json "$COMMIT"
