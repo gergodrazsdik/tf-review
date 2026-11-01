@@ -18,6 +18,7 @@ public static class EvidenceChecker
     public const string PointerUnresolved = "pointer_unresolved";
     public const string PointerOtherResource = "pointer_other_resource";
     public const string AttributeUnchanged = "attribute_unchanged";
+    public const string NoCostIncrease = "no_cost_increase";
     public const string NoDocument = "no_document";
     public const string DocumentNotRetrieved = "document_not_retrieved";
     public const string DocumentNotApplicable = "document_not_applicable";
@@ -69,6 +70,11 @@ public static class EvidenceChecker
         if (finding.Deterministic)
         {
             return null;
+        }
+
+        if (finding.Agent == Reporter.Cost && finding.MonthlyCostDeltaUsd is not > 0)
+        {
+            return NoCostIncrease;
         }
 
         return pointers.Any(pointer => plan.PointsAtUnchangedAttribute(pointer.PlanPointer))

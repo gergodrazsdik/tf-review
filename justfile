@@ -56,8 +56,19 @@ e2e-live runs="3":
 
 # Refresh the eval fixtures from the seeded branches' redacted plans; run it outside the Claude sandbox
 [group('dev')]
-fixtures:
-    scripts/fixtures.sh
+fixtures *cases:
+    scripts/fixtures.sh {{ cases }}
+
+# Save what real Checkov and Infracost say about each eval case; needs the token from pass, so it's yours to run
+[group('dev')]
+record-scans:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    unset SSH_AUTH_SOCK
+    INFRACOST_CLI_AUTHENTICATION_TOKEN="$(pass show tf-review/infracost/cli-token)"
+    export INFRACOST_CLI_AUTHENTICATION_TOKEN
+    dotnet build -m:1 tests/TfReview.Eval
+    TF_STANDARDS_DIR="{{ justfile_directory() }}/../tf-standards" dotnet run --project tests/TfReview.Eval --no-build -- record-scans
 
 # Price a plan JSON with the token from pass for this run only; pinentry may prompt
 [group('dev')]

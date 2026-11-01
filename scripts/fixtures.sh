@@ -5,7 +5,11 @@
 set -euo pipefail
 
 demo=gergodrazsdik/tf-review-demo
-cases=(c5-missing-tags c6-bad-name c8-tag-value c9-bad-environment c10-subnet)
+# C4 isn't here, because it's hand-built (D33). Pass case names to refresh only those.
+cases=(c1-open-ssh c2-public-storage c3-owner-role c5-missing-tags c6-bad-name c8-tag-value c9-bad-environment c10-subnet)
+if [ "$#" -gt 0 ]; then
+  cases=("$@")
+fi
 guid='[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 
 work=$(mktemp -d)

@@ -1,0 +1,211 @@
+{
+  "currency": "USD",
+  "summary": {
+    "projects": 1,
+    "resources": 1,
+    "costed_resources": 1,
+    "free_resources": 0,
+    "total_monthly_cost": "0",
+    "finops_policies": 3,
+    "failing_finops_policies": 2,
+    "distinct_failing_finops_resources": 1,
+    "tagging_policies": 1,
+    "failing_tagging_policies": 1,
+    "distinct_failing_tagging_resources": 1
+  },
+  "projects": [
+    {
+      "project_name": "after.json",
+      "path": "after.json",
+      "finops_results": [
+        {
+          "policy_id": "00000000-0000-0000-0000-000000000000",
+          "policy_name": "Storage Account - consider disabling public network access",
+          "policy_slug": "azure-storage-account-disable-public-network-access",
+          "policy_message": "Storage accounts should disable public network access to prevent direct internet exposure and improve security posture. Restrict access to private endpoints and virtual networks only.",
+          "failing_resources": [
+            {
+              "name": "azurerm_storage_account.seed",
+              "issues": [
+                {
+                  "description": "Set `public_network_access_enabled` to `false` to prevent direct internet exposure and improve security posture.",
+                  "yearly_savings": "0",
+                  "monthly_carbon_savings_grams_co2e": "0",
+                  "monthly_water_savings_liters": "0",
+                  "address": "azurerm_storage_account.seed",
+                  "attribute": "public_network_access_enabled"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "policy_id": "00000000-0000-0000-0000-000000000000",
+          "policy_name": "Storage Accounts - consider using a lifecycle policy for blob storage",
+          "policy_slug": "azure-use-storage-account-lifecycle-policy",
+          "policy_message": "A lifecycle policy should be defined for Azure blob storage accounts to automate the transition of your data based on its usage pattern to optimize storage costs, improve performance, or to delete blobs that are no longer needed.",
+          "failing_resources": [
+            {
+              "name": "azurerm_storage_account.seed",
+              "issues": [
+                {
+                  "description": "Set `blob_properties[0].last_access_time_enabled` to `true` to take advantage of access time tracking",
+                  "yearly_savings": "0",
+                  "monthly_carbon_savings_grams_co2e": "0",
+                  "monthly_water_savings_liters": "0",
+                  "address": "azurerm_storage_account.seed",
+                  "attribute": "blob_properties[0].last_access_time_enabled"
+                },
+                {
+                  "description": "Attach a storage management policy to this storage account to take advantage of lifecycle policies",
+                  "yearly_savings": "0",
+                  "monthly_carbon_savings_grams_co2e": "0",
+                  "monthly_water_savings_liters": "0",
+                  "address": "azurerm_storage_account.seed"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "policy_id": "00000000-0000-0000-0000-000000000000",
+          "policy_name": "Storage Accounts - consider upgrading account kind to StorageV2",
+          "policy_slug": "azure-use-storage-account-v2-storage-policy",
+          "policy_message": "Azure recommends general-purpose v2 accounts for most storage scenarios. v2 accounts incorporate all of the functionality of general-purpose v1 and Blob storage accounts, and have the latest features such as lifecycle management and access tiers.",
+          "failing_resources": []
+        }
+      ],
+      "tagging_results": [
+        {
+          "policy_id": "00000000-0000-0000-0000-000000000000",
+          "policy_name": "FinOps tags",
+          "message": "This example Tagging policy shows how you can enforce required FinOps tag keys/values in pull requests. This example checks for the tags 'Service' (can have any value) and 'Environment' (must be Dev/Stage/Prod) on all taggable resources being changed in the pull request. You can adjust it from https://dashboard.infracost.io \u003e Governance \u003e Tagging policies. You have a 14 day trial of this feature as it's part of Infracost Cloud.",
+          "tag_schema": [
+            {
+              "key": "Environment",
+              "valid_values": [
+                "Dev",
+                "Prod",
+                "Stage"
+              ],
+              "mandatory": true
+            },
+            {
+              "key": "Service",
+              "mandatory": true
+            }
+          ],
+          "failing_resources": [
+            {
+              "address": "azurerm_storage_account.seed",
+              "resource_type": "azurerm_storage_account",
+              "invalid_tags": [
+                {
+                  "key": "Environment",
+                  "value": ""
+                }
+              ],
+              "path": "",
+              "line": 0,
+              "missing_mandatory_tags": [
+                "Service"
+              ],
+              "propagation_problems": []
+            }
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "name": "azurerm_storage_account.seed",
+          "type": "azurerm_storage_account",
+          "is_supported": true,
+          "is_free": false,
+          "cost_components": [
+            {
+              "name": "Capacity",
+              "unit": "GB",
+              "price": "0.0208",
+              "quantity": "0",
+              "base_monthly_cost": "0",
+              "usage_monthly_cost": "0",
+              "total_monthly_cost": "0",
+              "monthly_carbon_savings_grams_co2e": "0",
+              "monthly_water_savings_liters": "0",
+              "usage_based": true
+            },
+            {
+              "name": "Write operations",
+              "unit": "10k operations",
+              "price": "0.05",
+              "quantity": "0",
+              "base_monthly_cost": "0",
+              "usage_monthly_cost": "0",
+              "total_monthly_cost": "0",
+              "monthly_carbon_savings_grams_co2e": "0",
+              "monthly_water_savings_liters": "0",
+              "usage_based": true
+            },
+            {
+              "name": "List and create container operations",
+              "unit": "10k operations",
+              "price": "0.05",
+              "quantity": "0",
+              "base_monthly_cost": "0",
+              "usage_monthly_cost": "0",
+              "total_monthly_cost": "0",
+              "monthly_carbon_savings_grams_co2e": "0",
+              "monthly_water_savings_liters": "0",
+              "usage_based": true
+            },
+            {
+              "name": "Read operations",
+              "unit": "10k operations",
+              "price": "0.004",
+              "quantity": "0",
+              "base_monthly_cost": "0",
+              "usage_monthly_cost": "0",
+              "total_monthly_cost": "0",
+              "monthly_carbon_savings_grams_co2e": "0",
+              "monthly_water_savings_liters": "0",
+              "usage_based": true
+            },
+            {
+              "name": "All other operations",
+              "unit": "10k operations",
+              "price": "0.004",
+              "quantity": "0",
+              "base_monthly_cost": "0",
+              "usage_monthly_cost": "0",
+              "total_monthly_cost": "0",
+              "monthly_carbon_savings_grams_co2e": "0",
+              "monthly_water_savings_liters": "0",
+              "usage_based": true
+            },
+            {
+              "name": "Blob index",
+              "unit": "10k tags",
+              "price": "0.03",
+              "quantity": "0",
+              "base_monthly_cost": "0",
+              "usage_monthly_cost": "0",
+              "total_monthly_cost": "0",
+              "monthly_carbon_savings_grams_co2e": "0",
+              "monthly_water_savings_liters": "0",
+              "usage_based": true
+            }
+          ],
+          "tags": {
+            "environment": "prod",
+            "owner": "gergodrazsdik",
+            "project": "tf-review-demo"
+          },
+          "supports_tags": true,
+          "metadata": {
+            "deep_checksum": "588ecaf01d307c8d"
+          }
+        }
+      ]
+    }
+  ]
+}

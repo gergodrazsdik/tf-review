@@ -29,9 +29,6 @@ public sealed class ReviewRunner(
     InfracostRunner? infracost = null,
     CheckovRunner? checkov = null)
 {
-    private const string CostAgent = "cost";
-    private const string SecurityAgent = "security";
-
     private readonly IArbiter arbiter = arbiter ?? new RuleArbiter();
 
     public async Task<ReviewResult> RunAsync(
@@ -68,34 +65,48 @@ public sealed class ReviewRunner(
             var plan = CondensedPlan.From(redacted.Plan);
             var policyFindings = ran.ToFindings(plan);
             var corpus = await LoadCorpusAsync(directory.FullName, cancellationToken);
-            var conventions = config.Agents.Contains(ConventionsAgent.Name, StringComparer.Ordinal)
-                ? await RunConventionsAsync(plan, policyFindings, corpus, cancellationToken)
-                : ConventionsPass.Skipped;
 
-            var (cost, costNotReviewed) = config.Agents.Contains(CostAgent, StringComparer.Ordinal)
+            var (cost, costFailure) = Enabled(config, AgentProfile.Cost)
                 ? await RunCostAsync(redacted.Plan, cancellationToken)
                 : (null, null);
-
-            var (securityFindings, securityNotReviewed) = config.Agents.Contains(SecurityAgent, StringComparer.Ordinal)
+            var (checkovFindings, checkovFailure) = Enabled(config, AgentProfile.Security)
                 ? await RunCheckovAsync(redacted.Plan, plan, cancellationToken)
                 : ([], null);
 
-            var check = EvidenceChecker.Check([.. policyFindings, .. securityFindings, .. conventions.Findings], plan, conventions.Docs);
-            var arbitration = await arbiter.ArbitrateAsync(check.Kept, plan, cancellationToken);
+            // A failed scan already says that scope wasn't reviewed, and a cost agent without figures has nothing to judge.
+            var passes = await Task.WhenAll(
+                Enabled(config, AgentProfile.Conventions)
+                    ? RunAgentAsync(AgentProfile.Conventions, plan, policyFindings, corpus, null, cancellationToken)
+                    : Task.FromResult(AgentPass.Skipped),
+                Enabled(config, AgentProfile.Security)
+                    ? RunAgentAsync(AgentProfile.Security, plan, policyFindings, corpus, null, cancellationToken)
+                    : Task.FromResult(AgentPass.Skipped),
+                cost is { } && cost.Resources.Any(resource => resource.Priced && resource.AfterUsd > resource.BeforeUsd)
+                    ? RunAgentAsync(AgentProfile.Cost, plan, [], corpus, cost.Resources, cancellationToken)
+                    : Task.FromResult(AgentPass.Skipped));
+
+            // Each agent's findings are checked against the documents in its own prompt, not everyone's.
+            var scanners = EvidenceChecker.Check([.. policyFindings, .. checkovFindings], plan, []);
+            var checks = passes.Select(pass => EvidenceChecker.Check(pass.Findings, plan, pass.Docs)).Prepend(scanners).ToList();
+            var arbitration = await arbiter.ArbitrateAsync([.. checks.SelectMany(check => check.Kept)], plan, cancellationToken);
 
             IReadOnlyList<NotReviewed> notReviewed =
             [
-                .. conventions.NotReviewed,
-                .. new[] { securityNotReviewed, costNotReviewed }.OfType<NotReviewed>(),
+                .. new[] { checkovFailure, costFailure }.OfType<NotReviewed>()
+                    .Concat(passes.SelectMany(pass => pass.NotReviewed))
+                    .DistinctBy(missing => missing.Scope)
+                    .OrderBy(missing => missing.Scope),
             ];
-            return new ReviewResult(1, commit, arbitration.Verdict, arbitration.Findings, notReviewed, check.Drops)
+            var omitted = passes.SelectMany(pass => pass.Omitted).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
+
+            return new ReviewResult(1, commit, arbitration.Verdict, arbitration.Findings, notReviewed, MergeDrops(checks))
             {
                 Cost = cost,
                 StandardsCommit = config.Commit,
                 StandardsRepository = config.Repository,
                 DocPaths = DocPaths(arbitration.Findings, corpus),
-                OmittedDocs = conventions.Omitted.Count == 0 ? null : conventions.Omitted,
-                Usage = conventions.Usage,
+                OmittedDocs = omitted.Count == 0 ? null : omitted,
+                Usage = Usage([.. passes.SelectMany(pass => pass.Calls)]),
             };
         }
         catch (StandardsFetchException)
@@ -108,7 +119,20 @@ public sealed class ReviewRunner(
         }
     }
 
-    /// <summary>A broken corpus stops the agent, but the policies have already run and their findings still count.</summary>
+    private static bool Enabled(TfReviewConfig config, AgentProfile profile) => config.Agents.Contains(profile.Name, StringComparer.Ordinal);
+
+    private static Dictionary<string, int> MergeDrops(IEnumerable<EvidenceCheck> checks)
+    {
+        var drops = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var (reason, count) in checks.SelectMany(check => check.Drops))
+        {
+            drops[reason] = drops.GetValueOrDefault(reason) + count;
+        }
+
+        return drops;
+    }
+
+    /// <summary>A broken corpus stops the agents, but the policies have already run and their findings still count.</summary>
     private static async Task<StandardsCorpus?> LoadCorpusAsync(string directory, CancellationToken cancellationToken)
     {
         try
@@ -169,37 +193,42 @@ public sealed class ReviewRunner(
             null);
     }
 
-    private async Task<ConventionsPass> RunConventionsAsync(
-        CondensedPlan plan, IReadOnlyList<Finding> policyFindings, StandardsCorpus? corpus, CancellationToken cancellationToken)
+    private async Task<AgentPass> RunAgentAsync(
+        AgentProfile profile,
+        CondensedPlan plan,
+        IReadOnlyList<Finding> policyFindings,
+        StandardsCorpus? corpus,
+        IReadOnlyList<ResourceCostChange>? costs,
+        CancellationToken cancellationToken)
     {
         if (corpus is null)
         {
-            return ConventionsPass.NotReviewedFor(NotReviewedReason.StandardsUnavailable);
+            return AgentPass.NotReviewedFor(profile, NotReviewedReason.StandardsUnavailable);
         }
 
         if (model is null)
         {
-            return ConventionsPass.NotReviewedFor(NotReviewedReason.Unavailable);
+            return AgentPass.NotReviewedFor(profile, NotReviewedReason.Unavailable);
         }
 
         var retrieval = await new FileRetriever(corpus).RetrieveAsync(
-            new RetrievalQuery(ConventionsAgent.Topics, plan.ResourceTypes()), cancellationToken);
+            new RetrievalQuery(profile.Topics, plan.ResourceTypes()), cancellationToken);
 
-        var outcome = await new ConventionsAgent(model.Chat).ReviewAsync(plan, retrieval.Docs, policyFindings, cancellationToken);
+        var outcome = await new ReviewAgent(model.Chat, profile).ReviewAsync(plan, retrieval.Docs, policyFindings, costs, cancellationToken);
         foreach (var call in outcome.Calls)
         {
             log?.Invoke(
-                $"{ConventionsAgent.Name}: prompt v{outcome.PromptVersion}, model {model.Deployment}, attempt {call.Attempt}, "
+                $"{profile.Name}: prompt v{outcome.PromptVersion}, model {model.Deployment}, attempt {call.Attempt}, "
                 + $"finish {call.Finish}, {call.InputTokens} in ({call.CachedInputTokens} cached), {call.OutputTokens} out, "
                 + $"{(long)call.Latency.TotalMilliseconds} ms.");
         }
 
-        return new ConventionsPass(
+        return new AgentPass(
             outcome is AgentReviewed reviewed ? reviewed.Findings : [],
             retrieval.Docs,
             retrieval.OmittedDocIds,
-            outcome is AgentFailed failed ? [new NotReviewed(ReviewScope.Conventions, failed.Reason)] : [],
-            Usage(outcome.Calls));
+            outcome is AgentFailed failed ? [new NotReviewed(profile.Scope, failed.Reason)] : [],
+            outcome.Calls);
     }
 
     private TokenUsage? Usage(IReadOnlyList<AgentCall> calls) => calls.Count == 0
@@ -212,16 +241,16 @@ public sealed class ReviewRunner(
             LatencyMs = (long)calls.Sum(call => call.Latency.TotalMilliseconds),
         };
 
-    private sealed record ConventionsPass(
+    private sealed record AgentPass(
         IReadOnlyList<Finding> Findings,
         IReadOnlyList<StandardsDoc> Docs,
         IReadOnlyList<string> Omitted,
         IReadOnlyList<NotReviewed> NotReviewed,
-        TokenUsage? Usage)
+        IReadOnlyList<AgentCall> Calls)
     {
-        public static readonly ConventionsPass Skipped = new([], [], [], [], null);
+        public static readonly AgentPass Skipped = new([], [], [], [], []);
 
-        public static ConventionsPass NotReviewedFor(NotReviewedReason reason) =>
-            new([], [], [], [new NotReviewed(ReviewScope.Conventions, reason)], null);
+        public static AgentPass NotReviewedFor(AgentProfile profile, NotReviewedReason reason) =>
+            new([], [], [], [new NotReviewed(profile.Scope, reason)], []);
     }
 }

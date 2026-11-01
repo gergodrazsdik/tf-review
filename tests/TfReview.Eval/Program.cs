@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.AI;
 using TfReview.Agents;
 using TfReview.Core;
@@ -9,9 +10,10 @@ using TfReview.GitHub;
 using TfReview.Rag;
 using TfReview.Scanners;
 
-// Runs the seeded cases through the real review. `replay` uses recorded model answers, offline and free,
-// so it proves the code around the model and nothing about the model. `live` calls the real model, and is
-// what the gate counts: every run of every case has to pass.
+// Runs the seeded cases through the real review. Conftest always runs for real. Checkov and Infracost replay
+// what `record-scans` saved, because CI has neither Checkov nor the token, and prices shouldn't move a test.
+// `replay` also uses recorded model answers, offline and free, so it proves the code around the model and
+// nothing about the model. `live` calls the real model, and is what the gate counts.
 const string CasesDirectory = "tests/fixtures/cases";
 const string Commit = "0000000000000000000000000000000000000000";
 const string Config = $"""
@@ -19,7 +21,10 @@ const string Config = $"""
     standards:
       repository: gergodrazsdik/tf-standards
       commit: {Commit}
+    agents: [conventions, security, cost]
     """;
+
+AgentProfile[] profiles = [AgentProfile.Conventions, AgentProfile.Security, AgentProfile.Cost];
 
 // Relaxed escaping keeps recorded answers readable in a diff. These files are never rendered as HTML.
 JsonSerializerOptions fileOptions = new() { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
@@ -31,6 +36,7 @@ var standardsDirectory = Environment.GetEnvironmentVariable("TF_STANDARDS_DIR")
 return args switch
 {
     ["replay"] => await Replay(),
+    ["record-scans"] => await RecordScans(),
     ["live", "--runs", var runs] => await Live(int.Parse(runs, CultureInfo.InvariantCulture), null),
     ["live", "--runs", var runs, "--record", var directory] => await Live(int.Parse(runs, CultureInfo.InvariantCulture), directory),
     _ => Usage(),
@@ -38,44 +44,83 @@ return args switch
 
 static int Usage()
 {
-    Console.Error.WriteLine("usage: eval replay\n       eval live --runs <n> [--record <dir>]");
+    Console.Error.WriteLine("usage: eval replay\n       eval record-scans\n       eval live --runs <n> [--record <dir>]");
     return 2;
 }
 
 async Task<int> Replay()
 {
-    var version = Prompts.Load(ConventionsAgent.Name).Version;
     var failures = 0;
-
     foreach (var directory in cases)
     {
-        var path = Path.Combine(directory, "answer.json");
-        if (!File.Exists(path))
+        var answers = new Dictionary<string, string>(StringComparer.Ordinal);
+        var stale = new List<string>();
+        foreach (var profile in profiles)
         {
-            failures += Report(Path.GetFileName(directory), 1, ["no recorded answer"]);
-            continue;
+            var path = Path.Combine(directory, "answers", $"{profile.Name}.json");
+            if (File.Exists(path))
+            {
+                var answer = JsonSerializer.Deserialize<RecordedAnswer>(await File.ReadAllTextAsync(path))!;
+                var version = Prompts.Load(profile.Name).Version;
+                if (answer.PromptVersion != version)
+                {
+                    stale.Add($"{profile.Name} was recorded with prompt v{answer.PromptVersion}, and the prompt is v{version}: re-record it with the live run");
+                }
+
+                answers[profile.Name] = answer.Text;
+            }
         }
 
-        var answer = JsonSerializer.Deserialize<RecordedAnswer>(await File.ReadAllTextAsync(path))!;
-        if (answer.PromptVersion != version)
-        {
-            failures += Report(Path.GetFileName(directory), 1, [$"recorded with prompt v{answer.PromptVersion}, and the prompt is v{version}: re-record it with the live run"]);
-            continue;
-        }
-
-        var result = await Review(directory, new ReplayChat(answer.Text));
-        failures += Report(Path.GetFileName(directory), 1, await Problems(directory, result));
+        var result = await Review(directory, new ReplayChat(answers, profiles));
+        failures += Report(Path.GetFileName(directory), 1, [.. stale, .. await Problems(directory, result)]);
     }
 
     Console.WriteLine(failures == 0 ? $"PASS: {cases.Length} case(s) replayed." : $"FAIL: {failures} case(s).");
     return failures == 0 ? 0 : 1;
 }
 
+// Saves what the real scanners say about each case's plan. It needs Checkov on PATH and the Infracost token.
+async Task<int> RecordScans()
+{
+    foreach (var directory in cases)
+    {
+        foreach (var stale in Directory.GetFiles(directory, "*.scan"))
+        {
+            File.Delete(stale);
+        }
+
+        var scans = new RecordingScans(new ProcessRunner(), directory);
+        var plan = new PlanRedactor().Redact(await File.ReadAllTextAsync(Path.Combine(directory, "plan.json")));
+        if (plan is not Redacted redacted)
+        {
+            throw new InvalidOperationException($"{directory}: the redactor refused the plan.");
+        }
+
+        var checkov = await new CheckovRunner(scans).RunAsync(redacted.Plan);
+        var infracost = await new InfracostRunner(scans).RunAsync(redacted.Plan);
+        Console.WriteLine($"{Path.GetFileName(directory)}: {Describe(checkov)}, {Describe(infracost)}");
+        if (checkov is CheckovFailed || infracost is InfracostFailed)
+        {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static string Describe(object outcome) => outcome switch
+{
+    CheckovRan ran => $"Checkov {ran.Violations.Count} on the allowlist",
+    CheckovFailed failed => $"Checkov FAILED {failed.Reason}",
+    InfracostRan ran => string.Create(CultureInfo.InvariantCulture, $"Infracost {ran.TotalDelta:+0.00;-0.00;0.00} a month"),
+    InfracostFailed failed => $"Infracost FAILED {failed.Reason}",
+    _ => "unknown",
+};
+
 async Task<int> Live(int runs, string? recordDirectory)
 {
     var endpoint = new Uri(Required("TF_REVIEW_OPENAI_ENDPOINT"));
     var deployment = Required("TF_REVIEW_OPENAI_DEPLOYMENT");
-    var version = Prompts.Load(ConventionsAgent.Name).Version;
     using var client = LlmClient.Create(endpoint, deployment);
 
     var failures = 0;
@@ -86,7 +131,7 @@ async Task<int> Live(int runs, string? recordDirectory)
         var passes = 0;
         for (var run = 1; run <= runs; run++)
         {
-            using var recording = new RecordingChat(client);
+            using var recording = new RecordingChat(client, profiles);
             var result = await Review(directory, recording, deployment);
             var problems = await Problems(directory, result);
             failures += Report(name, run, problems);
@@ -101,13 +146,16 @@ async Task<int> Live(int runs, string? recordDirectory)
             if (problems.Count == 0)
             {
                 passes++;
-                if (recordDirectory is not null && recording.Text is { } text)
+                if (recordDirectory is not null)
                 {
-                    var target = Path.Combine(recordDirectory, name);
-                    Directory.CreateDirectory(target);
-                    await File.WriteAllTextAsync(
-                        Path.Combine(target, "answer.json"),
-                        JsonSerializer.Serialize(new RecordedAnswer(version, text), fileOptions) + "\n");
+                    foreach (var (agent, text) in recording.Answers)
+                    {
+                        var target = Path.Combine(recordDirectory, name, "answers");
+                        Directory.CreateDirectory(target);
+                        await File.WriteAllTextAsync(
+                            Path.Combine(target, $"{agent}.json"),
+                            JsonSerializer.Serialize(new RecordedAnswer(Prompts.Load(agent).Version, text), fileOptions) + "\n");
+                    }
                 }
             }
         }
@@ -115,17 +163,21 @@ async Task<int> Live(int runs, string? recordDirectory)
         Console.WriteLine($"{name}: {passes} of {runs}");
     }
 
-    Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"Prompt v{version}, model {deployment}, estimated cost ~${totalCost:0.0000}."));
+    var versions = string.Join(", ", profiles.Select(profile => $"{profile.Name} v{Prompts.Load(profile.Name).Version}"));
+    Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"Prompts {versions}, model {deployment}, estimated cost ~${totalCost:0.0000}."));
     Console.WriteLine(failures == 0 ? $"PASS: {cases.Length} case(s), {runs} run(s) each." : $"FAIL: {failures} failed run(s).");
     return failures == 0 ? 0 : 1;
 }
 
 async Task<ReviewResult> Review(string directory, IChatClient chat, string deployment = "replay")
 {
+    var scans = new RecordedScans(directory);
     var runner = new ReviewRunner(
         new LocalDirectorySource(standardsDirectory),
         new ConftestRunner(new ProcessRunner()),
-        new ReviewModel(chat, deployment));
+        new ReviewModel(chat, deployment),
+        infracost: new InfracostRunner(scans),
+        checkov: new CheckovRunner(scans));
 
     return await runner.RunAsync(await File.ReadAllTextAsync(Path.Combine(directory, "plan.json")), Config, Commit);
 }
@@ -150,11 +202,21 @@ async Task<List<string>> Problems(string directory, ReviewResult result)
 
     foreach (var finding in result.Findings)
     {
-        var pointer = finding.Evidence.Any(item => item.Value is PlanEvidence);
-        var citation = finding.Evidence.Any(item => item.Value is DocEvidence doc && doc.DocId == finding.Rule);
-        if (!pointer || !citation)
+        if (!finding.Evidence.Any(item => item.Value is PlanEvidence))
         {
-            problems.Add($"{finding.ResourceAddress} {finding.Rule}: no plan pointer or citation");
+            problems.Add($"{finding.ResourceAddress} {finding.Rule}: no plan pointer");
+        }
+
+        // A scanner's own rule ID has no document behind it. Anything citing a standard has to name it.
+        var citesStandard = Regex.IsMatch(finding.Rule, "^(ADR|POL|DES)-[0-9]{3}$");
+        if (citesStandard && !finding.Evidence.Any(item => item.Value is DocEvidence doc && doc.DocId == finding.Rule))
+        {
+            problems.Add($"{finding.ResourceAddress} {finding.Rule}: no citation");
+        }
+
+        if (finding.Agent == Reporter.Cost && finding.MonthlyCostDeltaUsd is not > 0)
+        {
+            problems.Add($"{finding.ResourceAddress} {finding.Rule}: no cost figure");
         }
     }
 
@@ -188,12 +250,72 @@ internal sealed record RecordedAnswer(
     [property: JsonPropertyName("prompt_version")] int PromptVersion,
     [property: JsonPropertyName("text")] string Text);
 
-/// <summary>Always gives the same answer, for runs that mustn't reach the model.</summary>
-internal sealed class ReplayChat(string text) : IChatClient
+/// <summary>Which scan a scanner run is, and so which file holds its output.</summary>
+internal static class ScanFile
+{
+    public static string Name(string program, IReadOnlyList<string> arguments)
+    {
+        if (program == "checkov")
+        {
+            return "checkov.scan";
+        }
+
+        return arguments[1].EndsWith("before.json", StringComparison.Ordinal) ? "infracost-before.scan" : "infracost-after.scan";
+    }
+}
+
+/// <summary>Plays back saved scanner output. A missing file fails the scan, and so the case.</summary>
+internal sealed class RecordedScans(string directory) : IProcessRunner
+{
+    public async Task<ProcessResult?> RunAsync(
+        string program, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken = default)
+    {
+        var path = Path.Combine(directory, ScanFile.Name(program, arguments));
+        return File.Exists(path) ? new ProcessResult(0, await File.ReadAllTextAsync(path, cancellationToken)) : null;
+    }
+}
+
+/// <summary>Runs the real scanner and saves its output, with GUIDs zeroed, because these files are public.</summary>
+internal sealed partial class RecordingScans(IProcessRunner inner, string directory) : IProcessRunner
+{
+    public async Task<ProcessResult?> RunAsync(
+        string program, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken = default)
+    {
+        var result = await inner.RunAsync(program, arguments, timeout, cancellationToken);
+        if (result is not null)
+        {
+            var clean = Guid().Replace(result.Output, "00000000-0000-0000-0000-000000000000");
+            await File.WriteAllTextAsync(Path.Combine(directory, ScanFile.Name(program, arguments)), clean, cancellationToken);
+        }
+
+        return result;
+    }
+
+    [GeneratedRegex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")]
+    private static partial Regex Guid();
+}
+
+/// <summary>Works out which agent a request is from, because each has its own prompt.</summary>
+internal static class AgentOf
+{
+    public static string? Request(ChatOptions? options, IEnumerable<AgentProfile> profiles) =>
+        profiles.FirstOrDefault(profile => options?.Instructions?.StartsWith(Prompts.Load(profile.Name).Body, StringComparison.Ordinal) == true)?.Name;
+}
+
+/// <summary>Gives each agent its recorded answer, for runs that mustn't reach the model. No answer is a failure.</summary>
+internal sealed class ReplayChat(IReadOnlyDictionary<string, string> answers, IEnumerable<AgentProfile> profiles) : IChatClient
 {
     public Task<ChatResponse> GetResponseAsync(
-        IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
-        Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, text)) { FinishReason = ChatFinishReason.Stop });
+        IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        var agent = AgentOf.Request(options, profiles);
+        if (agent is null || !answers.TryGetValue(agent, out var text))
+        {
+            throw new InvalidOperationException($"There's no recorded answer for {agent ?? "this request"}.");
+        }
+
+        return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, text)) { FinishReason = ChatFinishReason.Stop });
+    }
 
     public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
         IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
@@ -206,16 +328,22 @@ internal sealed class ReplayChat(string text) : IChatClient
     }
 }
 
-/// <summary>Keeps the model's last answer, so a passing run can become a replay.</summary>
-internal sealed class RecordingChat(IChatClient inner) : DelegatingChatClient(inner)
+/// <summary>Keeps each agent's last answer, so a passing run can become a replay.</summary>
+internal sealed class RecordingChat(IChatClient inner, IEnumerable<AgentProfile> profiles) : DelegatingChatClient(inner)
 {
-    public string? Text { get; private set; }
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> answers = new(StringComparer.Ordinal);
+
+    public IReadOnlyDictionary<string, string> Answers => answers;
 
     public override async Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
     {
         var response = await base.GetResponseAsync(messages, options, cancellationToken);
-        Text = response.Text;
+        if (AgentOf.Request(options, profiles) is { } agent)
+        {
+            answers[agent] = response.Text;
+        }
+
         return response;
     }
 

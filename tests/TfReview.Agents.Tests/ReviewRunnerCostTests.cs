@@ -37,6 +37,24 @@ public class ReviewRunnerCostTests
         await Assert.That(result.Cost!.BeforeUsd).IsEqualTo(31.904m);
         await Assert.That(result.Cost.AfterUsd).IsEqualTo(141.696m);
         await Assert.That(result.Cost.Resources.Single().ResourceAddress).IsEqualTo(Vm);
+    }
+
+    // The agents' prices come from the scan, so without a model the figures still reach the comment.
+    [Test]
+    public async Task Without_a_model_an_increase_is_still_shown_and_the_agent_reported_as_not_reviewed()
+    {
+        var result = await Run(WithCost, new FakeScans(Scan(1m), Scan(2m)));
+
+        await Assert.That(result.Cost!.AfterUsd).IsEqualTo(2m);
+        await Assert.That(result.NotReviewed.Single()).IsEqualTo(new NotReviewed(ReviewScope.Cost, NotReviewedReason.Unavailable));
+    }
+
+    // Nothing to judge, so there's nothing to say wasn't reviewed.
+    [Test]
+    public async Task No_increase_needs_no_agent()
+    {
+        var result = await Run(WithCost, new FakeScans(Scan(2m), Scan(1m)));
+
         await Assert.That(result.NotReviewed).IsEmpty();
     }
 
@@ -115,7 +133,6 @@ public class ReviewRunnerCostTests
         var finding = result.Findings.Single();
         await Assert.That(finding.Rule).IsEqualTo("CKV_AZURE_190");
         await Assert.That(finding.Deterministic).IsTrue();
-        await Assert.That(result.NotReviewed).IsEmpty();
     }
 
     // The false clean: it read nothing and exited 0.

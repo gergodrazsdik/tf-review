@@ -290,6 +290,7 @@ gh repo edit gergodrazsdik/tf-standards --template
 | `just e2e` | `tf-review` | Replays recorded model responses over the committed fixtures and asserts the expected findings; offline, no Azure and no token spend, so the Claude Code Stop hook can run it |
 | `just e2e-live` | `tf-review` | Runs the committed fixtures against the real model N times and asserts on the review result; manual, and the `e2e-live` workflow runs it on PRs that change the agent, its prompts or the fixtures |
 | `just fixtures` | `tf-review` | Takes the redacted plan each seeded branch's review already made, replaces every GUID with zeros, and writes it to `tests/fixtures/cases/`, so no raw plan reaches a laptop and no Azure login is needed |
+| `just record-scans` | `tf-review` | Saves what real Checkov and Infracost say about each eval case, so `just e2e` and CI need neither; reads the token from pass, so you run it |
 | `just bootstrap-plan` / `bootstrap-apply` / `bootstrap-migrate` | `tf-review` | The bootstrap project with your `az login`; apply and migrate ask first |
 | `just secrets-sync` | `tf-review` | Copies the Infracost token from pass into each onboarded repo's Actions secrets, and into Key Vault from M3; you run it, never an agent |
 | `just policy-test` | `tf-standards` | `opa fmt --fail`, `conftest verify`, frontmatter schema check |
