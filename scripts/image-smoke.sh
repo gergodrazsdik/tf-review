@@ -52,6 +52,9 @@ run "$image" review /work/refused.json /work/config.yml /work/refused-result.jso
 jq -e '.verdict == "not_reviewed" and .not_reviewed[0].reason == "redaction_refused"' "$work/refused-result.json"
 
 run --entrypoint conftest "$image" --version
+run --entrypoint infracost -e HOME=/tmp "$image" --version
+run --entrypoint test "$image" -x /opt/infracost/plugins/infracost-parser-terraform-plan
+run --entrypoint test "$image" -x /opt/infracost/plugins/infracost-provider-azure
 
 uid=$(run --entrypoint id "$image" -u)
 if [ "$uid" = 0 ]; then
