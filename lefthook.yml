@@ -1,0 +1,24 @@
+---
+pre-commit:
+  parallel: true
+  commands:
+    tofu-fmt:
+      glob: "*.tf"
+      run: tofu fmt -check {staged_files}
+    tflint:
+      glob: "*.tf"
+      run: tflint --recursive --config "$PWD/.tflint.hcl"
+    yamllint:
+      glob: "*.{yml,yaml}"
+      run: yamllint --strict {staged_files}
+    actionlint:
+      glob: ".github/workflows/*"
+      run: actionlint
+    pinact:
+      glob: ".github/workflows/*"
+      run: pinact run --check
+    shellcheck:
+      glob: "*.sh"
+      run: shellcheck {staged_files}
+    gitleaks:
+      run: gitleaks git --pre-commit --staged --no-banner

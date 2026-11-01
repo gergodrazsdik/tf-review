@@ -1,0 +1,13 @@
+{
+  "resource_address": "azurerm_storage_account.logs",
+  "rule": "ADR-002",
+  "severity": "medium",
+  "agent": "conventions",
+  "deterministic": true,
+  "title": "Required tag owner is missing",
+  "evidence": [
+    { "plan_pointer": "/resource_changes/0/change/after/tags" },
+    { "doc_id": "ADR-002" }
+  ],
+  "suggestion": "Add the owner tag."
+}

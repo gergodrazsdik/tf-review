@@ -242,10 +242,10 @@ gh repo edit gergodrazsdik/tf-standards --template
 
 1. Workflow token read-only by default: `gh api -X PUT repos/gergodrazsdik/<repo>/actions/permissions/workflow -f default_workflow_permissions=read`
 2. Settings → Actions: require approval for workflow runs from all outside contributors
-3. Ruleset on `main` kept in the repo as `.github/rulesets/main.json` (PR required, signed commits, required checks `lint` and `plan`), applied with `gh api repos/gergodrazsdik/<repo>/rulesets --input .github/rulesets/main.json`
+3. Ruleset on `main` kept in the repo as `.github/rulesets/main.json` (PR required, squash merges only, signed commits, required check `lint`, plus `plan` in `tf-review-demo`, the only repo with a plan job in M0), applied with `gh api repos/gergodrazsdik/<repo>/rulesets --input .github/rulesets/main.json`
 4. `tf-review-demo` only: environment `prod` with you as required reviewer
 
-**justfile recipes** (`just` lists them; destructive ones carry `[confirm]`)
+**justfile recipes** (`just` lists them; destructive ones carry `[confirm]`). Each recipe arrives with the milestone that first needs it: M0 has `claude`, `hooks`, `lint`, `contracts`, `bootstrap-*` and `policy-test`; `test`, `plan`, `cost`, `review`, `e2e` and `secrets-sync` come with M1 and M2.
 
 | Recipe | Repo | Does |
 | --- | --- | --- |
@@ -257,7 +257,7 @@ gh repo edit gergodrazsdik/tf-standards --template
 | `just cost <plan.json>` | `tf-review`, `tf-review-demo` | `infracost scan <plan.json> --json` with the token read from pass for that run only and `SSH_AUTH_SOCK` unset |
 | `just review <plan.json>` | `tf-review` | Runs the reviewer console app locally on one plan |
 | `just e2e` | `tf-review` | Plans the demo fixtures, reviews them, asserts the expected findings; the Claude Code Stop hook runs it |
-| `just bootstrap-plan` / `bootstrap-apply` | `tf-review` | The bootstrap project with your `az login`; apply asks first |
+| `just bootstrap-plan` / `bootstrap-apply` / `bootstrap-migrate` | `tf-review` | The bootstrap project with your `az login`; apply and migrate ask first |
 | `just secrets-sync` | `tf-review` | Copies pass entries into Actions secrets and Key Vault; you run it, never an agent |
 | `just policy-test` | `tf-standards` | `opa fmt --fail`, `conftest verify`, frontmatter schema check |
 
@@ -419,9 +419,9 @@ M1 is deliberately thin: one agent and one Azure resource (Foundry with gpt-5.4-
 
 - [x] Prerequisite tools installed and verified (setup doc step 41)
 - [x] Three repos created; demo and standards marked as templates
-- [ ] Scaffold all three repos: justfile, lefthook, CLAUDE.md, `.claude/` settings, lint workflow, ruleset JSON
-- [ ] `tf-review/docs/contracts/`: JSON Schemas for `.tf-review.yml`, findings, corpus frontmatter
-- [ ] `tf-standards`: ADR-001 naming, ADR-002 required tags, POL-001 storage, with Rego and `conftest verify` tests
+- [x] Scaffold all three repos: justfile, lefthook, CLAUDE.md, `.claude/` settings, lint workflow, ruleset JSON
+- [x] `tf-review/docs/contracts/`: JSON Schemas for `.tf-review.yml`, findings, corpus frontmatter
+- [x] `tf-standards`: ADR-001 naming, ADR-002 required tags, POL-001 storage, with Rego and `conftest verify` tests
 - [ ] Bootstrap: state storage, identities, GitHub variables and `prod` environment, budget; apply, then migrate state
 - [ ] Rulesets applied; fork-PR approval set in each repo
 - [ ] Gate: a demo PR plans, comments, and applies after approval
