@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/gergodrazsdik/tf-review/main/docs/contracts/tf-review-config.schema.json",
   "title": ".tf-review.yml",
-  "description": "Per-repo reviewer configuration.",
+  "description": "Per-repo reviewer configuration, read from the PR's base commit so a PR can't weaken its own review.",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "standards"],
@@ -27,11 +27,11 @@
       }
     },
     "agents": {
-      "description": "Specialist agents to run. The orchestrator and arbiter always run.",
+      "description": "Specialist agents to run. Only the agents that exist are allowed: security and cost join in M2, along with the orchestrator and the LLM arbiter, which always run.",
       "type": "array",
       "uniqueItems": true,
-      "items": { "enum": ["security", "cost", "conventions"] },
-      "default": ["security", "cost", "conventions"]
+      "items": { "enum": ["conventions"] },
+      "default": ["conventions"]
     },
     "thresholds": {
       "type": "object",

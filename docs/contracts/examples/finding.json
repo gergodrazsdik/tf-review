@@ -6,7 +6,7 @@
   "deterministic": true,
   "title": "Required tag owner is missing",
   "evidence": [
-    { "plan_pointer": "/resource_changes/0/change/after/tags" },
+    { "plan_pointer": "/resource_changes/azurerm_storage_account.logs/change/after/tags" },
     { "doc_id": "ADR-002" }
   ],
   "suggestion": "Add the owner tag."

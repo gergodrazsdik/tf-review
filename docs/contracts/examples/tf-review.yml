@@ -4,7 +4,7 @@ tool_version: 1.13.2
 standards:
   repository: gergodrazsdik/tf-standards
   commit: 0123456789abcdef0123456789abcdef01234567
-agents: [security, cost, conventions]
+agents: [conventions]
 thresholds:
   comment_min_severity: low
 gate:

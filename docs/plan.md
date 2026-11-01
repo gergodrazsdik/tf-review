@@ -164,7 +164,7 @@ Five LLM roles by M2 (M1 has only the conventions agent, D19–D20), each a Micr
 
 - Prompts live in `tf-review/prompts/<agent>.md` with a version header; the version is logged per call and is part of the result-cache key
 - Invalid JSON gets one retry; after that, the agent's slice is reported as "not reviewed" instead of guessed
-- A deterministic evidence check runs before the arbiter: each finding needs both a plan pointer that resolves and matches its `resource_address`, and a doc ID that is accepted, was retrieved for this prompt and applies to that resource type; failures are dropped and counted by reason, and never retried
+- A deterministic evidence check runs before the arbiter: each finding needs a plan pointer that resolves and matches its `resource_address`, and an LLM finding no scanner backs also needs a doc ID that is accepted, was retrieved for this prompt and applies to that resource type, since scanner rules such as Checkov's have no doc; failures are dropped and counted by reason, and never retried
 - Deduplication key: resource address plus rule (doc ID or scanner rule ID); the highest severity wins and the evidence is merged
 - Only deterministic high findings (Checkov, conftest) can block, and only when a repo opts in (D9); LLM-only findings never block
 - Agents see only redacted plans: only the redactor reads the raw plan, and `CondensedPlan` is the only plan type the agents accept. Redaction can't catch unmarked secrets under ordinary attribute names (D25)
@@ -231,7 +231,7 @@ tf-review/
 
 1. Reusable workflow inputs, secrets and outputs (`working-directory`, `config-path`, `image`; `tool` from M2; gate mode comes from the config's `gate.mode`; the Azure IDs are passed as secrets, with `secrets: inherit` for same-owner repos and explicitly otherwise)
 2. `.tf-review.yml` schema: enabled agents, severity thresholds, gate mode, standards source
-3. Finding schema: resource address, severity, evidence (an address-keyed plan pointer and a doc ID), suggestion, agent
+3. Finding schema: resource address, severity, evidence (an address-keyed plan pointer, and a doc ID when no scanner backs the finding), suggestion, agent (`scanner` when no LLM agent reported it)
 4. Corpus frontmatter schema: `id`, `type`, `status`, `superseded_by`, `applies_to`, `topics`, `severity`, `rego`
 5. Review result schema (M1): verdict, findings, `not_reviewed` slices and evidence-check drop counts
 
@@ -477,7 +477,7 @@ Work runs in this order, so unknowns surface first and a real comment lands befo
 *2. Solution and contracts*
 
 - [x] Solution skeleton: `global.json`, `.slnx` written by hand, central packages, `UseArtifactsOutput`; projects Core, Scanners, Rag, Agents, GitHub and Cli, with test projects added alongside the code they test; `just test`, `just lint-dotnet`, a required CI `test` job running the full `dotnet test` and `dotnet format`
-- [ ] Contract PRs: address-keyed pointers and the corrected `finding.json` example (its `deterministic: true` needs a scanner-sourced finding); `topics` in corpus frontmatter, in both repos and on every existing doc; review result schema; config schema text and defaults for M1, where only `conventions` exists
+- [x] Contract PRs: address-keyed pointers and the `scanner` agent value; `topics` in corpus frontmatter, in both repos and on every existing doc; review result schema; config schema text and defaults for M1, where only `conventions` exists; `scripts/check_contract_cases.py` proves the schemas reject what they should
 
 *3. Walking skeleton: first real comment*
 

@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Review result",
+  "description": "The outcome of one review: what tfreview review writes, tfreview publish renders and the evals assert on. It has no $id, so its $ref resolves next to this file instead of against the published copy on main.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "commit", "verdict", "findings", "not_reviewed", "evidence_drops"],
+  "properties": {
+    "version": { "const": 1 },
+    "commit": {
+      "description": "The commit reviewed, so a stale result can't pass for a newer one.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "standards_commit": {
+      "description": "The tf-standards commit the review used. Absent when the review failed before fetching it.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "verdict": {
+      "description": "no_findings never means approval, and partial coverage shows in not_reviewed. not_reviewed means nothing was reviewed.",
+      "enum": ["no_findings", "findings", "not_reviewed"]
+    },
+    "findings": {
+      "description": "Ranked, most severe first.",
+      "type": "array",
+      "items": { "$ref": "finding.schema.json" }
+    },
+    "not_reviewed": {
+      "description": "What couldn't be reviewed and why. A slice is reported here rather than guessed.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scope", "reason"],
+        "properties": {
+          "scope": {
+            "description": "The agent that couldn't finish, or plan when the whole plan was refused.",
+            "enum": ["plan", "conventions", "security", "cost"]
+          },
+          "reason": {
+            "enum": [
+              "redaction_refused",
+              "invalid_output",
+              "refused",
+              "truncated",
+              "content_filter",
+              "rate_limited",
+              "unavailable",
+              "timeout"
+            ]
+          }
+        }
+      }
+    },
+    "evidence_drops": {
+      "description": "Findings the evidence check dropped, counted by reason.",
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 1 }
+    },
+    "usage": {
+      "description": "Totals across the review's LLM calls, for the cost metrics.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_tokens", "output_tokens"],
+      "properties": {
+        "input_tokens": { "type": "integer", "minimum": 0 },
+        "output_tokens": { "type": "integer", "minimum": 0 },
+        "cached_input_tokens": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "verdict": { "const": "findings" } }, "required": ["verdict"] },
+      "then": { "properties": { "findings": { "minItems": 1 } } }
+    },
+    {
+      "if": { "properties": { "verdict": { "const": "no_findings" } }, "required": ["verdict"] },
+      "then": { "properties": { "findings": { "maxItems": 0 } } }
+    },
+    {
+      "if": { "properties": { "verdict": { "const": "not_reviewed" } }, "required": ["verdict"] },
+      "then": {
+        "properties": {
+          "findings": { "maxItems": 0 },
+          "not_reviewed": { "minItems": 1 }
+        }
+      }
+    }
+  ]
+}
