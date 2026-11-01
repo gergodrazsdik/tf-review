@@ -328,6 +328,30 @@ public class PlanRedactorTests
     }
 
     [Test]
+    public async Task Refuses_two_changes_to_the_same_resource()
+    {
+        var plan = JsonNode.Parse(Plan("""{"a":1}""", "{}"))!;
+        var changes = plan["resource_changes"]!.AsArray();
+        changes.Add(changes[0]!.DeepClone());
+
+        var outcome = new PlanRedactor().Redact(plan.ToJsonString());
+
+        await Assert.That(outcome is Refused { Rule: RefusalRule.MalformedPlan, Location: "/resource_changes/1" }).IsTrue();
+    }
+
+    [Test]
+    public async Task A_deposed_instance_is_a_separate_change()
+    {
+        var plan = JsonNode.Parse(Plan("""{"a":1}""", "{}"))!;
+        var changes = plan["resource_changes"]!.AsArray();
+        var deposed = changes[0]!.DeepClone();
+        deposed["deposed"] = "abc123";
+        changes.Add(deposed);
+
+        await Assert.That(new PlanRedactor().Redact(plan.ToJsonString()) is Redacted).IsTrue();
+    }
+
+    [Test]
     public async Task A_refusal_never_names_an_attribute()
     {
         var outcome = new PlanRedactor().Redact(Plan("""{"my-secret-map-key":"value"}""", """{"my-secret-map-key":"bad"}"""));

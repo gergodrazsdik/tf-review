@@ -30,9 +30,16 @@ public sealed record Refused(RefusalRule Rule, string Location) : RedactionOutco
 /// </summary>
 public sealed class RedactedPlan
 {
-    private readonly JsonObject root;
+    internal RedactedPlan(JsonObject root) => Root = root;
 
-    internal RedactedPlan(JsonObject root) => this.root = root;
+    internal JsonObject Root { get; }
 
-    public string ToCanonicalJson() => CanonicalJson.Write(root);
+    /// <summary>What identifies a resource change: its address, plus its deposed key if it has one.</summary>
+    internal static string ResourceKey(JsonObject change)
+    {
+        var address = change["address"]!.GetValue<string>();
+        return change["deposed"] is { } deposed ? $"{address} (deposed {deposed.GetValue<string>()})" : address;
+    }
+
+    public string ToCanonicalJson() => CanonicalJson.Write(Root);
 }

@@ -266,9 +266,17 @@ public sealed class PlanRedactor
                 throw new RefusalException(RefusalRule.MalformedPlan, $"/{ResourceChanges}");
             }
 
+            var seen = new HashSet<string>(StringComparer.Ordinal);
             for (var i = 0; i < items.Count; i++)
             {
-                changes.Add(BuildResource(items[i], $"/{ResourceChanges}/{i}", forms, ref dropped));
+                var resource = BuildResource(items[i], $"/{ResourceChanges}/{i}", forms, ref dropped);
+                if (!seen.Add(RedactedPlan.ResourceKey(resource)))
+                {
+                    // Findings point at a resource by this key, so it has to be unique.
+                    throw new RefusalException(RefusalRule.MalformedPlan, $"/{ResourceChanges}/{i}");
+                }
+
+                changes.Add(resource);
             }
         }
 
