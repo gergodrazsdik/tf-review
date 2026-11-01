@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "resource_address": "azurerm_virtual_network.seed",
+      "rule": "ADR-002",
+      "agent": "conventions",
+      "deterministic": true
+    }
+  ]
+}

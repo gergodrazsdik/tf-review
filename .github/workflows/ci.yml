@@ -49,6 +49,10 @@ jobs:
         run: dotnet test
         env:
           TF_STANDARDS_DIR: ${{ github.workspace }}/standards
+      - name: Replay the seeded cases
+        run: dotnet run --project tests/TfReview.Eval -- replay
+        env:
+          TF_STANDARDS_DIR: ${{ github.workspace }}/standards
       - name: Check formatting
         run: dotnet format --verify-no-changes
 

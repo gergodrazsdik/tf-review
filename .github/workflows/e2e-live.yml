@@ -1,0 +1,76 @@
+---
+name: e2e-live
+
+# Runs the seeded cases against the real model, as a PR that changes the agent has to be measured
+# rather than judged. Each run costs cents. It isn't a required check, so a model outage can't block merges.
+on:
+  pull_request:
+    paths:
+      - "prompts/**"
+      - "src/TfReview.Agents/**"
+      - "tests/TfReview.Eval/**"
+      - "tests/fixtures/cases/**"
+      - ".github/workflows/e2e-live.yml"
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Runs per case. The gate needs 3.
+        type: number
+        default: 3
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-live:
+    # Fork PRs get no OIDC token or secrets, so they can't reach the model.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    environment: review
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: gergodrazsdik/tf-standards
+          ref: 3f4d064b7059941dd268cd69cf694efec21c0c49
+          path: standards
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - name: Install conftest
+        run: scripts/install-ci-tools.sh conftest
+      - name: Build
+        run: dotnet build tests/TfReview.Eval
+      - name: Get a federated token
+        run: |
+          install -m 600 /dev/null "$RUNNER_TEMP/federated-token"
+          token=$(curl -fsS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r .value)
+          echo "::add-mask::$token"
+          printf '%s' "$token" >"$RUNNER_TEMP/federated-token"
+      - name: Run the cases against the model
+        env:
+          RUNS: ${{ inputs.runs || 3 }}
+          TF_STANDARDS_DIR: ${{ github.workspace }}/standards
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID_REVIEW }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          TF_REVIEW_OPENAI_ENDPOINT: ${{ vars.TF_REVIEW_OPENAI_ENDPOINT }}
+          TF_REVIEW_OPENAI_DEPLOYMENT: ${{ vars.TF_REVIEW_OPENAI_DEPLOYMENT }}
+        run: |
+          export AZURE_FEDERATED_TOKEN_FILE="$RUNNER_TEMP/federated-token"
+          dotnet run --project tests/TfReview.Eval --no-build -- live --runs "$RUNS" --record "$RUNNER_TEMP/answers"
+      # Passing answers, to commit as the replay fixtures after a prompt change.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: recorded-answers
+          path: ${{ runner.temp }}/answers
+          retention-days: 7
+          if-no-files-found: warn

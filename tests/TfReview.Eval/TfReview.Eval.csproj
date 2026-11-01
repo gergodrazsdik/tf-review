@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>TfReview.Eval</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/TfReview.Agents/TfReview.Agents.csproj" />
+    <ProjectReference Include="../../src/TfReview.GitHub/TfReview.GitHub.csproj" />
+  </ItemGroup>
+</Project>

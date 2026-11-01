@@ -59,7 +59,7 @@ All 30 decisions are settled as of 2026-11-01; D19–D29 came from the M1 design
 | D1 | IaC tool | OpenTofu 1.13 first; Terraform via a `tool` workflow input in M2 | Native state encryption; Terraform support doubles the test matrix, so it waits |
 | D2 | Agent runtime | C# 15 on .NET 11, Microsoft Agent Framework, `IChatClient` from Microsoft.Extensions.AI over the OpenAI SDK's `OpenAIClient` | Strongest stack; the provider stays swappable; unions and closed hierarchies fit findings and agent outcomes; support should end about when .NET 10's does (November 2028); Agent Framework dropped `Azure.AI.OpenAI` in 1.21 |
 | D3 | Where the review runs | One container image: the workflow runs it in M1–M2, Container Apps runs it from M3 | Identical binaries and tool versions locally, in CI and in Azure |
-| D4 | LLM | Azure OpenAI in Foundry, Data Zone Standard (EU): gpt-5.4-mini `2026-03-17` for every agent; gpt-6.1-sol `2026-09-29` for security and arbiter from M2, and gpt-6-luna `2026-09-22` as a small-model candidate, both once quota is granted; text-embedding-3-small `1` from M3; versions pinned and models set per agent in config | gpt-5.4-mini is the only chat model with quota (checked 2026-11-01); gpt-6.1-sol is reportedly cheaper than gpt-5.4 and gpt-5.5 and retires later; Luna must beat mini on the evals, not just on price; EU processing from day one |
+| D4 | LLM | Azure OpenAI in Foundry, Data Zone Standard (EU): gpt-5.4-mini `2026-03-17` for every agent, at low reasoning effort because its default of none failed valid names on the evals; gpt-6.1-sol `2026-09-29` for security and arbiter from M2, and gpt-6-luna `2026-09-22` as a small-model candidate, both once quota is granted; text-embedding-3-small `1` from M3; versions pinned and models set per agent in config | gpt-5.4-mini is the only chat model with quota (checked 2026-11-01); gpt-6.1-sol is reportedly cheaper than gpt-5.4 and gpt-5.5 and retires later; Luna must beat mini on the evals, not just on price; EU processing from day one |
 | D5 | Retrieval | Metadata filter plus whole docs in M1–M2; Cosmos DB free tier with vectors in M3 | The baseline shows whether vectors actually help |
 | D6 | Repo visibility | Public | Free Actions minutes and environment approvals; portfolio value |
 | D7 | Repos | `tf-review`, `tf-review-demo`, `tf-standards` (created 2026-11-01) | Standards have their own owner and lifecycle in production |
@@ -165,7 +165,7 @@ Five LLM roles by M2 (M1 has only the conventions agent, D19–D20), each a Micr
 
 - Prompts live in `tf-review/prompts/<agent>.md` with a version header, embedded in the assembly, with each version's hash in `prompts/versions.json`; the version is logged per call and is part of the result-cache key
 - Invalid JSON or a truncated answer gets one retry; after that, the agent's slice is reported as "not reviewed" instead of guessed. Refusals, content filters and service failures aren't retried by the agent, and the SDK retries 429s and 5xx itself
-- A deterministic evidence check runs before the arbiter: each finding needs a plan pointer that resolves and matches its `resource_address`, and an LLM finding no scanner backs also needs a doc ID that is accepted, was retrieved for this prompt and applies to that resource type, since scanner rules such as Checkov's have no doc; failures are dropped and counted by reason, and never retried
+- A deterministic evidence check runs before the arbiter: each finding needs a plan pointer that resolves and matches its `resource_address`, and an LLM finding no scanner backs also needs a doc ID that is accepted, was retrieved for this prompt and applies to that resource type, since scanner rules such as Checkov's have no doc, and must point at an attribute the plan changes; failures are dropped and counted by reason, and never retried
 - Deduplication key: resource address plus rule (doc ID or scanner rule ID); the highest severity wins and the evidence is merged
 - Only deterministic high findings (Checkov, conftest) can block, and only when a repo opts in (D9); LLM-only findings never block
 - Agents see only redacted plans: only the redactor reads the raw plan, and `CondensedPlan` is the only plan type the agents accept. Redaction can't catch unmarked secrets under ordinary attribute names (D25)
@@ -283,8 +283,8 @@ gh repo edit gergodrazsdik/tf-standards --template
 | `just cost <plan.json>` | `tf-review`, `tf-review-demo` | `infracost scan <plan.json> --json` with the token read from pass for that run only and `SSH_AUTH_SOCK` unset |
 | `just review <plan.json>` | `tf-review` | Runs the reviewer console app locally on one plan |
 | `just e2e` | `tf-review` | Replays recorded model responses over the committed fixtures and asserts the expected findings; offline, no Azure and no token spend, so the Claude Code Stop hook can run it |
-| `just e2e-live` | `tf-review` | Runs the committed fixtures against the real model N times and asserts on `review-result.json`; manual and CI only |
-| `just fixtures` | `tf-review` | Plans each seeded branch in a worktree and commits only the redacted output to `tests/fixtures/`; you run it |
+| `just e2e-live` | `tf-review` | Runs the committed fixtures against the real model N times and asserts on the review result; manual, and the `e2e-live` workflow runs it on PRs that change the agent, its prompts or the fixtures |
+| `just fixtures` | `tf-review` | Takes the redacted plan each seeded branch's review already made, replaces every GUID with zeros, and writes it to `tests/fixtures/cases/`, so no raw plan reaches a laptop and no Azure login is needed |
 | `just bootstrap-plan` / `bootstrap-apply` / `bootstrap-migrate` | `tf-review` | The bootstrap project with your `az login`; apply and migrate ask first |
 | `just secrets-sync` | `tf-review` | Copies pass entries into Actions secrets and Key Vault; you run it, never an agent |
 | `just policy-test` | `tf-standards` | `opa fmt --fail`, `conftest verify`, frontmatter schema check |
@@ -508,8 +508,9 @@ Work runs in this order, so unknowns surface first and a real comment lands befo
 
 *6. Evaluation and gate*
 
-- [ ] Seeded branches as draft PRs, each changing one thing so they stay mergeable: `seed/c5-missing-tags`, `seed/c6-bad-name`, `seed/c8-tag-value`, `seed/c9-bad-environment`, `seed/c10-subnet`. C5 and C6 add new resources, because renaming an existing one likely forces replacement. **You:** `just fixtures`, committing redacted output only
-- [ ] `just e2e` (replay, and **you** add it as the Stop hook, because `.claude/settings.json` is write-protected) and `just e2e-live`
+- [x] Seeded branches as draft PRs (`tf-review-demo` #10–14), each changing one thing so they stay mergeable: `seed/c5-missing-tags`, `seed/c6-bad-name`, `seed/c8-tag-value`, `seed/c9-bad-environment`, `seed/c10-subnet`. C5 and C6 add new resources, because renaming an existing one likely forces replacement. `just fixtures` commits their redacted plans with every GUID zeroed, because resource IDs hold the subscription ID
+- [x] `just e2e` (replay, also in CI's `test` job) and `just e2e-live` (real model, and the `e2e-live` workflow on PRs that change the agent, its prompts or the fixtures). Measured on 2026-11-01: prompt v1 failed C8 in 2 of 3 runs, because it judged an update's unchanged name and read examples as limits. Prompt v2 with the unchanged-attribute check fixed that but failed C5 in 3 of 3, reporting a valid name, and low reasoning effort then took all five cases to 3 of 3 at about $0.02 for the 15 runs
+- [ ] **You:** add `just e2e` as the Stop hook, because `.claude/settings.json` is write-protected
 - [ ] Gate: 3 of 3 `just e2e-live` runs per case: C5, C6 and C9 found with exact address, rule and citation; C8 and C10 `reviewed` with no findings, where `not_reviewed` fails; plus one real PR with a sticky comment. Agent findings are asserted before any conftest backstop
 
 **M2 · Full board**

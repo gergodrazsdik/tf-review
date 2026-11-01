@@ -11,6 +11,11 @@ internal static class TestPlans
         {"address":"{{address}}","type":"{{type}}","mode":"managed","change":{"actions":["create"],"before":null,"after":{{after}},"after_unknown":{},"before_sensitive":false,"after_sensitive":{} } }
         """;
 
+    public static string Update(string address, string type, string before, string after) =>
+        $$"""
+        {"address":"{{address}}","type":"{{type}}","mode":"managed","change":{"actions":["update"],"before":{{before}},"after":{{after}},"after_unknown":{},"before_sensitive":{},"after_sensitive":{} } }
+        """;
+
     public static string Json(params string[] resources) =>
         $$"""{"format_version":"1.2","resource_changes":[{{string.Join(',', resources)}}]}""";
 

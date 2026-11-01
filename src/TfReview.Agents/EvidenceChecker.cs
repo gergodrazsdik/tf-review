@@ -9,13 +9,15 @@ public sealed record EvidenceCheck(IReadOnlyList<Finding> Kept, IReadOnlyDiction
 /// <summary>
 /// Drops findings that can't be tied to this plan and these standards, which is what stands between a
 /// model's invention and the PR. Scanner findings need a plan pointer. Model findings also need a document
-/// that was in their prompt and applies to that resource type. Drops are counted and never retried.
+/// that was in their prompt and applies to that resource type, and have to be about something this plan
+/// changes, while a policy can still report an old problem. Drops are counted and never retried.
 /// </summary>
 public static class EvidenceChecker
 {
     public const string NoPlanPointer = "no_plan_pointer";
     public const string PointerUnresolved = "pointer_unresolved";
     public const string PointerOtherResource = "pointer_other_resource";
+    public const string AttributeUnchanged = "attribute_unchanged";
     public const string NoDocument = "no_document";
     public const string DocumentNotRetrieved = "document_not_retrieved";
     public const string DocumentNotApplicable = "document_not_applicable";
@@ -64,7 +66,14 @@ public static class EvidenceChecker
             }
         }
 
-        return finding.Deterministic ? null : DocumentDropReason(finding, plan, retrieved);
+        if (finding.Deterministic)
+        {
+            return null;
+        }
+
+        return pointers.Any(pointer => plan.PointsAtUnchangedAttribute(pointer.PlanPointer))
+            ? AttributeUnchanged
+            : DocumentDropReason(finding, plan, retrieved);
     }
 
     private static string? DocumentDropReason(Finding finding, CondensedPlan plan, IReadOnlyCollection<StandardsDoc> retrieved)
