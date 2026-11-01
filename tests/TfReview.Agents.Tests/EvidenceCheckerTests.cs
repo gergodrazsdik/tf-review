@@ -7,6 +7,7 @@ public class EvidenceCheckerTests
 {
     private const string Vnet = "azurerm_virtual_network.main";
     private const string Subnet = "azurerm_subnet.main";
+    private const string Updated = "azurerm_virtual_network.updated";
 
     private static readonly StandardsDoc Naming = TestPlans.Doc("ADR-001", "azurerm_virtual_network");
     private static readonly StandardsDoc Tagging = TestPlans.Doc("ADR-002", "*");
@@ -14,6 +15,12 @@ public class EvidenceCheckerTests
     private static readonly CondensedPlan Plan = TestPlans.Condensed(
         TestPlans.Create(Vnet, "azurerm_virtual_network", """{"name":"BadName","tags":null}"""),
         TestPlans.Create(Subnet, "azurerm_subnet", """{"name":"snet"}"""));
+
+    private static readonly CondensedPlan UpdatePlan = TestPlans.Condensed(TestPlans.Update(
+        Updated,
+        "azurerm_virtual_network",
+        """{"name":"BadName","tags":{"environment":"prod"}}""",
+        """{"name":"BadName","tags":{"environment":"production"}}"""));
 
     [Test]
     public async Task Keeps_a_model_finding_with_valid_evidence()
@@ -31,6 +38,38 @@ public class EvidenceCheckerTests
     public async Task A_pointer_to_a_null_attribute_counts()
     {
         var check = Check(ModelFinding(Vnet, "ADR-002", CondensedPlan.PointerTo(Vnet, "change", "after", "tags")));
+
+        await Assert.That(check.Kept.Count).IsEqualTo(1);
+    }
+
+    // C8: the condensed plan keeps an update's name for context, which invites comment on an old problem.
+    [Test]
+    public async Task Drops_a_model_finding_on_an_attribute_the_plan_doesnt_change()
+    {
+        var check = EvidenceChecker.Check(
+            [ModelFinding(Updated, "ADR-001", CondensedPlan.PointerTo(Updated, "change", "after", "name"))], UpdatePlan, [Naming]);
+
+        await Assert.That(check.Kept).IsEmpty();
+        await Assert.That(check.Drops[EvidenceChecker.AttributeUnchanged]).IsEqualTo(1);
+    }
+
+    // C9: the tag that breaks the standard is one that changes.
+    [Test]
+    public async Task Keeps_a_model_finding_on_an_attribute_the_plan_changes()
+    {
+        var check = EvidenceChecker.Check(
+            [ModelFinding(Updated, "ADR-002", CondensedPlan.PointerTo(Updated, "change", "after", "tags"))], UpdatePlan, [Tagging]);
+
+        await Assert.That(check.Kept.Count).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task A_policy_can_still_report_an_old_problem()
+    {
+        Finding finding = new(
+            Updated, "ADR-001", Severity.Low, Reporter.Scanner, true, "t", [new PlanEvidence(CondensedPlan.PointerTo(Updated, "change", "after", "name"))]);
+
+        var check = EvidenceChecker.Check([finding], UpdatePlan, [Naming]);
 
         await Assert.That(check.Kept.Count).IsEqualTo(1);
     }

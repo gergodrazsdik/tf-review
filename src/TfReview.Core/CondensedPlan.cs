@@ -78,6 +78,26 @@ public sealed class CondensedPlan
         return true;
     }
 
+    /// <summary>
+    /// Whether a pointer names an attribute an update leaves as it was. Those stay in the condensed plan
+    /// for context, such as a resource's name and tags, but this plan isn't what put their values there.
+    /// </summary>
+    public bool PointsAtUnchangedAttribute(string pointer)
+    {
+        var parts = pointer.Split('/').Select(Unescape).ToArray();
+        if (parts is not ["", ResourceChanges, var address, Change, After, var attribute]
+            || root[ResourceChanges]?[address]?[Change] is not JsonObject change
+            || change[Before] is not JsonObject before
+            || change[After] is not JsonObject after
+            || !before.ContainsKey(attribute)
+            || !after.ContainsKey(attribute))
+        {
+            return false;
+        }
+
+        return CanonicalJson.Write(before[attribute]) == CanonicalJson.Write(after[attribute]);
+    }
+
     /// <summary>The resource type at an address, or null if the plan has no such change.</summary>
     public string? TypeOf(string address) =>
         root[ResourceChanges]!.AsObject().TryGetPropertyValue(address, out var resource)
