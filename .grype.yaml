@@ -1,0 +1,12 @@
+---
+# Exceptions to the release's Grype gate (D28), each as narrow as it can be. Grype can't expire a rule, so
+# docs/plan.md holds the date to review each one by.
+ignore:
+  # go-jose: a denial of service when parsing JWKs that contain RSA keys. This plugin only parses plan JSON
+  # from our own redactor, inside a job that holds no long-lived secret but the Infracost token. Its source
+  # isn't public and 0.0.37 was the newest version found on 2026-11-01, so it can't be patched here.
+  - vulnerability: GHSA-mgcc-cww5-fp2q
+    package:
+      name: github.com/go-jose/go-jose/v4
+      version: v4.1.4
+      location: /opt/infracost/plugins/infracost-parser-terraform-plan

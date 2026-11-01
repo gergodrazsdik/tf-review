@@ -46,6 +46,7 @@ Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET S
 - [ ] Before gpt-5.4-mini retires (2027-09-21): move to a newer small model through the eval suite
 - [ ] After .NET 11 GA (scheduled 2026-11-10): install the GA SDK through `update-sources`, pin `global.json` to `11.0.100` without `allowPrerelease`, and re-pin the base image digest
 - [ ] After a conftest release that fixes the go1.27.1, x/net and go-jose findings (v0.71.1 and `main` don't, checked 2026-11-01): go back to the release binary in the `Containerfile`, which also ends the difference described under "Policy tests pass but enforcement differs"
+- [ ] By 2027-02-01, or at any Infracost update: review the `.grype.yaml` exception for `infracost-parser-terraform-plan`, and remove it once a plugin version ships go-jose 4.1.6 or later
 - [ ] After a CSharpier release that parses C# 15 (1.3.0 fails on `union`): add it back to the prerequisites and decide where it runs; until then `dotnet format` is the only C# formatter
 - [x] Infracost v2: create a personal access token, store it as `pass insert tf-review/infracost/cli-token`, clear any cached `infracost auth login` session
 - [ ] M3: create the GitHub App and store its private key as `pass insert -m tf-review/github-app/private-key`
@@ -83,7 +84,7 @@ All 34 decisions are settled as of 2026-11-01; D19–D29 came from the M1 design
 | D25 | Redaction policy | Tofu's sensitive marks plus an attribute-name denylist, with marked values swept wherever else they appear; GUIDs in changes are replaced too, but not in addresses; malformed input refuses the review; other values pass | The model keeps its context; unmarked secrets under ordinary names remain a known risk. Resource IDs hold the subscription ID, which D30 keeps out of public logs, and the plan artifact and comments are public too; addresses have to stay unique |
 | D26 | Corpus metadata | `topics` enum in corpus frontmatter; agents declare the topics they retrieve | The schema can't express "naming, tags" today, so POL-001 would reach the conventions agent |
 | D27 | Config source | `.tf-review.yml` is read from the PR's base commit | A PR can't disable its own review or swap the standards corpus; config changes apply after merge |
-| D28 | Release pipeline | The full pipeline from M1; Grype fails only on high findings that have a fix | Unpatched base image issues can't stall a release |
+| D28 | Release pipeline | The full pipeline from M1; Grype fails only on high findings that have a fix, with exceptions in `.grype.yaml` limited to one finding on one file | Unpatched base image issues can't stall a release. The first exception is go-jose in Infracost's closed-source plan parser, which we can't patch |
 | D29 | M1 gate | 3 of 3 fixture runs per case on C5, C6, C8, C9 and C10, plus one real PR | One run can pass by luck; 3 of 3 is still weak evidence, so M2's baseline replaces it |
 | D30 | Azure IDs in CI | Subscription, tenant and client IDs are Actions secrets; state and Foundry names stay variables | They aren't credentials, but Actions logs on public repos are public, and only secrets are masked there; state names are committed anyway, and masking the rest would add little |
 | D31 | Cost delta | Two `infracost scan` runs, over "before" and "after" plans rebuilt from the redacted plan's `resource_changes`; code computes the delta per resource | No main-branch baseline to store or let go stale, and no raw plan in the review job. `infracost diff` matches by file path, so it reports differently named files as one project removed and one added, and only its total is useful |
@@ -133,7 +134,7 @@ Only the arbiter talks back to GitHub, and only findings that carry evidence (a 
 | `tfreview` CLI, API and worker (.NET 11, one build) | Git tag | The review itself; the entry command decides the role |
 | conftest (bundled OPA), from M1 | Built from source at the commit behind v0.71.1, with go1.27.3, x/net 0.60.0 and go-jose 4.1.6, reported as `0.71.1-patched` | Runs the `tf-standards` Rego |
 | Checkov, from M2 | uv lockfile, installed into a venv | Security findings on the plan JSON |
-| Infracost CLI v2 + terraform-plan and azure plugins, from M2 | Version + checksums; `INFRACOST_CLI_PLUGIN_DIR` set in the image | Cost per resource; nothing downloads at run time |
+| Infracost CLI v2 + terraform-plan and azure plugins, from M2 | CLI built from source at the commit behind v2.18.3 with x/net 0.60.0, reported as `2.18.3-patched`; plugins by version and checksum; `INFRACOST_CLI_PLUGIN_DIR` set in the image | Cost per resource; nothing downloads at run time |
 
 Not in the image: OpenTofu (the plan runs in the consumer workflow, next to its credentials and state), the Azure CLI, git, and the `tf-standards` content, which is fetched at review time as a commit tarball over HTTPS, at the commit named in the base branch's `.tf-review.yml`, so a policy change never needs an image rebuild.
 
@@ -529,7 +530,8 @@ Work runs in this order, so the deterministic findings exist before the agents t
 *2. Cost*
 
 - [x] `ScannablePlan`, rebuilt from a `RedactedPlan`, with one side per scan; the no-resources check (D32)
-- [ ] Infracost CLI and pinned plugins in the image, on a read-only filesystem; `InfracostRunner` and the per-resource delta; a type Infracost can't price is reported as unknown rather than as free; a test with recorded scan output, so nothing needs the token
+- [x] Infracost CLI and pinned plugins in the image, on a read-only filesystem. The CLI is a source build with x/net 0.60.0, and the plan parser plugin has one narrow Grype exception (D28)
+- [x] `InfracostRunner` and the per-resource delta; a type Infracost can't price is reported as unknown rather than as free; a test with recorded scan output, so nothing needs the token
 - [ ] `just cost` and `just secrets-sync`, and the token secret in the review job. **You:** `just secrets-sync`
 
 *3. Security scanner*
