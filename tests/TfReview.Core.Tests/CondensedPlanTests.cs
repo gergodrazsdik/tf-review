@@ -7,6 +7,18 @@ public class CondensedPlanTests
     private const string Address = "azurerm_virtual_network.main";
 
     [Test]
+    public async Task Knows_the_types_that_change()
+    {
+        var plan = Condense(Plan(
+            Resource("a.one", "[\"create\"]", "null", "{}"),
+            Resource("a.two", "[\"create\"]", "null", "{}")));
+
+        await Assert.That(plan.TypeOf("a.two")).IsEqualTo("x");
+        await Assert.That(plan.TypeOf("c.missing")).IsNull();
+        await Assert.That(plan.ResourceTypes()).IsEquivalentTo(["x"]);
+    }
+
+    [Test]
     public async Task Drops_no_ops()
     {
         var plan = Condense(Plan(Resource("a.keep", "[\"update\"]", """{"x":1}""", """{"x":2}"""), Resource("a.same", "[\"no-op\"]", """{"x":1}""", """{"x":1}""")));

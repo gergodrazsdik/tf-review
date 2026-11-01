@@ -498,9 +498,9 @@ Work runs in this order, so unknowns surface first and a real comment lands befo
 *5. Agent and output*
 
 - [x] `GitHubTarballSource` (size, entry and download caps, path traversal guard, no links, only `.md` and `.rego`) and `TfReviewConfig`
-- [ ] `FileRetriever` with topics, `applies_to` and an 8k token cap that omits whole docs and reports them; a local directory source for the tests
+- [x] `FileRetriever` with topics, `applies_to` and an 8k token cap that omits whole docs and reports them; a local directory source for the tests
 - [ ] Versioned prompts, with a test that fails if a prompt changes without a version bump; conventions agent, wire-to-finding mapping, the one-retry rule, and separate handling of 429, 5xx, content filter and timeout
-- [ ] `EvidenceChecker` and `RuleArbiter` behind `IArbiter`
+- [x] `EvidenceChecker` and `RuleArbiter` behind `IArbiter`
 - [x] Comment renderer and sanitiser, including "not reviewed": untrusted text goes in inline code spans, where GitHub parses no markdown, mentions or links
 - [x] Wire redaction, conftest and the comment into the CLI, so a PR gets real policy findings before the agent exists; the review job re-runs the redactor on the untrusted artifact
 - [ ] Tokens, cost and latency in the step summary (App Insights arrives in M3; no check run until M3)

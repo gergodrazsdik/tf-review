@@ -78,6 +78,22 @@ public sealed class CondensedPlan
         return true;
     }
 
+    /// <summary>The resource type at an address, or null if the plan has no such change.</summary>
+    public string? TypeOf(string address) =>
+        root[ResourceChanges]!.AsObject().TryGetPropertyValue(address, out var resource)
+            ? resource?["type"]?.GetValue<string>()
+            : null;
+
+    /// <summary>The distinct resource types that change, which decide the standards an agent retrieves.</summary>
+    public IReadOnlyList<string> ResourceTypes() =>
+    [
+        .. root[ResourceChanges]!.AsObject()
+            .Select(resource => resource.Value?["type"]?.GetValue<string>())
+            .OfType<string>()
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal),
+    ];
+
     public string ToCanonicalJson() => CanonicalJson.Write(root);
 
     private static bool IsNoOp(JsonObject change) =>
