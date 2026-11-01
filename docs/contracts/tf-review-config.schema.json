@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/gergodrazsdik/tf-review/main/docs/contracts/tf-review-config.schema.json",
+  "title": ".tf-review.yml",
+  "description": "Per-repo reviewer configuration.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "standards"],
+  "properties": {
+    "version": { "const": 1 },
+    "tool_version": {
+      "description": "OpenTofu version the workflow installs.",
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "standards": {
+      "description": "The tf-standards source, fetched at this exact commit.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit"],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        },
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+      }
+    },
+    "agents": {
+      "description": "Specialist agents to run. The orchestrator and arbiter always run.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["security", "cost", "conventions"] },
+      "default": ["security", "cost", "conventions"]
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "comment_min_severity": {
+          "description": "Findings below this severity stay out of the PR comment.",
+          "enum": ["low", "medium", "high"],
+          "default": "low"
+        }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "description": "blocking fails the check only on deterministic high findings; LLM-only findings never block.",
+          "enum": ["advisory", "blocking"],
+          "default": "advisory"
+        }
+      }
+    }
+  }
+}

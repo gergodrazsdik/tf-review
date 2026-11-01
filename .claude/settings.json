@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(tofu apply*)",
+      "Bash(tofu destroy*)",
+      "Bash(terraform apply*)",
+      "Bash(terraform destroy*)",
+      "Bash(tofu state rm*)",
+      "Bash(az * delete*)",
+      "Bash(just bootstrap-apply*)",
+      "Bash(just bootstrap-migrate*)",
+      "Bash(just secrets-sync*)"
+    ]
+  }
+}

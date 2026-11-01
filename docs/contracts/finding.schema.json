@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/gergodrazsdik/tf-review/main/docs/contracts/finding.schema.json",
+  "title": "Finding",
+  "description": "One review finding. Agents, scanners and the arbiter all use this shape.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["resource_address", "rule", "severity", "agent", "deterministic", "title", "evidence"],
+  "properties": {
+    "resource_address": { "type": "string", "minLength": 1 },
+    "rule": {
+      "description": "Doc ID or scanner rule ID. With resource_address it forms the deduplication key.",
+      "type": "string",
+      "minLength": 1
+    },
+    "severity": { "enum": ["low", "medium", "high"] },
+    "agent": { "enum": ["orchestrator", "security", "cost", "conventions", "arbiter"] },
+    "deterministic": {
+      "description": "True when a scanner (Checkov, conftest) produced it. Only deterministic high findings can block.",
+      "type": "boolean"
+    },
+    "title": { "type": "string", "minLength": 1 },
+    "evidence": {
+      "description": "At least one plan pointer or accepted doc ID; the evidence check drops findings without a valid one.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["plan_pointer"],
+            "properties": {
+              "plan_pointer": {
+                "description": "JSON Pointer into the condensed plan.",
+                "type": "string",
+                "pattern": "^/"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["doc_id"],
+            "properties": {
+              "doc_id": { "type": "string", "pattern": "^(ADR|POL|DES)-[0-9]{3}$" }
+            }
+          }
+        ]
+      }
+    },
+    "suggestion": { "type": "string" },
+    "monthly_cost_delta_usd": {
+      "description": "Cost agent only.",
+      "type": "number"
+    }
+  }
+}
