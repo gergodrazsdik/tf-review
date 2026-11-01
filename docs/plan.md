@@ -32,7 +32,7 @@ Installed and verified on 2026-11-01 (setup doc step 41): OpenTofu 1.13.2, conft
 | conftest | Runs the `tf-standards` Rego against plan JSON, and their unit tests with `conftest verify` (same bundled OPA that enforces them) | Release binary, SLSA attestation | M1 |
 | OPA (`opa`) | `opa fmt` and `opa check` for the Rego only | Release binary, release attestation | M1 |
 | Checkov | Security scanner on plan JSON (D10) | `uv tool install checkov` | M2 |
-| Infracost CLI v2 | Cost of each plan with `infracost scan` on the plan JSON; JSON output for the cost agent | Release binary from `infracost/cli`, verified; plugins pinned by checksum in `INFRACOST_CLI_PLUGIN_DIR`, which also stops the CLI fetching them | M2 |
+| Infracost CLI v2 | Cost of each plan with `infracost scan` on plans rebuilt from the redacted one (D31); JSON output for the cost agent | Release binary from `infracost/cli`, verified; plugins pinned by checksum in `INFRACOST_CLI_PLUGIN_DIR`, which also stops the CLI fetching them | M2 |
 | TFLint + azurerm ruleset | Provider-aware lint in the pre-commit hook | Release binary, SLSA attestation; ruleset fetched by `tflint --init` | M0, optional |
 | tofu-ls | OpenTofu language server for Neovim and the `dg-lsp` plugin Source build at a pinned tag (`go mod download` + `go build`, because `go install` rejects its `replace` directive), checked against Go's checksum database | Optional |
 
@@ -52,7 +52,7 @@ Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET S
 
 ## Decision log
 
-All 30 decisions are settled as of 2026-11-01; D19–D29 came from the M1 design council. Changing one means editing its row and the sections it affects in the same commit.
+All 34 decisions are settled as of 2026-11-01; D19–D29 came from the M1 design council and D31–D34 from M2's spike. Changing one means editing its row and the sections it affects in the same commit.
 
 | # | Decision | Choice | Why |
 | --- | --- | --- | --- |
@@ -86,6 +86,10 @@ All 30 decisions are settled as of 2026-11-01; D19–D29 came from the M1 design
 | D28 | Release pipeline | The full pipeline from M1; Grype fails only on high findings that have a fix | Unpatched base image issues can't stall a release |
 | D29 | M1 gate | 3 of 3 fixture runs per case on C5, C6, C8, C9 and C10, plus one real PR | One run can pass by luck; 3 of 3 is still weak evidence, so M2's baseline replaces it |
 | D30 | Azure IDs in CI | Subscription, tenant and client IDs are Actions secrets; state and Foundry names stay variables | They aren't credentials, but Actions logs on public repos are public, and only secrets are masked there; state names are committed anyway, and masking the rest would add little |
+| D31 | Cost delta | Two `infracost scan` runs, over "before" and "after" plans rebuilt from the redacted plan's `resource_changes`; code computes the delta per resource | No main-branch baseline to store or let go stale, and no raw plan in the review job. `infracost diff` matches by file path, so it reports differently named files as one project removed and one added, and only its total is useful |
+| D32 | Scanner input | Checkov and Infracost read a plan rebuilt from the redacted one, and a scanner reporting no resources for a plan that has some counts as failed | Both exit 0 with an empty result on a plan without `planned_values`, which looks exactly like a clean scan. Scanners never see the raw plan, so a value marked sensitive can't be priced or checked |
+| D33 | C4 and C7 fixtures | Hand-built in `tests/fixtures/cases`, with no seeded PR | Both need an existing resource that a plan updates or replaces, and keeping a VM or database deployed for it would cost money. The other cases remain real seeded PRs |
+| D34 | Checkov findings | Only an allowlist of checks becomes findings, each with a severity set in code | One storage account failed 11 checks in the spike, and checks that look for related resources can't pass without `configuration`, so reporting everything would bury C1–C3 and fail C8 and C10 |
 
 ## Architecture
 
@@ -515,13 +519,42 @@ Work runs in this order, so unknowns surface first and a real comment lands befo
 
 **M2 · Full board**
 
-- [ ] One-day spike: cost delta via Infracost v2's diff against a main-branch baseline vs pricing `prior_state` ourselves; decide on case C4
-- [ ] Orchestrator, security and cost agents, and the LLM arbiter (D20); Checkov and Infracost inside the image
-- [ ] Dedupe rules in code
+Work runs in this order, so the deterministic findings exist before the agents that use them. Steps marked **you** can only be run by you.
+
+*1. Decide the unknowns*
+
+- [x] Spike on cost deltas (2026-11-01, hand-built plans): a VM going from `Standard_B2s` to `Standard_D4s_v5` priced at $31.90 before and $141.70 after, a change of $109.79 a month, from plans rebuilt out of `resource_changes` (D31). Scanning the redacted plan as it stands gives zero resources and exit 0, and Checkov does the same (D32). Infracost also runs an org tagging policy that contradicts ADR-002, so only its cost fields are read
+- [ ] **You:** re-check gpt-6.1-sol and gpt-6-luna quota from 2026-11-05 (see Accounts)
+
+*2. Cost*
+
+- [ ] `ScannablePlan`, rebuilt from a `RedactedPlan`, with one side per scan; the no-resources check (D32)
+- [ ] Infracost CLI and pinned plugins in the image, on a read-only filesystem; `InfracostRunner` and the per-resource delta; a type Infracost can't price is reported as unknown rather than as free; a test with recorded scan output, so nothing needs the token
+- [ ] `just cost` and `just secrets-sync`, and the token secret in the review job. **You:** `just secrets-sync`
+
+*3. Security scanner*
+
+- [ ] Checkov from a uv lockfile in the image, with Python on the base image; check that Grype still passes
+- [ ] `CheckovRunner` and the allowlist (D34), with findings that cite the Checkov rule ID
+
+*4. Agents*
+
+- [ ] `tf-standards`: network and identity policies for C1 and C3, with Rego where a rule is exact
+- [ ] Security and cost agents, each with a versioned prompt, its own wire schema and low reasoning effort; config contract for the new agents
+- [ ] Seeded cases C1–C3 as real PRs, and C4 and C7 as hand-built fixtures (D33), in `e2e` and `e2e-live`
+
+*5. Orchestrator and arbiter*
+
+- [ ] Orchestrator: routing by resource type and risk order, and a code fallback that sends everything everywhere if its output is invalid, so routing can't silently skip a review
+- [ ] LLM arbiter behind `IArbiter` (D20), which can only rank and drop what the evidence check kept, never add; the rule-based merge stays as its input and its fallback
+- [ ] Comment: monthly cost delta and risk order
+
+*6. Evaluation and gate*
+
 - [ ] Prompt-cache layout; `cached_tokens` logged per call
-- [ ] Seeded cases C1–C4 and C7; eval suite in CI with the baseline recorded
 - [ ] gpt-6.1-sol deployed for security and arbiter, and gpt-6-luna compared with gpt-5.4-mini on the eval suite, if quota is granted; each new model first passes the structured output smoke test, because Microsoft's supported list stops at the GPT-5.1 generation; models set per agent
 - [ ] Terraform support through the `tool` input (D1)
+- [ ] Eval suite in CI with the baseline recorded, including new cases the prompts weren't tuned on, because M1's five were
 - [ ] Gate: C1–C10 run in CI, baseline recorded
 
 **M3 · Central service**
