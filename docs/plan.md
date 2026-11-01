@@ -415,7 +415,7 @@ flowchart TB
 
 M1 is deliberately thin: one agent and one Azure resource (Foundry with gpt-5.4-mini), so the first real PR comment lands early and every later milestone has an eval baseline to beat. A milestone is done when its gate passes on a real PR, not when its tasks are ticked.
 
-**M0 · Foundations** (gate passed 2026-11-01; open items below)
+**M0 · Foundations** (done; gate passed 2026-11-01)
 
 - [x] Prerequisite tools installed and verified (setup doc step 41)
 - [x] Three repos created; demo and standards marked as templates
@@ -425,14 +425,6 @@ M1 is deliberately thin: one agent and one Azure resource (Foundry with gpt-5.4-
 - [x] Bootstrap: state storage, identities, GitHub variables and `prod` environment, budget; apply, then migrate state
 - [x] Rulesets applied; fork-PR approval set in each repo
 - [x] Gate: a demo PR plans, comments, and applies after approval (`tf-review-demo` PR #2, 2026-11-01)
-
-Open items from the M0 scaffold:
-
-- [ ] Turn on the Claude Code sandbox in each repo: from a home-dir session add `tofu *` and `just bootstrap-*` to `excludedCommands` in user settings, because a sandboxed `tofu plan` can't read `~/.azure`; then set `.claude/settings.local.json` in each repo. The scaffold task above is ticked without this
-- [ ] From a home-dir session, add a `tofu fmt` branch for `.tf` files to `claude-lint-hook`; until then the hook uses `terraform fmt`, while lefthook and CI use `tofu fmt`
-- [x] Confirm the subscription's billing currency is EUR before `just bootstrap-apply`: the budget's 30 is in that currency (D15)
-- [ ] Add more platforms to `bootstrap/.terraform.lock.hcl` (`tofu providers lock`) if bootstrap ever runs off `linux_amd64`
-- [ ] Align `pinact`: CI pins 5.0.2, the local install is 5.0.0
 
 **M1 · MVP in the runner**
 
@@ -570,10 +562,10 @@ This plan is `tf-review/docs/plan.md`. Sessions update it in the same PR wheneve
 
 - **CLAUDE.md per repo**: purpose, which `just` recipes to run (`lint`, `test`, `plan`, `e2e`), pointer to the contracts; kept short
 - **`.claude/rules/` with path globs**: OpenTofu conventions for `**/*.tf`, C# for `src/**`, Rego for `**/*.rego`
-- **Sandbox on per repo** via `.claude/settings.local.json`, as in your other projects; `tofu init` needs `registry.opentofu.org`, so either allowlist it or add `tofu` to `excludedCommands` in user settings (project settings can't add exclusions)
+- **Sandbox on per repo** via `.claude/settings.local.json`, as in your other projects; user settings exclude `tofu`, `az` and `just bootstrap-*`, which need `~/.azure`, and allowlist `registry.opentofu.org` for the `tofu init` inside `just lint`
 - **Stop hook in `tf-review`** runs `just e2e`
 - **`permissions.deny`**: `tofu apply`, `terraform apply`, `tofu state rm`, `az * delete`; Claude plans, CI applies, and `just bootstrap-apply` and `just secrets-sync` stay yours
-- **Lint hook**: `claude-lint-hook` already runs `terraform fmt`; add a `tofu fmt` branch for `.tf` files so the agent and lefthook agree
+- **Lint hook**: `claude-lint-hook` runs `tofu fmt` on `.tf` files, so the agent, lefthook and CI agree
 - **Plan mode** for changes spanning two repos; the plan file survives compaction
 - **Worktrees** for parallel sessions (`gwt` to switch), e.g. agent prompts in one, demo fixtures in another
 - **`plugin/` in `tf-review`**: the OpenTofu conventions skill and hooks packaged so consumer repos get the same guardrails locally (M4)
