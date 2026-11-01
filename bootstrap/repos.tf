@@ -7,17 +7,26 @@ locals {
     repo => "repo:${var.github_owner}@${data.github_user.owner.id}/${repo}@${data.github_repository.repo[repo].repo_id}"
   }
 
+  # The Foundry resource lives in this repo's target resource group. infra/ creates it with
+  # these names, so changing one here means changing it there too.
+  foundry_repo         = "tf-review"
+  foundry_account_name = "ais-tf-review-prod"
+  foundry_deployment   = "gpt-5.4-mini"
+
   # Variable name => value, per repo.
   repo_variables = merge([
     for repo in keys(var.repos) : {
       for name, value in {
-        AZURE_CLIENT_ID_PLAN     = azurerm_user_assigned_identity.plan[repo].client_id
-        AZURE_CLIENT_ID_APPLY    = azurerm_user_assigned_identity.apply[repo].client_id
-        AZURE_TENANT_ID          = data.azurerm_client_config.current.tenant_id
-        AZURE_SUBSCRIPTION_ID    = var.subscription_id
-        TF_STATE_RESOURCE_GROUP  = azurerm_resource_group.state.name
-        TF_STATE_STORAGE_ACCOUNT = azurerm_storage_account.state.name
-        TF_STATE_CONTAINER       = azurerm_storage_container.repo[repo].name
+        AZURE_CLIENT_ID_PLAN        = azurerm_user_assigned_identity.plan[repo].client_id
+        AZURE_CLIENT_ID_APPLY       = azurerm_user_assigned_identity.apply[repo].client_id
+        AZURE_CLIENT_ID_REVIEW      = azurerm_user_assigned_identity.review[repo].client_id
+        AZURE_TENANT_ID             = data.azurerm_client_config.current.tenant_id
+        AZURE_SUBSCRIPTION_ID       = var.subscription_id
+        TF_STATE_RESOURCE_GROUP     = azurerm_resource_group.state.name
+        TF_STATE_STORAGE_ACCOUNT    = azurerm_storage_account.state.name
+        TF_STATE_CONTAINER          = azurerm_storage_container.repo[repo].name
+        TF_REVIEW_OPENAI_ENDPOINT   = "https://${local.foundry_account_name}.openai.azure.com/openai/v1/"
+        TF_REVIEW_OPENAI_DEPLOYMENT = local.foundry_deployment
       } : "${repo}/${name}" => { repo = repo, name = name, value = value }
     }
   ]...)
@@ -61,6 +70,17 @@ resource "azurerm_user_assigned_identity" "apply" {
   tags                = local.common_tags
 }
 
+# Calls the LLM from the review job, which runs no PR code. It gets no state or target access,
+# so the plan job's PR code can't reach the LLM through its own identity (D21).
+resource "azurerm_user_assigned_identity" "review" {
+  for_each = var.repos
+
+  name                = "id-${each.key}-review-prod"
+  resource_group_name = azurerm_resource_group.state.name
+  location            = azurerm_resource_group.state.location
+  tags                = local.common_tags
+}
+
 resource "azurerm_federated_identity_credential" "plan" {
   for_each = var.repos
 
@@ -79,6 +99,16 @@ resource "azurerm_federated_identity_credential" "apply" {
   audience                  = ["api://AzureADTokenExchange"]
   issuer                    = local.github_oidc_issuer
   subject                   = "${local.github_oidc_subject[each.key]}:environment:prod"
+}
+
+resource "azurerm_federated_identity_credential" "review" {
+  for_each = var.repos
+
+  name                      = "github-environment-review"
+  user_assigned_identity_id = azurerm_user_assigned_identity.review[each.key].id
+  audience                  = ["api://AzureADTokenExchange"]
+  issuer                    = local.github_oidc_issuer
+  subject                   = "${local.github_oidc_subject[each.key]}:environment:review"
 }
 
 resource "azurerm_role_assignment" "plan_target" {
@@ -113,6 +143,24 @@ resource "azurerm_role_assignment" "apply_state" {
   principal_id         = azurerm_user_assigned_identity.apply[each.key].principal_id
 }
 
+# Here and not in infra/, because the apply identity's Contributor can't assign roles (D24).
+resource "azurerm_role_assignment" "review_llm" {
+  for_each = var.repos
+
+  scope                = azurerm_resource_group.target[local.foundry_repo].id
+  role_definition_name = "Cognitive Services OpenAI User"
+  principal_id         = azurerm_user_assigned_identity.review[each.key].principal_id
+}
+
+# The person running bootstrap also plans from the laptop (just plan, just fixtures).
+resource "azurerm_role_assignment" "deployer_repo_state" {
+  for_each = var.repos
+
+  scope                = azurerm_storage_container.repo[each.key].id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
 resource "github_actions_variable" "repo" {
   for_each = local.repo_variables
 
@@ -145,6 +193,15 @@ resource "github_repository_environment" "prod" {
     protected_branches     = false
     custom_branch_policies = true
   }
+}
+
+# No reviewers or branch policy: it runs on PRs, and it exists to scope the review identity's
+# federated credential. Anyone who can edit a workflow can still use it (D21).
+resource "github_repository_environment" "review" {
+  for_each = var.repos
+
+  repository  = each.key
+  environment = "review"
 }
 
 resource "github_repository_environment_deployment_policy" "prod_main" {

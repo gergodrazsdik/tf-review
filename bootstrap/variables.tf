@@ -34,11 +34,14 @@ variable "budget_start_date" {
 }
 
 variable "repos" {
-  description = "Onboarded repos, keyed by repo name. Each entry gets a state container, a target resource group, plan and apply identities, and Actions variables."
+  description = "Onboarded repos, keyed by repo name. Each entry gets a state container, a target resource group, plan, apply and review identities, and Actions variables."
   type = map(object({
     target_resource_group = string
   }))
   default = {
+    "tf-review" = {
+      target_resource_group = "rg-tf-review-prod"
+    }
     "tf-review-demo" = {
       target_resource_group = "rg-tf-review-demo-prod"
     }
