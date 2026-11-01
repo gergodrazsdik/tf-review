@@ -1,0 +1,7 @@
+{
+  "format_version": "1.2",
+  "resource_changes": [
+    { "address": "azurerm_virtual_network.a", "change": { "actions": ["create"] } },
+    { "address": "azurerm_resource_group.b", "change": { "actions": ["no-op"] } }
+  ]
+}

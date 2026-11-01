@@ -1,0 +1,7 @@
+# Only what the Containerfile copies, so nothing else can end up in an image layer.
+*
+!global.json
+!Directory.Build.props
+!Directory.Packages.props
+!src/
+!scripts/install-ci-tools.sh

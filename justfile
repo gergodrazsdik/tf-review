@@ -37,6 +37,12 @@ validate: bootstrap-validate infra-validate
 test:
     dotnet build -m:1
     dotnet run --project tests/TfReview.Core.Tests --no-build
+    dotnet run --project tests/TfReview.GitHub.Tests --no-build
+
+# Build the review image with podman; it can't run from a recipe in the Claude sandbox
+[group('dev')]
+image:
+    podman build --format docker -t tf-review:dev -f Containerfile .
 
 # Check C# formatting and style in a way that works in the Claude sandbox; CI runs the full dotnet format
 [group('dev')]

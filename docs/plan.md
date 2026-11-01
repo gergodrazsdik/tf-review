@@ -481,7 +481,7 @@ Work runs in this order, so unknowns surface first and a real comment lands befo
 
 *3. Walking skeleton: first real comment*
 
-- [ ] `tfreview` stub that posts counts only, no plan content; `Containerfile` with conftest and `just image`
+- [x] `tfreview` stub that posts counts only, no plan content; `Containerfile` with conftest and `just image`
 - [ ] `release.yml` and `dev-image.yml`; PR CI builds and smoke-tests the image without pushing. **You:** tag `image-v0.0.1`, make the package public once, merge the digest PR
 - [ ] Reusable workflow v0 with both jobs, inline with no composite action (a called workflow's `./` resolves to the caller). **You:** tag `v0.0.1`
 - [ ] Demo: `plan.yml` becomes the caller, losing the raw plan comment and `--edit-last`, which would overwrite the sticky comment; add `.tf-review.yml`. **You:** re-apply the ruleset, because the required `plan` context likely gets renamed and would otherwise block every PR
