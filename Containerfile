@@ -12,5 +12,6 @@ FROM mcr.microsoft.com/dotnet/aspnet:11.0-resolute@sha256:bae0269049d5061ab7f499
 ENV DOTNET_EnableDiagnostics=0
 COPY --from=build /app /app
 COPY --from=build /tools/ci-tools/conftest /usr/local/bin/conftest
-USER $APP_UID
+# The base image's APP_UID, as a number so a host can tell it isn't root without resolving it.
+USER 1654
 ENTRYPOINT ["/app/tfreview"]
