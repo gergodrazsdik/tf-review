@@ -4,6 +4,8 @@ namespace TfReview.GitHub.Tests;
 
 public class CommentRendererTests
 {
+    private const string LinkCommit = "0123456789abcdef0123456789abcdef01234567";
+
     private static readonly string Commit = new('a', 40);
 
     private static readonly PlanCounts Counts = new(
@@ -56,7 +58,63 @@ public class CommentRendererTests
         var comment = CommentRenderer.Render(Result(Verdict.Findings, Finding("Required tag owner is missing")), Counts);
 
         await Assert.That(comment).Contains("**1 finding(s)**");
-        await Assert.That(comment).Contains("| medium | `azurerm_x.y` | `ADR-002` | `Required tag owner is missing` | policy |");
+        await Assert.That(comment).Contains("| medium | `azurerm_x.y` | `ADR-002` | `Required tag owner is missing` |  | policy |");
+    }
+
+    [Test]
+    public async Task Links_a_cited_doc_at_the_pinned_commit()
+    {
+        var comment = CommentRenderer.Render(Linked("adr/ADR-002-tags.md"), Counts);
+
+        await Assert.That(comment).Contains($"[ADR-002](https://github.com/owner/standards/blob/{LinkCommit}/adr/ADR-002-tags.md)");
+    }
+
+    // The result file passes between jobs, so a bad value mustn't become a link.
+    [Test]
+    [Arguments("../../evil")]
+    [Arguments("adr/x.md) [click](https://evil.example")]
+    [Arguments("https://evil.example/x")]
+    public async Task Doesnt_link_a_path_that_looks_wrong(string path)
+    {
+        var comment = CommentRenderer.Render(Linked(path), Counts);
+
+        await Assert.That(comment).DoesNotContain("](https://");
+        await Assert.That(comment).Contains("| `ADR-002` |");
+    }
+
+    [Test]
+    public async Task Doesnt_link_a_rule_that_isnt_a_doc_id()
+    {
+        var result = Linked("adr/x.md") with { DocPaths = new Dictionary<string, string> { ["CKV_AZURE_1"] = "adr/x.md" } };
+        result = result with { Findings = [result.Findings[0] with { Rule = "CKV_AZURE_1" }] };
+
+        await Assert.That(CommentRenderer.Render(result, Counts)).DoesNotContain("](https://");
+    }
+
+    [Test]
+    public async Task Shows_a_suggestion_as_inert_text()
+    {
+        var result = Linked("adr/x.md");
+        result = result with { Findings = [result.Findings[0] with { Suggestion = "See [this](https://evil.example)" }] };
+
+        await Assert.That(CommentRenderer.Render(result, Counts)).Contains("| `See [this](https://evil.example)` |");
+    }
+
+    [Test]
+    public async Task Says_which_docs_didnt_fit()
+    {
+        var result = Linked("adr/x.md") with { OmittedDocs = ["ADR-003"] };
+
+        await Assert.That(CommentRenderer.Render(result, Counts)).Contains("Not checked, too large for the prompt: `ADR-003`.");
+    }
+
+    [Test]
+    public async Task Labels_a_finding_both_found()
+    {
+        var result = Linked("adr/x.md");
+        result = result with { Findings = [result.Findings[0] with { Deterministic = true, Agent = Reporter.Conventions }] };
+
+        await Assert.That(CommentRenderer.Render(result, Counts)).Contains("| policy and model |");
     }
 
     [Test]
@@ -175,4 +233,18 @@ public class CommentRendererTests
 
     private static ReviewResult NotReviewedResult() =>
         ReviewResult.Failed(Commit, ReviewScope.Conventions, NotReviewedReason.Unavailable);
+
+    private static ReviewResult Linked(string path) =>
+        new(
+            1,
+            Commit,
+            Verdict.Findings,
+            [new Finding("a.b", "ADR-002", Severity.Medium, Reporter.Conventions, false, "t", [new PlanEvidence("/resource_changes/a.b")])],
+            [],
+            new Dictionary<string, int>())
+        {
+            StandardsCommit = LinkCommit,
+            StandardsRepository = "owner/standards",
+            DocPaths = new Dictionary<string, string> { ["ADR-002"] = path },
+        };
 }

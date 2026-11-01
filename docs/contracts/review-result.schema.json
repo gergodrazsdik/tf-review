@@ -17,6 +17,21 @@
       "type": "string",
       "pattern": "^[0-9a-f]{40}$"
     },
+    "standards_repository": {
+      "description": "The repository standards_commit belongs to, for doc links.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    },
+    "doc_paths": {
+      "description": "Where each cited doc lives in that repository, by doc ID. Comments link only to these.",
+      "type": "object",
+      "additionalProperties": { "type": "string", "pattern": "^[A-Za-z0-9_-][A-Za-z0-9_./-]*$" }
+    },
+    "omitted_docs": {
+      "description": "Docs that matched but didn't fit the token cap, so the review didn't check against them.",
+      "type": "array",
+      "items": { "type": "string", "pattern": "^(ADR|POL|DES)-[0-9]{3}$" }
+    },
     "verdict": {
       "description": "no_findings never means approval, and partial coverage shows in not_reviewed. not_reviewed means nothing was reviewed.",
       "enum": ["no_findings", "findings", "not_reviewed"]
@@ -70,7 +85,10 @@
       "properties": {
         "input_tokens": { "type": "integer", "minimum": 0 },
         "output_tokens": { "type": "integer", "minimum": 0 },
-        "cached_input_tokens": { "type": "integer", "minimum": 0 }
+        "cached_input_tokens": { "type": "integer", "minimum": 0 },
+        "model": { "type": "string" },
+        "calls": { "type": "integer", "minimum": 0 },
+        "latency_ms": { "type": "integer", "minimum": 0 }
       }
     }
   },

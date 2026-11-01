@@ -58,7 +58,11 @@ static async Task<int> Review(string redactedPath, string configPath, string out
     else
     {
         using var http = new HttpClient { BaseAddress = new Uri("https://codeload.github.com/") };
-        var runner = new ReviewRunner(new GitHubTarballSource(http), new ConftestRunner(new ProcessRunner()));
+        var runner = new ReviewRunner(
+            new GitHubTarballSource(http),
+            new ConftestRunner(new ProcessRunner()),
+            ModelFromEnvironment(),
+            log: Console.WriteLine);
         result = await runner.RunAsync(redacted, config, commit);
     }
 
@@ -94,6 +98,13 @@ static async Task<int> Publish(string resultPath, string redactedPath, string co
         counts = PlanCounts.From(redacted.Plan);
     }
 
+    // First, so what the review cost is on record even if posting the comment fails. The file is mounted
+    // from the runner, which appends it to the real step summary, as the container can't reach that path.
+    if (Environment.GetEnvironmentVariable("GITHUB_STEP_SUMMARY") is { Length: > 0 } summaryPath)
+    {
+        await File.WriteAllTextAsync(summaryPath, StepSummary.Render(result));
+    }
+
     var body = CommentRenderer.Render(result, counts);
 
     var repository = Required("GITHUB_REPOSITORY");
@@ -104,6 +115,16 @@ static async Task<int> Publish(string resultPath, string redactedPath, string co
     var action = await new StickyComment(http, repository, pullRequest).UpsertAsync(body);
     Console.WriteLine($"Comment {action.ToString().ToLowerInvariant()} for commit {commit}.");
     return 0;
+}
+
+// No model configured means the agent reports "not reviewed", rather than the whole review failing.
+static ReviewModel? ModelFromEnvironment()
+{
+    var endpoint = Environment.GetEnvironmentVariable("TF_REVIEW_OPENAI_ENDPOINT");
+    var deployment = Environment.GetEnvironmentVariable("TF_REVIEW_OPENAI_DEPLOYMENT");
+    return Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) && !string.IsNullOrEmpty(deployment)
+        ? new ReviewModel(LlmClient.Create(uri, deployment), deployment)
+        : null;
 }
 
 // A missing file is expected when an earlier job failed.

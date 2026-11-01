@@ -2,6 +2,8 @@
   "version": 1,
   "commit": "0123456789abcdef0123456789abcdef01234567",
   "standards_commit": "89abcdef0123456789abcdef0123456789abcdef",
+  "standards_repository": "gergodrazsdik/tf-standards",
+  "doc_paths": { "ADR-002": "adr/ADR-002-tags.md" },
   "verdict": "findings",
   "findings": [
     {
@@ -19,6 +21,13 @@
     }
   ],
   "not_reviewed": [],
-  "evidence_drops": { "doc_not_retrieved": 1 },
-  "usage": { "input_tokens": 3120, "output_tokens": 410 }
+  "evidence_drops": { "document_not_retrieved": 1 },
+  "usage": {
+    "input_tokens": 3120,
+    "output_tokens": 410,
+    "cached_input_tokens": 0,
+    "model": "gpt-5.4-mini",
+    "calls": 1,
+    "latency_ms": 2400
+  }
 }
