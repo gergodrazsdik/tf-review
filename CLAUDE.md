@@ -6,6 +6,8 @@ Multi-agent, RAG-backed reviewer for OpenTofu pull requests. The plan, decisions
 
 - `just lint`: the checks that work in the Claude sandbox
 - `just validate`: `tofu validate` and `tflint`. Their plugins can't start in the sandbox, so run this with the sandbox disabled for that one command
+- `just test`: build and run the tests. Run it bare, so it runs outside the sandbox with a prompt
+- `just lint-dotnet`: C# formatting and style, in a way that works in the sandbox
 - `just contracts`: validate the contract examples against their schemas
 - `just bootstrap-validate`: validate `bootstrap/` without a backend
 - `just hooks`: install the git hooks
@@ -18,3 +20,5 @@ Multi-agent, RAG-backed reviewer for OpenTofu pull requests. The plan, decisions
 - `tf-standards` keeps a copy of `corpus-frontmatter.schema.json`: change both together.
 - `scripts/install-ci-tools.sh` is identical in all three repos. Keep its pins the same as `docs/plan.md` and the setup doc.
 - `main` takes squash-merged PRs only, and third-party actions are pinned to full SHAs with `pinact`.
+- `csharp-ls` doesn't parse C# 15 yet, so it reports false errors on `union` and `closed`. Trust `dotnet build`.
+- Solution builds in the sandbox use `dotnet build -m:1`; a plain one hangs.
