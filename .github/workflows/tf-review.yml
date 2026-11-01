@@ -19,7 +19,7 @@ on:
       image:
         description: Review image by digest. Only tf-review's signed release and dev packages are accepted.
         type: string
-        default: ghcr.io/gergodrazsdik/tf-review@sha256:5c4b23a5c2468bae0f24613ff9bd2e6e21f41ef3c9d027a968140c88a4c29ccb
+        default: ghcr.io/gergodrazsdik/tf-review@sha256:c186625ba35543b479145b0c5eaf72fbde96f305022b6f5334a0c59337cb10c8
     secrets:
       AZURE_CLIENT_ID_PLAN:
         required: true
