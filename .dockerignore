@@ -4,3 +4,4 @@
 !Directory.Build.props
 !Directory.Packages.props
 !src/
+!prompts/

@@ -102,6 +102,9 @@ public enum NotReviewedReason
 
     [JsonStringEnumMemberName("scanner_failed")]
     ScannerFailed,
+
+    [JsonStringEnumMemberName("plan_too_large")]
+    PlanTooLarge,
 }
 
 public sealed record Finding(

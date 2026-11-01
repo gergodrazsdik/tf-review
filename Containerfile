@@ -3,6 +3,7 @@ FROM mcr.microsoft.com/dotnet/sdk:11.0-resolute@sha256:3a9175b6c54b2f076817af136
 WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props ./
 COPY src/ src/
+COPY prompts/ prompts/
 RUN dotnet publish src/TfReview.Cli --configuration Release --output /app
 
 # conftest v0.71.1 from source, because its release binary has high and critical findings from
