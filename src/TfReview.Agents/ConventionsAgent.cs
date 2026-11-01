@@ -214,6 +214,9 @@ public sealed class ConventionsAgent(IChatClient chat, TimeSpan? attemptTimeout 
             {
                 Instructions = system,
                 MaxOutputTokens = maxOutputTokens,
+
+                // gpt-5.4-mini defaults to none, and without any reasoning it fails valid names on the evals.
+                Reasoning = new ReasoningOptions { Effort = ReasoningEffort.Low },
                 ResponseFormat = ChatResponseFormat.ForJsonSchema(JsonDocument.Parse(Schema).RootElement, SchemaName),
                 AdditionalProperties = new AdditionalPropertiesDictionary { ["strict"] = true },
             },

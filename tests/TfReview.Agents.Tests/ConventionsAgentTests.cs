@@ -123,6 +123,16 @@ public class ConventionsAgentTests
     }
 
     [Test]
+    public async Task Asks_the_model_to_reason()
+    {
+        var chat = new FakeChat(FakeChat.Answer(Empty));
+
+        await Review(chat);
+
+        await Assert.That(chat.Requests.Single().Options!.Reasoning!.Effort).IsEqualTo(ReasoningEffort.Low);
+    }
+
+    [Test]
     public async Task The_system_message_holds_the_instructions_and_sorted_standards_and_no_plan()
     {
         var chat = new FakeChat(FakeChat.Answer(Empty));
