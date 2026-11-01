@@ -42,7 +42,7 @@ Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET S
 
 - [x] Convert the Azure trial to Pay-As-You-Go, then check Azure OpenAI quota in Germany West Central
 - [x] Delete the resource group the Foundry portal auto-created in Sweden Central
-- [ ] Before M2: request Data Zone Standard quota for gpt-6.1-sol and gpt-6-luna
+- [ ] Before M2: get Data Zone Standard quota for gpt-6.1-sol and gpt-6-luna. The subscription is on Free Tier (checked 2026-11-01); Microsoft's Tier 1 table lists 100K TPM for both, and tiers rise automatically with usage and payment history, so re-check quota after M1's usage before filing the request form
 - [ ] Before gpt-5.4-mini retires (2027-09-21): move to a newer small model through the eval suite
 - [ ] After .NET 11 GA (scheduled 2026-11-10): install the GA SDK through `update-sources`, pin `global.json` to `11.0.100` without `allowPrerelease`, and re-pin the base image digest
 - [ ] After a CSharpier release that parses C# 15 (1.3.0 fails on `union`): add it back to the prerequisites and decide where it runs; until then `dotnet format` is the only C# formatter
@@ -316,7 +316,7 @@ claude *args:
 | pass entry | Used locally by | Reaches CI or Azure via |
 | --- | --- | --- |
 | `tf-review/infracost/cli-token` | `just cost` runs, exported as `INFRACOST_CLI_AUTHENTICATION_TOKEN` | M2: `just secrets-sync` → Actions secret per onboarded repo; M3: Key Vault, repo secrets removed |
-| `tf-review/github/bootstrap-token` | `just bootstrap-*` (github provider: Actions secrets and variables, environments) | Never leaves the machine |
+| `tf-review/github/bootstrap-token` | `just bootstrap-*` (github provider: Actions secrets and variables, environments; the fine-grained token needs Secrets read and write on every onboarded repo) | Never leaves the machine |
 | `tf-review/github-app/private-key` (M3) | Local runs of the review service | `just secrets-sync` → Key Vault |
 
 Azure needs no keys at all: Azure OpenAI and Cosmos DB use Entra ID (`az login` locally, OIDC in CI, managed identity in Azure) with local key auth disabled on both. Recipes read pass entries only at run time, so pinentry may prompt.
