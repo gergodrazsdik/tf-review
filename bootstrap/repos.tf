@@ -13,15 +13,24 @@ locals {
   foundry_account_name = "ais-tf-review-prod"
   foundry_deployment   = "gpt-5.4-mini"
 
+  # Secret name => value, per repo. These IDs aren't credentials, but Actions logs on public repos
+  # are public, and only secrets get masked there, including inside tofu's resource IDs (D30).
+  repo_secrets = merge([
+    for repo in keys(var.repos) : {
+      for name, value in {
+        AZURE_CLIENT_ID_PLAN   = azurerm_user_assigned_identity.plan[repo].client_id
+        AZURE_CLIENT_ID_APPLY  = azurerm_user_assigned_identity.apply[repo].client_id
+        AZURE_CLIENT_ID_REVIEW = azurerm_user_assigned_identity.review[repo].client_id
+        AZURE_TENANT_ID        = data.azurerm_client_config.current.tenant_id
+        AZURE_SUBSCRIPTION_ID  = var.subscription_id
+      } : "${repo}/${name}" => { repo = repo, name = name, value = value }
+    }
+  ]...)
+
   # Variable name => value, per repo.
   repo_variables = merge([
     for repo in keys(var.repos) : {
       for name, value in {
-        AZURE_CLIENT_ID_PLAN        = azurerm_user_assigned_identity.plan[repo].client_id
-        AZURE_CLIENT_ID_APPLY       = azurerm_user_assigned_identity.apply[repo].client_id
-        AZURE_CLIENT_ID_REVIEW      = azurerm_user_assigned_identity.review[repo].client_id
-        AZURE_TENANT_ID             = data.azurerm_client_config.current.tenant_id
-        AZURE_SUBSCRIPTION_ID       = var.subscription_id
         TF_STATE_RESOURCE_GROUP     = azurerm_resource_group.state.name
         TF_STATE_STORAGE_ACCOUNT    = azurerm_storage_account.state.name
         TF_STATE_CONTAINER          = azurerm_storage_container.repo[repo].name
@@ -159,6 +168,14 @@ resource "azurerm_role_assignment" "deployer_repo_state" {
   scope                = azurerm_storage_container.repo[each.key].id
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = data.azurerm_client_config.current.object_id
+}
+
+resource "github_actions_secret" "repo" {
+  for_each = local.repo_secrets
+
+  repository  = each.value.repo
+  secret_name = each.value.name
+  value       = each.value.value
 }
 
 resource "github_actions_variable" "repo" {

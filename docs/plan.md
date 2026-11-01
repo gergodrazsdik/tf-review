@@ -51,7 +51,7 @@ Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET S
 
 ## Decision log
 
-All 29 decisions are settled as of 2026-11-01; D19–D29 came from the M1 design council. Changing one means editing its row and the sections it affects in the same commit.
+All 30 decisions are settled as of 2026-11-01; D19–D29 came from the M1 design council. Changing one means editing its row and the sections it affects in the same commit.
 
 | # | Decision | Choice | Why |
 | --- | --- | --- | --- |
@@ -84,6 +84,7 @@ All 29 decisions are settled as of 2026-11-01; D19–D29 came from the M1 design
 | D27 | Config source | `.tf-review.yml` is read from the PR's base commit | A PR can't disable its own review or swap the standards corpus; config changes apply after merge |
 | D28 | Release pipeline | The full pipeline from M1; Grype fails only on high findings that have a fix | Unpatched base image issues can't stall a release |
 | D29 | M1 gate | 3 of 3 fixture runs per case on C5, C6, C8, C9 and C10, plus one real PR | One run can pass by luck; 3 of 3 is still weak evidence, so M2's baseline replaces it |
+| D30 | Azure IDs in CI | Subscription, tenant and client IDs are Actions secrets; state and Foundry names stay variables | They aren't credentials, but Actions logs on public repos are public, and only secrets are masked there; state names are committed anyway, and masking the rest would add little |
 
 ## Architecture
 
@@ -228,7 +229,7 @@ tf-review/
 
 **Contracts owned by `tf-review`** (versioned with tags, JSON Schema where possible)
 
-1. Reusable workflow inputs and outputs (`working-directory`, `config-path`, `image`; `tool` from M2; gate mode comes from the config's `gate.mode`)
+1. Reusable workflow inputs, secrets and outputs (`working-directory`, `config-path`, `image`; `tool` from M2; gate mode comes from the config's `gate.mode`; the Azure IDs are passed as secrets, with `secrets: inherit` for same-owner repos and explicitly otherwise)
 2. `.tf-review.yml` schema: enabled agents, severity thresholds, gate mode, standards source
 3. Finding schema: resource address, severity, evidence (an address-keyed plan pointer and a doc ID), suggestion, agent
 4. Corpus frontmatter schema: `id`, `type`, `status`, `superseded_by`, `applies_to`, `topics`, `severity`, `rego`
@@ -315,7 +316,7 @@ claude *args:
 | pass entry | Used locally by | Reaches CI or Azure via |
 | --- | --- | --- |
 | `tf-review/infracost/cli-token` | `just cost` runs, exported as `INFRACOST_CLI_AUTHENTICATION_TOKEN` | M2: `just secrets-sync` → Actions secret per onboarded repo; M3: Key Vault, repo secrets removed |
-| `tf-review/github/bootstrap-token` | `just bootstrap-*` (github provider: Actions variables, `prod` environment) | Never leaves the machine |
+| `tf-review/github/bootstrap-token` | `just bootstrap-*` (github provider: Actions secrets and variables, environments) | Never leaves the machine |
 | `tf-review/github-app/private-key` (M3) | Local runs of the review service | `just secrets-sync` → Key Vault |
 
 Azure needs no keys at all: Azure OpenAI and Cosmos DB use Entra ID (`az login` locally, OIDC in CI, managed identity in Azure) with local key auth disabled on both. Recipes read pass entries only at run time, so pinentry may prompt.
@@ -328,7 +329,7 @@ One storage account holds every repo's state, created once by a bootstrap projec
 
 1. Run once with local state through the bootstrap recipes (OpenTofu, your az login): resource group, storage account (versioning, soft delete, `CanNotDelete` lock), state containers, managed identities, federated credentials, role assignments.
 2. Add the `azurerm` backend (`use_oidc`, `use_azuread_auth`) and run `init -migrate-state` so bootstrap's own state moves into the account.
-3. Onboard repos through a `repos` map: each entry creates a container, a plan identity and an apply identity, and sets the repo's Actions variables via the `github` provider.
+3. Onboard repos through a `repos` map: each entry creates a container, plan, apply and review identities, and sets the repo's Actions secrets and variables via the `github` provider.
 4. Later, give bootstrap its own CI identity so onboarding becomes a reviewed PR.
 
 **Identities per repo**
