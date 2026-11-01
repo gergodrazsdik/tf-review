@@ -528,7 +528,7 @@ Work runs in this order, so the deterministic findings exist before the agents t
 
 *2. Cost*
 
-- [ ] `ScannablePlan`, rebuilt from a `RedactedPlan`, with one side per scan; the no-resources check (D32)
+- [x] `ScannablePlan`, rebuilt from a `RedactedPlan`, with one side per scan; the no-resources check (D32)
 - [ ] Infracost CLI and pinned plugins in the image, on a read-only filesystem; `InfracostRunner` and the per-resource delta; a type Infracost can't price is reported as unknown rather than as free; a test with recorded scan output, so nothing needs the token
 - [ ] `just cost` and `just secrets-sync`, and the token secret in the review job. **You:** `just secrets-sync`
 
