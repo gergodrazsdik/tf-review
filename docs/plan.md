@@ -6,7 +6,7 @@ Nov 1, 2026 · @Drazsdik Gergő
 
 Build a multi-agent, RAG-backed review board that comments on OpenTofu (later also Terraform) pull requests, reusable by any repo through one reusable GitHub workflow, at roughly $5–30/month on Azure. Deterministic tools find issues; LLM agents explain them, rank them and tie them to the team's own standards. One container image runs the whole review: in the GitHub runner during M1–M2, in Azure Container Apps from M3.
 
-Status: v1, every decision taken (see the Decision log); M0 is in progress. This document now lives in `tf-review/docs/plan.md` and is maintained there.
+Status: v1, every decision taken (see the Decision log); M0's gate has passed and M1 is next. This document now lives in `tf-review/docs/plan.md` and is maintained there.
 
 **Goals**
 
@@ -415,7 +415,7 @@ flowchart TB
 
 M1 is deliberately thin: one agent and one Azure resource (Foundry with gpt-5.4-mini), so the first real PR comment lands early and every later milestone has an eval baseline to beat. A milestone is done when its gate passes on a real PR, not when its tasks are ticked.
 
-**M0 · Foundations** (in progress)
+**M0 · Foundations** (gate passed 2026-11-01; open items below)
 
 - [x] Prerequisite tools installed and verified (setup doc step 41)
 - [x] Three repos created; demo and standards marked as templates
@@ -423,8 +423,8 @@ M1 is deliberately thin: one agent and one Azure resource (Foundry with gpt-5.4-
 - [x] `tf-review/docs/contracts/`: JSON Schemas for `.tf-review.yml`, findings, corpus frontmatter
 - [x] `tf-standards`: ADR-001 naming, ADR-002 required tags, POL-001 storage, with Rego and `conftest verify` tests
 - [x] Bootstrap: state storage, identities, GitHub variables and `prod` environment, budget; apply, then migrate state
-- [ ] Rulesets applied; fork-PR approval set in each repo
-- [ ] Gate: a demo PR plans, comments, and applies after approval
+- [x] Rulesets applied; fork-PR approval set in each repo
+- [x] Gate: a demo PR plans, comments, and applies after approval (`tf-review-demo` PR #2, 2026-11-01)
 
 Open items from the M0 scaffold:
 
