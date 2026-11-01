@@ -422,7 +422,7 @@ M1 is deliberately thin: one agent and one Azure resource (Foundry with gpt-5.4-
 - [x] Scaffold all three repos: justfile, lefthook, CLAUDE.md, `.claude/` settings, lint workflow, ruleset JSON
 - [x] `tf-review/docs/contracts/`: JSON Schemas for `.tf-review.yml`, findings, corpus frontmatter
 - [x] `tf-standards`: ADR-001 naming, ADR-002 required tags, POL-001 storage, with Rego and `conftest verify` tests
-- [ ] Bootstrap: state storage, identities, GitHub variables and `prod` environment, budget; apply, then migrate state
+- [x] Bootstrap: state storage, identities, GitHub variables and `prod` environment, budget; apply, then migrate state
 - [ ] Rulesets applied; fork-PR approval set in each repo
 - [ ] Gate: a demo PR plans, comments, and applies after approval
 
@@ -430,7 +430,7 @@ Open items from the M0 scaffold:
 
 - [ ] Turn on the Claude Code sandbox in each repo: from a home-dir session add `tofu *` and `just bootstrap-*` to `excludedCommands` in user settings, because a sandboxed `tofu plan` can't read `~/.azure`; then set `.claude/settings.local.json` in each repo. The scaffold task above is ticked without this
 - [ ] From a home-dir session, add a `tofu fmt` branch for `.tf` files to `claude-lint-hook`; until then the hook uses `terraform fmt`, while lefthook and CI use `tofu fmt`
-- [ ] Confirm the subscription's billing currency is EUR before `just bootstrap-apply`: the budget's 30 is in that currency (D15)
+- [x] Confirm the subscription's billing currency is EUR before `just bootstrap-apply`: the budget's 30 is in that currency (D15)
 - [ ] Add more platforms to `bootstrap/.terraform.lock.hcl` (`tofu providers lock`) if bootstrap ever runs off `linux_amd64`
 - [ ] Align `pinact`: CI pins 5.0.2, the local install is 5.0.0
 

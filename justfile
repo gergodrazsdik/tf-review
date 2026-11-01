@@ -69,4 +69,4 @@ bootstrap-apply:
 [confirm('Migrate the bootstrap state into Azure Storage?')]
 [group('bootstrap')]
 bootstrap-migrate:
-    tofu -chdir=bootstrap init -migrate-state -input=false
+    tofu -chdir=bootstrap init -migrate-state -force-copy -input=false
