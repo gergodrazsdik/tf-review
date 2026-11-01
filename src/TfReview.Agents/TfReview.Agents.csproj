@@ -3,5 +3,11 @@
     <ProjectReference Include="../TfReview.Core/TfReview.Core.csproj" />
     <ProjectReference Include="../TfReview.Rag/TfReview.Rag.csproj" />
     <ProjectReference Include="../TfReview.Scanners/TfReview.Scanners.csproj" />
+    <PackageReference Include="Azure.Identity" />
+    <PackageReference Include="Microsoft.Agents.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    <PackageReference Include="OpenAI" />
+    <EmbeddedResource Include="../../prompts/*.md" LogicalName="prompts.%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

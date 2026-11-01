@@ -50,7 +50,8 @@
               "timeout",
               "invalid_config",
               "standards_unavailable",
-              "scanner_failed"
+              "scanner_failed",
+              "plan_too_large"
             ]
           }
         }

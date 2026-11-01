@@ -6,4 +6,7 @@
     <PackageReference Include="TUnit" />
     <ProjectReference Include="../../src/TfReview.Agents/TfReview.Agents.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="../../prompts/versions.json" Link="prompts/versions.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

@@ -163,8 +163,8 @@ Five LLM roles by M2 (M1 has only the conventions agent, D19–D20), each a Micr
 
 **Rules every agent run follows**
 
-- Prompts live in `tf-review/prompts/<agent>.md` with a version header; the version is logged per call and is part of the result-cache key
-- Invalid JSON gets one retry; after that, the agent's slice is reported as "not reviewed" instead of guessed
+- Prompts live in `tf-review/prompts/<agent>.md` with a version header, embedded in the assembly, with each version's hash in `prompts/versions.json`; the version is logged per call and is part of the result-cache key
+- Invalid JSON or a truncated answer gets one retry; after that, the agent's slice is reported as "not reviewed" instead of guessed. Refusals, content filters and service failures aren't retried by the agent, and the SDK retries 429s and 5xx itself
 - A deterministic evidence check runs before the arbiter: each finding needs a plan pointer that resolves and matches its `resource_address`, and an LLM finding no scanner backs also needs a doc ID that is accepted, was retrieved for this prompt and applies to that resource type, since scanner rules such as Checkov's have no doc; failures are dropped and counted by reason, and never retried
 - Deduplication key: resource address plus rule (doc ID or scanner rule ID); the highest severity wins and the evidence is merged
 - Only deterministic high findings (Checkov, conftest) can block, and only when a repo opts in (D9); LLM-only findings never block
@@ -499,7 +499,7 @@ Work runs in this order, so unknowns surface first and a real comment lands befo
 
 - [x] `GitHubTarballSource` (size, entry and download caps, path traversal guard, no links, only `.md` and `.rego`) and `TfReviewConfig`
 - [x] `FileRetriever` with topics, `applies_to` and an 8k token cap that omits whole docs and reports them; a local directory source for the tests
-- [ ] Versioned prompts, with a test that fails if a prompt changes without a version bump; conventions agent, wire-to-finding mapping, the one-retry rule, and separate handling of 429, 5xx, content filter and timeout
+- [x] Versioned prompts, with a test that fails if a prompt changes without a version bump; conventions agent, wire-to-finding mapping, the one-retry rule, and separate handling of 429, 5xx, content filter and timeout. A plan over 20k estimated tokens is reported as `plan_too_large` without a call, because the 30K TPM limit would reject it anyway; truncation gets the one retry with double the output limit; a thin `DelegatingChatClient` provides the finish reason Agent Framework hides. Prompts share no preamble file until M2 adds a second agent
 - [x] `EvidenceChecker` and `RuleArbiter` behind `IArbiter`
 - [x] Comment renderer and sanitiser, including "not reviewed": untrusted text goes in inline code spans, where GitHub parses no markdown, mentions or links
 - [x] Wire redaction, conftest and the comment into the CLI, so a PR gets real policy findings before the agent exists; the review job re-runs the redactor on the untrusted artifact
