@@ -75,6 +75,11 @@ public sealed partial class ConftestRunner(IProcessRunner processes, string prog
 {
     private const string DefaultNamespace = "main";
 
+    // Policies come from the repo a config names, so they run as pure functions of the plan (D47). This is OPA's
+    // list of built-ins without http.send, net.lookup_ip_addr and opa.runtime, which also leaves out conftest's own
+    // file readers. A policy using one doesn't compile, which is reported as a failed scan. `just conftest-capabilities`.
+    private const string CapabilitiesResource = "conftest-capabilities.json";
+
     private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(2);
 
     public async Task<ConftestOutcome> RunAsync(
@@ -86,11 +91,19 @@ public sealed partial class ConftestRunner(IProcessRunner processes, string prog
             var path = Path.Combine(directory.FullName, "plan.json");
             await File.WriteAllTextAsync(path, plan.ToCanonicalJson(), cancellationToken);
 
+            var capabilities = Path.Combine(directory.FullName, "capabilities.json");
+            await using (var embedded = typeof(ConftestRunner).Assembly.GetManifestResourceStream(CapabilitiesResource)
+                ?? throw new InvalidOperationException("The conftest capabilities aren't embedded."))
+            await using (var file = File.Create(capabilities))
+            {
+                await embedded.CopyToAsync(file, cancellationToken);
+            }
+
             // Our policies have their own packages. Without --all-namespaces conftest only reads "main",
             // finds nothing there, and reports a clean result that checked nothing.
             var result = await processes.RunAsync(
                 program,
-                ["test", "--no-color", "--all-namespaces", "--output", "json", "--parser", "json", "--policy", standardsDirectory, path],
+                ["test", "--no-color", "--all-namespaces", "--output", "json", "--parser", "json", "--capabilities", capabilities, "--policy", standardsDirectory, path],
                 Timeout,
                 cancellationToken);
 

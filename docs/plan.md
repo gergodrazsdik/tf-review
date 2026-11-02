@@ -53,7 +53,7 @@ Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET S
 
 ## Decision log
 
-All 46 decisions are settled as of 2026-11-02; D19–D29 came from the M1 design council, D31–D34 from M2's spike, D35–D36 from building its orchestrator and arbiter, D37–D45 from planning M3, and D46 from applying its infrastructure. Changing one means editing its row and the sections it affects in the same commit.
+All 47 decisions are settled as of 2026-11-02; D19–D29 came from the M1 design council, D31–D34 from M2's spike, D35–D36 from building its orchestrator and arbiter, D37–D45 from planning M3, D46 from applying its infrastructure, and D47 from designing the worker. Changing one means editing its row and the sections it affects in the same commit.
 
 | # | Decision | Choice | Why |
 | --- | --- | --- | --- |
@@ -103,6 +103,7 @@ All 46 decisions are settled as of 2026-11-02; D19–D29 came from the M1 design
 | D44 | Refreshing the corpus | Changing `corpus/sources.yml` is the only trigger: on a PR a dry run reports what would change, with no credentials, and on merge indexing runs. A team's rules aren't indexed, because reviews read them at their pinned commit (D42) | One path, in the repo that owns the corpus's use. Sources change slowly, so a person choosing a commit is enough, and a pin change is a reviewable, revertible PR |
 | D45 | API trust | The API accepts a GitHub OIDC token only with this audience, `event_name` `pull_request`, `environment` `review`, a `repository_id` on the allowlist, and a `job_workflow_ref` naming `tf-review`'s `tf-review.yml` at a commit on a list of released commits. It takes the PR number from `ref`, never from the request | Real tokens showed `environment` refuses the plan job, which runs PR code, and `job_workflow_ref` refuses a job a PR adds to its own workflow. GitHub resolves a fork's commit through its parent repo, so a commit SHA alone in `tf-review`'s name proves nothing, hence the list of released commits |
 | D46 | Cosmos in `infra/` | The Cosmos account and its vector container use the azapi provider, and its database and other containers stay in azurerm. azurerm lists an account's keys on every read, even with keys disabled, so a Reader's plan fails with a 403, and it can't declare a vector policy. The alternative was giving the plan identity, which runs PR code, the right to list keys. With azapi it stays a Reader, and no keys reach the state |
+| D47 | Sealed scanners | Scanners get only the environment they need, and conftest runs without `http.send`, `net.lookup_ip_addr`, `opa.runtime` or its own file readers. A policy using one doesn't compile, which reports a failed scan. The App's key is read from Key Vault into the worker's memory when posting, never put in its environment | A config chooses the standards repo, and its Rego runs in the review. A test showed Rego reading an environment variable and calling out over the network. In the service that would reach the managed identity's endpoint, so one repo's config could get at Key Vault and every other repo's reviews |
 
 ## Architecture
 
@@ -616,11 +617,12 @@ Work runs in this order, so the unknowns surface before anything depends on them
 - [x] `infra/`: Storage (queue, redacted plans with a 7-day lifecycle rule), Key Vault, Container Apps environment, App Insights with a daily cap, the embedding deployment, and Cosmos on the free tier with vector search. **You:** approve `prod`
 - [x] Bootstrap: the service's managed identity with its LLM, queue, blob and secret roles at resource group scope, your right to write the vault's secrets, and the allowlist from the `repos` map (D40) as the `TF_REVIEW_ALLOWED_REPOSITORY_IDS` variable on this repo. **You:** `bootstrap-plan`, `bootstrap-apply`
 - [x] **You:** create the GitHub App, private to your account, and store its key with `pass insert -m tf-review/github-app/private-key`
-- [ ] **You:** `just secrets-sync` into Key Vault, once the vault exists
+- [x] **You:** `just secrets-sync` into Key Vault, once the vault exists
 - [x] Delete the `removed` and `import` blocks that hand the Cosmos account to azapi (D46), once applied, and check the next plan shows no changes
 
 *3. The service*
 
+- [x] Seal the scanners before anything holds real credentials (D47)
 - [ ] The released commits for D45: a file in `infra/`, because bootstrap would mean you running it each release. A commit can't name itself, so the release flow adds a tag's commit in a PR after tagging, and the demo repins once that's applied
 - [ ] Cosmos data-plane roles for the service identity, in `infra/`, because they need the account and Contributor can create them
 - [ ] `TfReview.Api`: `POST /reviews` checks the token against D45, with a test per refused case including a fork's commit, redacts again, stores the plan, enqueues, and answers `202`; `GET /reviews/{id}`; size limits and a rate limit per repo, because ingress is public

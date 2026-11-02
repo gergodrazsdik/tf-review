@@ -1,5 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <EmbeddedResource Include="conftest-capabilities.json" LogicalName="conftest-capabilities.json" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../TfReview.Core/TfReview.Core.csproj" />
   </ItemGroup>
 </Project>

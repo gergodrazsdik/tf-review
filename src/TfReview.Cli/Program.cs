@@ -68,7 +68,7 @@ static async Task<int> Review(string redactedPath, string configPath, string out
             // Without a token a scan waits forever for a login.
             infracost: string.IsNullOrEmpty(Environment.GetEnvironmentVariable("INFRACOST_CLI_AUTHENTICATION_TOKEN"))
                 ? null
-                : new InfracostRunner(new ProcessRunner()),
+                : new InfracostRunner(new ProcessRunner(InfracostRunner.EnvironmentVariables)),
             checkov: new CheckovRunner(new ProcessRunner()));
         try
         {

@@ -90,7 +90,7 @@ async Task<int> RecordScans(string[] names)
             File.Delete(stale);
         }
 
-        var scans = new RecordingScans(new ProcessRunner(), directory);
+        var scans = new RecordingScans(new ProcessRunner(InfracostRunner.EnvironmentVariables), directory);
         var plan = new PlanRedactor().Redact(await File.ReadAllTextAsync(Path.Combine(directory, "plan.json")));
         if (plan is not Redacted redacted)
         {

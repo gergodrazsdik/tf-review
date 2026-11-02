@@ -80,6 +80,11 @@ cost plan:
     export INFRACOST_CLI_AUTHENTICATION_TOKEN
     infracost scan "{{ plan }}" --json --no-color --currency USD
 
+# Regenerate conftest's capabilities after moving to a new conftest: pass the OPA version `conftest --version` reports
+[group('dev')]
+conftest-capabilities opa_version:
+    opa capabilities --version v{{ opa_version }} | jq -c 'del(.builtins[] | select(.name == "http.send" or .name == "opa.runtime" or .name == "net.lookup_ip_addr")) | .allow_net = []' > src/TfReview.Scanners/conftest-capabilities.json
+
 # Copy the Infracost token into each onboarded repo's Actions secrets, and it and the GitHub App's key into Key Vault; yours to run, never an agent's
 [confirm('Copy the Infracost token into the Actions secrets of tf-review and tf-review-demo, and it and the GitHub App key into Key Vault?')]
 [group('bootstrap')]

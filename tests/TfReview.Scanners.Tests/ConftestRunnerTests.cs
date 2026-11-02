@@ -111,6 +111,39 @@ public class ConftestRunnerTests
         await Assert.That(outcome).IsEqualTo(new ConftestFailed(ConftestFailure.CouldNotRun));
     }
 
+    // D47: a config chooses the repo these come from, and each would reach the review's credentials if it ran.
+    [Test]
+    [Arguments("opa.runtime().env")]
+    [Arguments("http.send({\"method\": \"GET\", \"url\": \"http://127.0.0.1:9/\"})")]
+    [Arguments("net.lookup_ip_addr(\"example.com\")")]
+    [Arguments("parse_config_file(\"/proc/self/environ\")")]
+    public async Task A_policy_reaching_outside_the_plan_doesnt_run(string call)
+    {
+        Standards();
+        var directory = Directory.CreateTempSubdirectory("tfreview-policy-");
+        try
+        {
+            await File.WriteAllTextAsync(
+                Path.Combine(directory.FullName, "reach.rego"),
+                $$"""
+                package reach
+
+                deny contains msg if {
+                    value := {{call}}
+                    msg := sprintf("%v", [value])
+                }
+                """);
+
+            var outcome = await new ConftestRunner(new ProcessRunner()).RunAsync(Redact(Plan(C6BadName)), directory.FullName);
+
+            await Assert.That(outcome).IsEqualTo(new ConftestFailed(ConftestFailure.NoJson));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
     private static async Task<IReadOnlyList<ConftestViolation>> Violations(string resource)
     {
         var outcome = await new ConftestRunner(new ProcessRunner()).RunAsync(Redact(Plan(resource)), Standards());

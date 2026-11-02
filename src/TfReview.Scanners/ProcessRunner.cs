@@ -10,8 +10,19 @@ public interface IProcessRunner
     Task<ProcessResult?> RunAsync(string program, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken = default);
 }
 
-public sealed class ProcessRunner : IProcessRunner
+/// <summary>
+/// Runs scanners without the review's environment. A scanner reads files from a PR's plan and a config's
+/// standards repo, so nothing it starts should find the review's secrets or its managed identity's endpoint.
+/// </summary>
+/// <param name="passedOn">Variables a scanner needs on top of the basics, which are the only others it gets.</param>
+public sealed class ProcessRunner(params string[] passedOn) : IProcessRunner
 {
+    private static readonly string[] Basics =
+    [
+        "PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "PYTHONDONTWRITEBYTECODE",
+        "SSL_CERT_DIR", "SSL_CERT_FILE", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy",
+    ];
+
     public async Task<ProcessResult?> RunAsync(
         string program, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken = default)
     {
@@ -21,6 +32,15 @@ public sealed class ProcessRunner : IProcessRunner
             RedirectStandardError = true,
             UseShellExecute = false,
         };
+
+        start.Environment.Clear();
+        foreach (var name in Basics.Concat(passedOn))
+        {
+            if (Environment.GetEnvironmentVariable(name) is { } value)
+            {
+                start.Environment[name] = value;
+            }
+        }
 
         // An argument list, never a command line: paths can't be read as options or shell syntax.
         foreach (var argument in arguments)
