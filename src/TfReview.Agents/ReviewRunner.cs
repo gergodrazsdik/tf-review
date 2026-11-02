@@ -29,6 +29,9 @@ public sealed class ReviewRunner(
     InfracostRunner? infracost = null,
     CheckovRunner? checkov = null)
 {
+    /// <summary>The evidence_drops key for resources a model listed while saying they don't break a standard.</summary>
+    public const string ModelRetracted = "model_retracted";
+
     private readonly IArbiter arbiter = arbiter ?? (model is null ? new RuleArbiter() : new LlmArbiter(model.Chat));
 
     public async Task<ReviewResult> RunAsync(
@@ -110,6 +113,12 @@ public sealed class ReviewRunner(
             var omitted = passes.SelectMany(pass => pass.Omitted).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
 
             var drops = MergeDrops(checks);
+            var retracted = passes.Sum(pass => pass.Retracted);
+            if (retracted > 0)
+            {
+                drops[ModelRetracted] = retracted;
+            }
+
             if (arbitration.Dropped > 0)
             {
                 drops[LlmArbiter.ArbiterDropped] = arbitration.Dropped;
@@ -245,6 +254,7 @@ public sealed class ReviewRunner(
             outcome.Calls)
         {
             Plan = slice,
+            Retracted = outcome is AgentReviewed { Retracted: var count } ? count : 0,
         };
     }
 
@@ -278,6 +288,9 @@ public sealed class ReviewRunner(
     {
         /// <summary>What this agent was shown, which its findings have to point into.</summary>
         public CondensedPlan? Plan { get; init; }
+
+        /// <summary>Resources it listed while saying they don't break the standard.</summary>
+        public int Retracted { get; init; }
 
         public static readonly AgentPass Skipped = new([], [], [], [], []);
 

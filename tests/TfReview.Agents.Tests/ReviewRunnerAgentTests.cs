@@ -49,7 +49,7 @@ public class ReviewRunnerAgentTests
     private static readonly string SubnetPlan = TestPlans.Json(TestPlans.Create(Subnet, "azurerm_subnet", """{"name":"snet-a-prod"}"""));
 
     private static string Answer(string address, string doc = "ADR-002", string attribute = "tags") =>
-        $$"""{"findings":[{"resource_address":"{{address}}","doc_id":"{{doc}}","attribute":"{{attribute}}","title":"Model title","suggestion":"Model suggestion"}]}""";
+        $$"""{"findings":[{"breaks_standard":true,"resource_address":"{{address}}","doc_id":"{{doc}}","attribute":"{{attribute}}","title":"Model title","suggestion":"Model suggestion"}]}""";
 
     // C9: the policies pass, and only the model can see the value breaks the standard.
     [Test]
@@ -93,6 +93,19 @@ public class ReviewRunnerAgentTests
         await Assert.That(result.Verdict).IsEqualTo(Verdict.NoFindings);
         await Assert.That(result.NotReviewed).IsEmpty();
         await Assert.That(result.EvidenceDrops[EvidenceChecker.PointerUnresolved]).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task Counts_what_the_model_listed_while_saying_it_was_fine()
+    {
+        const string Answered = """
+            {"findings":[{"breaks_standard":false,"resource_address":"azurerm_virtual_network.main","doc_id":"ADR-002","attribute":"tags","title":"Fine.","suggestion":null}]}
+            """;
+
+        var result = await Run(VnetPlan, new FakeChat(FakeChat.Answer(Answered)), NoViolations);
+
+        await Assert.That(result.Verdict).IsEqualTo(Verdict.NoFindings);
+        await Assert.That(result.EvidenceDrops[ReviewRunner.ModelRetracted]).IsEqualTo(1);
     }
 
     [Test]
