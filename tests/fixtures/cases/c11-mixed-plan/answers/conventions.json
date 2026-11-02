@@ -1,0 +1,4 @@
+{
+  "prompt_version": 2,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_virtual_network.untagged\",\"doc_id\":\"ADR-002\",\"attribute\":\"tags\",\"title\":\"The value \\\"null\\\" for tags means this virtual network has no required tags.\",\"suggestion\":\"Set tags with non-empty owner, environment, and project values.\"},{\"resource_address\":\"azurerm_virtual_network.wrong_env\",\"doc_id\":\"ADR-002\",\"attribute\":\"tags\",\"title\":\"The tag value \\\"production\\\" for environment is not allowed; ADR-002 requires \\\"dev\\\", \\\"test\\\", or \\\"prod\\\".\",\"suggestion\":\"Change the environment tag to one of the allowed values, such as \\\"prod\\\".\"}]}"
+}

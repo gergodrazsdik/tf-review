@@ -1,0 +1,4 @@
+{
+  "prompt_version": 1,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_linux_virtual_machine.main\",\"doc_id\":\"ADR-003\",\"attribute\":\"size\",\"title\":\"azurerm_linux_virtual_machine.main size changes from $20 to $35 per month, a $15 increase.\",\"suggestion\":\"Confirm the larger VM size is intended and necessary for the workload.\"}]}"
+}

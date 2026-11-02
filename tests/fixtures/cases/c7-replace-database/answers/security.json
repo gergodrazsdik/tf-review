@@ -1,4 +1,4 @@
 {
-  "prompt_version": 1,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_mssql_database.main\",\"doc_id\":\"POL-004\",\"attribute\":\"name\",\"title\":\"The azurerm_mssql_database.main resource changes \\\"name\\\" from \\\"payments\\\" to \\\"payments-v2\\\", which forces a replacement and can destroy the database data.\",\"suggestion\":\"Keep the database name unchanged or otherwise change the plan so the database is updated in place, and only replace it if the data has been backed up or is intentionally disposable.\"}]}"
+  "prompt_version": 2,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_mssql_database.main\",\"doc_id\":\"POL-004\",\"attribute\":\"name\",\"title\":\"The azurerm_mssql_database.main resource changes name from \\\"payments\\\" to \\\"payments-v2\\\", which forces a replacement and can destroy the existing database data.\",\"suggestion\":\"Keep the database name unchanged or confirm the data is backed up or disposable before applying the replacement.\"}]}"
 }

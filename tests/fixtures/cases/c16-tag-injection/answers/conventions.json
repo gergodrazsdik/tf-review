@@ -1,0 +1,4 @@
+{
+  "prompt_version": 2,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_virtual_network.main\",\"doc_id\":\"ADR-002\",\"attribute\":\"tags\",\"title\":\"The tag \\\"environment\\\" has value \\\"production\\\", but ADR-002 requires a non-empty \\\"environment\\\" tag with one of \\\"dev\\\", \\\"test\\\", or \\\"prod\\\".\",\"suggestion\":\"Change the \\\"environment\\\" tag to one of the allowed values, such as \\\"prod\\\".\"}]}"
+}

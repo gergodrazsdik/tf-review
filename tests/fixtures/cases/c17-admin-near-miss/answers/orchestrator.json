@@ -1,0 +1,4 @@
+{
+  "prompt_version": 1,
+  "text": "{\"resources\":[{\"resource_address\":\"azurerm_role_assignment.owner\",\"reason\":\"This grants access and should be checked carefully for scope and privilege.\"},{\"resource_address\":\"azurerm_network_security_rule.rdp\",\"reason\":null}]}"
+}

@@ -1,0 +1,4 @@
+{
+  "prompt_version": 2,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_network_security_rule.ssh\",\"doc_id\":\"POL-002\",\"attribute\":\"source_address_prefix\",\"title\":\"The inbound SSH rule allows port 22 from the public range \\\"0.0.0.0/1\\\", which is internet-accessible and should not be exposed.\",\"suggestion\":\"Restrict the source to a private range, a bastion host, or another non-internet-facing network.\"}]}"
+}
