@@ -39,6 +39,12 @@ public sealed record InfracostFailed(InfracostFailure Reason) : InfracostOutcome
 /// </summary>
 public sealed class InfracostRunner(IProcessRunner processes, string program = "infracost")
 {
+    /// <summary>What a scan needs passed on: its login, its pinned plugins, and no update or agent checks.</summary>
+    public static readonly string[] EnvironmentVariables =
+    [
+        "INFRACOST_CLI_AUTHENTICATION_TOKEN", "INFRACOST_CLI_PLUGIN_DIR", "INFRACOST_SKIP_UPDATE_CHECK", "INFRACOST_SKIP_AGENT_CHECK",
+    ];
+
     // Without a token a scan waits forever for a login, so this also ends that.
     private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(3);
 
