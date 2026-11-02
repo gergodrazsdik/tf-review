@@ -290,6 +290,7 @@ gh repo edit gergodrazsdik/tf-standards --template
 | `just e2e` | `tf-review` | Replays recorded model responses over the committed fixtures and asserts the expected findings; offline, no Azure and no token spend, so the Claude Code Stop hook can run it |
 | `just e2e-live` | `tf-review` | Runs the committed fixtures against the real model N times and asserts on the review result; manual, and the `e2e-live` workflow runs it on PRs that change the agent, its prompts or the fixtures |
 | `just fixtures` | `tf-review` | Takes the redacted plan each seeded branch's review already made, replaces every GUID with zeros, and writes it to `tests/fixtures/cases/`, so no raw plan reaches a laptop and no Azure login is needed |
+| `just record-scans` | `tf-review` | Saves what real Checkov and Infracost say about each eval case, so `just e2e` and CI need neither; reads the token from pass, so you run it |
 | `just bootstrap-plan` / `bootstrap-apply` / `bootstrap-migrate` | `tf-review` | The bootstrap project with your `az login`; apply and migrate ask first |
 | `just secrets-sync` | `tf-review` | Copies the Infracost token from pass into each onboarded repo's Actions secrets, and into Key Vault from M3; you run it, never an agent |
 | `just policy-test` | `tf-standards` | `opa fmt --fail`, `conftest verify`, frontmatter schema check |
@@ -542,15 +543,16 @@ Work runs in this order, so the deterministic findings exist before the agents t
 
 *4. Agents*
 
-- [ ] `tf-standards`: network and identity policies for C1 and C3, with Rego where a rule is exact
-- [ ] Security and cost agents, each with a versioned prompt, its own wire schema and low reasoning effort; config contract for the new agents
-- [ ] Seeded cases C1–C3 as real PRs, and C4 and C7 as hand-built fixtures (D33), in `e2e` and `e2e-live`
+- [x] `tf-standards`: POL-002 and POL-003 for C1 and C3, with Rego, and ADR-003 for cost, which has none because a policy can't see prices. A helper named `violation` passed `conftest verify` and would have failed every real review, so `just policy-test` now also runs `conftest test`
+- [x] Security and cost agents: one `ReviewAgent` with a profile each, a versioned prompt per agent, the shared wire schema and low reasoning effort. Each agent's findings are checked against the documents in its own prompt. Prices come from Infracost, and a cost finding on a resource with no increase is dropped
+- [x] Seeded cases C1–C3 as real PRs (`tf-review-demo` #20–22), and C4 as a hand-built fixture (D33), in `e2e` and `e2e-live`, with recorded Checkov and Infracost output from `just record-scans`. All nine cases passed 3 of 3 on the first live run. C7 moves to part 5, because it tests the orchestrator and arbiter
 
 *5. Orchestrator and arbiter*
 
 - [ ] Orchestrator: routing by resource type and risk order, and a code fallback that sends everything everywhere if its output is invalid, so routing can't silently skip a review
 - [ ] LLM arbiter behind `IArbiter` (D20), which can only rank and drop what the evidence check kept, never add; the rule-based merge stays as its input and its fallback
-- [ ] Comment: monthly cost delta and risk order
+- [ ] Seeded case C7 as a hand-built fixture (D33)
+- [ ] Comment: risk order; the monthly cost delta is there since part 2
 
 *6. Evaluation and gate*
 

@@ -1,0 +1,22 @@
+{
+  "findings": [
+    {
+      "resource_address": "azurerm_storage_account.seed",
+      "rule": "POL-001",
+      "agent": "security",
+      "deterministic": true
+    },
+    {
+      "resource_address": "azurerm_storage_account.seed",
+      "rule": "CKV_AZURE_190",
+      "agent": "scanner",
+      "deterministic": true
+    },
+    {
+      "resource_address": "azurerm_storage_account.seed",
+      "rule": "CKV_AZURE_59",
+      "agent": "scanner",
+      "deterministic": true
+    }
+  ]
+}

@@ -153,6 +153,19 @@ public class EvidenceCheckerTests
     }
 
     [Test]
+    public async Task A_cost_finding_needs_an_increase()
+    {
+        var saving = ModelFinding(Vnet, "ADR-001", CondensedPlan.PointerTo(Vnet, "change", "after", "name")) with
+        {
+            Agent = Reporter.Cost,
+            MonthlyCostDeltaUsd = -5m,
+        };
+
+        await AssertDropped(saving, EvidenceChecker.NoCostIncrease);
+        await Assert.That(Check(saving with { MonthlyCostDeltaUsd = 5m }).Kept.Count).IsEqualTo(1);
+    }
+
+    [Test]
     public async Task Counts_drops_by_reason()
     {
         var check = Check(

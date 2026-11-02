@@ -183,7 +183,7 @@ public class ReviewRunnerAgentTests
 
         await Run(VnetPlan, new FakeChat(FakeChat.Answer(Answer(Vnet))), NoViolations, log: lines.Add);
 
-        await Assert.That(lines.Single()).Contains($"prompt v{Prompts.Load(ConventionsAgent.Name).Version}");
+        await Assert.That(lines.Single()).Contains($"prompt v{Prompts.Load(AgentProfile.Conventions.Name).Version}");
         await Assert.That(lines.Single()).DoesNotContain("vnet-a-prod");
         await Assert.That(lines.Single()).DoesNotContain("Model title");
     }

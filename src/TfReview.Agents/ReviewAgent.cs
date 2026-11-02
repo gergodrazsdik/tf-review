@@ -25,17 +25,14 @@ public sealed record AgentFailed(int PromptVersion, IReadOnlyList<AgentCall> Cal
     : AgentOutcome(PromptVersion, Calls);
 
 /// <summary>
-/// Reviews a plan against naming and tagging standards. Plan text only ever reaches the user message, and
+/// Reviews a plan against the standards a profile retrieves. Plan text only ever reaches the user message, and
 /// the agent has no tools. The model chooses the resource, document, attribute and wording; code sets the
-/// rule, severity, reporter and evidence, so a model can't claim to be deterministic or raise a severity.
+/// rule, severity, reporter, evidence and any cost figure, so a model can't claim to be deterministic, raise
+/// a severity or invent a price.
 /// </summary>
-public sealed class ConventionsAgent(IChatClient chat, TimeSpan? attemptTimeout = null)
+public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan? attemptTimeout = null)
 {
-    public const string Name = "conventions";
-
-    public static readonly IReadOnlyList<string> Topics = ["naming", "tagging"];
-
-    private const string SchemaName = "conventions_output";
+    private const string SchemaName = "review_output";
     private const int MaxOutputTokens = 4_000;
     private const int MaxAttempts = 2;
 
@@ -82,9 +79,10 @@ public sealed class ConventionsAgent(IChatClient chat, TimeSpan? attemptTimeout 
         CondensedPlan plan,
         IReadOnlyList<StandardsDoc> docs,
         IReadOnlyList<Finding> policyFindings,
+        IReadOnlyList<ResourceCostChange>? costs = null,
         CancellationToken cancellationToken = default)
     {
-        var prompt = Prompts.Load(Name);
+        var prompt = Prompts.Load(profile.Name);
         var calls = new List<AgentCall>();
 
         // No standard applies, so there's nothing to ask, and no reason to pay for it.
@@ -93,7 +91,7 @@ public sealed class ConventionsAgent(IChatClient chat, TimeSpan? attemptTimeout 
             return new AgentReviewed(prompt.Version, calls, []);
         }
 
-        var user = UserMessage(plan, policyFindings);
+        var user = UserMessage(plan, docs, policyFindings, costs);
         if (TokenEstimate.Of(user) > MaxUserMessageTokens)
         {
             return new AgentFailed(prompt.Version, calls, NotReviewedReason.PlanTooLarge);
@@ -111,7 +109,7 @@ public sealed class ConventionsAgent(IChatClient chat, TimeSpan? attemptTimeout 
             {
                 using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 deadline.CancelAfter(timeout);
-                await NewAgent(capture, system, maxOutputTokens).RunAsync(user, cancellationToken: deadline.Token);
+                await NewAgent(capture, profile.Name, system, maxOutputTokens).RunAsync(user, cancellationToken: deadline.Token);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -147,7 +145,7 @@ public sealed class ConventionsAgent(IChatClient chat, TimeSpan? attemptTimeout 
                 continue;
             }
 
-            if (response is not null && ParseFindings(response.Text, docs) is { } findings)
+            if (response is not null && ParseFindings(response.Text, docs, costs) is { } findings)
             {
                 return new AgentReviewed(prompt.Version, calls, findings);
             }
@@ -175,29 +173,47 @@ public sealed class ConventionsAgent(IChatClient chat, TimeSpan? attemptTimeout 
 
     /// <summary>
     /// Plan text and policy messages come from the PR. Escaping these characters keeps the JSON valid and
-    /// means no value can close the fence around it.
+    /// means no value can close the fence around it. An agent only sees findings for the standards it was
+    /// given, because it couldn't cite any others.
     /// </summary>
-    private static string UserMessage(CondensedPlan plan, IReadOnlyList<Finding> policyFindings)
+    private static string UserMessage(
+        CondensedPlan plan, IReadOnlyList<StandardsDoc> docs, IReadOnlyList<Finding> policyFindings, IReadOnlyList<ResourceCostChange>? costs)
     {
         var policies = new JsonArray(
         [
-            .. policyFindings.Select(finding => (JsonNode)new JsonObject
-            {
-                ["resource_address"] = finding.ResourceAddress,
-                ["doc_id"] = finding.Rule,
-                ["title"] = finding.Title,
-            }),
+            .. policyFindings
+                .Where(finding => docs.Any(doc => doc.Id == finding.Rule))
+                .Select(finding => (JsonNode)new JsonObject
+                {
+                    ["resource_address"] = finding.ResourceAddress,
+                    ["doc_id"] = finding.Rule,
+                    ["title"] = finding.Title,
+                }),
         ]);
 
-        return $"""
-            <policy_findings>
-            {Escape(CanonicalJson.Write(policies))}
-            </policy_findings>
+        var message = new StringBuilder()
+            .AppendLine("<policy_findings>")
+            .AppendLine(Escape(CanonicalJson.Write(policies)))
+            .AppendLine("</policy_findings>")
+            .AppendLine();
 
-            <plan_data>
-            {Escape(plan.ToCanonicalJson())}
-            </plan_data>
-            """;
+        if (costs is not null)
+        {
+            var figures = new JsonArray(
+            [
+                .. costs.Where(cost => cost.Priced).Select(cost => (JsonNode)new JsonObject
+                {
+                    ["resource_address"] = cost.ResourceAddress,
+                    ["before_usd"] = cost.BeforeUsd,
+                    ["after_usd"] = cost.AfterUsd,
+                    ["delta_usd"] = cost.AfterUsd - cost.BeforeUsd,
+                }),
+            ]);
+
+            message.AppendLine("<cost_data>").AppendLine(Escape(CanonicalJson.Write(figures))).AppendLine("</cost_data>").AppendLine();
+        }
+
+        return message.AppendLine("<plan_data>").AppendLine(Escape(plan.ToCanonicalJson())).Append("</plan_data>").ToString();
     }
 
     private static string Escape(string json) => json
@@ -205,11 +221,11 @@ public sealed class ConventionsAgent(IChatClient chat, TimeSpan? attemptTimeout 
         .Replace("<", "\\u003c", StringComparison.Ordinal)
         .Replace(">", "\\u003e", StringComparison.Ordinal);
 
-    private static ChatClientAgent NewAgent(IChatClient client, string system, int maxOutputTokens) => new(
+    private static ChatClientAgent NewAgent(IChatClient client, string name, string system, int maxOutputTokens) => new(
         client,
         new ChatClientAgentOptions
         {
-            Name = Name,
+            Name = name,
             ChatOptions = new ChatOptions
             {
                 Instructions = system,
@@ -256,7 +272,7 @@ public sealed class ConventionsAgent(IChatClient chat, TimeSpan? attemptTimeout 
         response.Messages.SelectMany(message => message.Contents).OfType<ErrorContent>().Any(error => error.ErrorCode == "Refusal");
 
     /// <summary>The findings in an answer, or null if it doesn't match the wire schema exactly.</summary>
-    private static Finding[]? ParseFindings(string text, IReadOnlyList<StandardsDoc> docs)
+    private Finding[]? ParseFindings(string text, IReadOnlyList<StandardsDoc> docs, IReadOnlyList<ResourceCostChange>? costs)
     {
         WireOutput? output;
         try
@@ -273,10 +289,10 @@ public sealed class ConventionsAgent(IChatClient chat, TimeSpan? attemptTimeout 
             return null;
         }
 
-        return [.. output.Findings.Select(finding => ToFinding(finding, docs))];
+        return [.. output.Findings.Select(finding => ToFinding(finding, docs, costs))];
     }
 
-    private static Finding ToFinding(WireFinding wire, IReadOnlyList<StandardsDoc> docs)
+    private Finding ToFinding(WireFinding wire, IReadOnlyList<StandardsDoc> docs, IReadOnlyList<ResourceCostChange>? costs)
     {
         // An unknown document gets a placeholder severity, and the evidence check then drops the finding.
         var severity = docs.FirstOrDefault(doc => doc.Id == wire.DocId)?.Severity ?? Severity.Low;
@@ -287,9 +303,14 @@ public sealed class ConventionsAgent(IChatClient chat, TimeSpan? attemptTimeout 
             ? [new DocEvidence(wire.DocId)]
             : [new PlanEvidence(CondensedPlan.PointerTo(wire.ResourceAddress, "change", "after", attribute)), new DocEvidence(wire.DocId)];
 
-        return new Finding(wire.ResourceAddress, wire.DocId, severity, Reporter.Conventions, Deterministic: false, wire.Title.Trim(), evidence)
+        return new Finding(wire.ResourceAddress, wire.DocId, severity, profile.Reporter, Deterministic: false, wire.Title.Trim(), evidence)
         {
             Suggestion = string.IsNullOrWhiteSpace(wire.Suggestion) ? null : wire.Suggestion.Trim(),
+
+            // From Infracost, never the model. The evidence check drops a cost finding with no increase here.
+            MonthlyCostDeltaUsd = costs?.FirstOrDefault(cost => cost.Priced && cost.ResourceAddress == wire.ResourceAddress) is { } figure
+                ? figure.AfterUsd - figure.BeforeUsd
+                : null,
         };
     }
 

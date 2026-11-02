@@ -51,9 +51,9 @@ public class PromptsTests
     [Test]
     public async Task The_conventions_prompt_is_embedded_and_names_its_agent()
     {
-        var prompt = Prompts.Load(ConventionsAgent.Name);
+        var prompt = Prompts.Load(AgentProfile.Conventions.Name);
 
-        await Assert.That(prompt.Agent).IsEqualTo(ConventionsAgent.Name);
+        await Assert.That(prompt.Agent).IsEqualTo(AgentProfile.Conventions.Name);
         await Assert.That(prompt.Body).DoesNotContain("version:");
     }
 

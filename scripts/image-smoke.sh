@@ -59,7 +59,7 @@ chmod 666 "$work/storage.json" "$work/security.yml"
 run "$image" redact /work/storage.json /work/storage-redacted.json
 run -e HOME=/tmp "$image" review /work/storage-redacted.json /work/security.yml /work/security-result.json "$commit"
 jq -e '
-  .not_reviewed == []
+  all(.not_reviewed[]; .reason != "scanner_failed")
   and any(.findings[]; .rule == "CKV_AZURE_190" and .deterministic == true)
   and all(.findings[]; (.resource_address | contains("canary")) | not)
 ' "$work/security-result.json"

@@ -1,0 +1,4 @@
+{
+  "prompt_version": 2,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_virtual_network.seed\",\"doc_id\":\"ADR-002\",\"attribute\":\"tags\",\"title\":\"The tags on \\\"azurerm_virtual_network.seed\\\" are null, so the required owner, environment, and project tags are missing.\",\"suggestion\":\"Set non-empty tags for owner, environment, and project on the virtual network.\"}]}"
+}
