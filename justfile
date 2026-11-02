@@ -37,6 +37,7 @@ validate: bootstrap-validate infra-validate
 test:
     dotnet build -m:1
     dotnet run --project tests/TfReview.Agents.Tests --no-build
+    dotnet run --project tests/TfReview.Api.Tests --no-build
     dotnet run --project tests/TfReview.Core.Tests --no-build
     dotnet run --project tests/TfReview.GitHub.Tests --no-build
     TF_STANDARDS_DIR="{{ justfile_directory() }}/../tf-standards" dotnet run --project tests/TfReview.Rag.Tests --no-build
