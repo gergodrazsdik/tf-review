@@ -19,6 +19,7 @@ Multi-agent, RAG-backed reviewer for OpenTofu pull requests. The plan, decisions
 - This repo owns the contracts in `docs/contracts/`. `tf-review-demo` and `tf-standards` depend on them, so a breaking change means a new version and changes in those repos.
 - `tf-standards` keeps a copy of `corpus-frontmatter.schema.json`: change both together.
 - `scripts/install-ci-tools.sh` is identical in all three repos. Keep its pins the same as `docs/plan.md` and the setup doc.
+- No `azurerm_client_config` data source in `infra/`: its printed ID holds the Azure IDs in base64, and Actions logs here are public (D30).
 - `main` takes squash-merged PRs only, and third-party actions are pinned to full SHAs with `pinact`.
 - `csharp-ls` doesn't parse C# 15 yet, so it reports false errors on `union` and `closed`. Trust `dotnet build`.
 - Solution builds in the sandbox use `dotnet build -m:1`; a plain one hangs.
