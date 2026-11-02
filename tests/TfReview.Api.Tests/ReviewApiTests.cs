@@ -389,6 +389,31 @@ public class ReviewApiTests
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
     }
 
+    // The workflow's real client against the real endpoint, so the two can't disagree about the request.
+    [Test]
+    public async Task The_submit_command_is_accepted()
+    {
+        await using var api = await Api.StartAsync();
+        var submitter = new ReviewSubmitter(
+            api.Client,
+            _ => Task.FromResult(Token(GoodClaims())),
+            (_, _) => Task.CompletedTask,
+            _ => { });
+
+        var accepted = await submitter.SubmitAsync(CleanPlan, Commit, ".tf-review.yml");
+
+        await Assert.That(accepted).IsTrue();
+        var job = api.Queue.Jobs.Single();
+        await Assert.That(job.Commit).IsEqualTo(Commit);
+        await Assert.That(job.ConfigPath).IsEqualTo(".tf-review.yml");
+    }
+
+    [Test]
+    public async Task The_audiences_match()
+    {
+        await Assert.That(ReviewSubmitter.Audience).IsEqualTo(ApiOptions.Audience);
+    }
+
     [Test]
     public async Task The_health_check_needs_no_token()
     {
