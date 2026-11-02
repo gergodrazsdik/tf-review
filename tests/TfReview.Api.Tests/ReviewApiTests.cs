@@ -524,6 +524,9 @@ public class ReviewApiTests
             this.Jobs.Add(job);
             return Task.CompletedTask;
         }
+
+        public Task<ReceivedJob?> ReceiveAsync(TimeSpan visibility, CancellationToken cancellationToken = default) =>
+            Task.FromResult<ReceivedJob?>(null);
     }
 
     private sealed class FakeStatuses : IReviewStatusStore

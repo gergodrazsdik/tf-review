@@ -42,6 +42,7 @@ test:
     dotnet run --project tests/TfReview.GitHub.Tests --no-build
     TF_STANDARDS_DIR="{{ justfile_directory() }}/../tf-standards" dotnet run --project tests/TfReview.Rag.Tests --no-build
     TF_STANDARDS_DIR="{{ justfile_directory() }}/../tf-standards" dotnet run --project tests/TfReview.Scanners.Tests --no-build
+    dotnet run --project tests/TfReview.Worker.Tests --no-build
 
 # Replay recorded model answers over the seeded cases: offline and free, so it proves only the code around the model
 [group('dev')]

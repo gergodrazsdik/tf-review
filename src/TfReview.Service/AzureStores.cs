@@ -68,6 +68,30 @@ internal sealed class StorageReviewQueue(QueueClient queue) : IReviewQueue
 {
     public async Task EnqueueAsync(ReviewJob job, CancellationToken cancellationToken = default) =>
         await queue.SendMessageAsync(JsonSerializer.Serialize(job), cancellationToken);
+
+    public async Task<ReceivedJob?> ReceiveAsync(TimeSpan visibility, CancellationToken cancellationToken = default)
+    {
+        var response = await queue.ReceiveMessageAsync(visibility, cancellationToken);
+        if (response.Value is not { } message)
+        {
+            return null;
+        }
+
+        ReviewJob? job;
+        try
+        {
+            job = JsonSerializer.Deserialize<ReviewJob>(message.MessageText);
+        }
+        catch (JsonException)
+        {
+            job = null;
+        }
+
+        return new ReceivedJob(
+            job,
+            message.DequeueCount,
+            async token => await queue.DeleteMessageAsync(message.MessageId, message.PopReceipt, token));
+    }
 }
 
 internal sealed class CosmosStatusStore(Container container) : IReviewStatusStore

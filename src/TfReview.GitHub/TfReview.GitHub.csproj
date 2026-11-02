@@ -1,5 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <InternalsVisibleTo Include="TfReview.GitHub.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../TfReview.Core/TfReview.Core.csproj" />
   </ItemGroup>
 </Project>

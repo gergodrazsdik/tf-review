@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Azure.Security.KeyVault.Secrets" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../TfReview.Agents/TfReview.Agents.csproj" />
+    <ProjectReference Include="../TfReview.Core/TfReview.Core.csproj" />
+    <ProjectReference Include="../TfReview.GitHub/TfReview.GitHub.csproj" />
+    <ProjectReference Include="../TfReview.Rag/TfReview.Rag.csproj" />
+    <ProjectReference Include="../TfReview.Scanners/TfReview.Scanners.csproj" />
+    <ProjectReference Include="../TfReview.Service/TfReview.Service.csproj" />
+  </ItemGroup>
+</Project>

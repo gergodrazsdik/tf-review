@@ -10,5 +10,6 @@
     <ProjectReference Include="../TfReview.GitHub/TfReview.GitHub.csproj" />
     <ProjectReference Include="../TfReview.Rag/TfReview.Rag.csproj" />
     <ProjectReference Include="../TfReview.Scanners/TfReview.Scanners.csproj" />
+    <ProjectReference Include="../TfReview.Worker/TfReview.Worker.csproj" />
   </ItemGroup>
 </Project>
