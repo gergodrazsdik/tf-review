@@ -6,12 +6,14 @@ using TfReview.Core;
 using TfReview.GitHub;
 using TfReview.Rag;
 using TfReview.Scanners;
+using TfReview.Service;
 using TfReview.Worker;
 
 const string Usage = """
     usage: tfreview redact <plan.json> <redacted.json>
            tfreview review <redacted.json> <config.yml> <result.json> <commit>
            tfreview publish <result.json> <redacted.json> <commit>
+           tfreview submit <redacted.json> <commit> <config-path>
            tfreview serve
            tfreview work
     """;
@@ -24,6 +26,8 @@ switch (args)
         return await Review(redacted, config, output, commit);
     case ["publish", var result, var redacted, var commit] when IsCommit(commit):
         return await Publish(result, redacted, commit);
+    case ["submit", var redacted, var commit, var configPath] when IsCommit(commit):
+        return await Submit(redacted, commit, configPath);
     case ["serve"]:
         await ReviewApi.RunAsync();
         return 0;
@@ -141,6 +145,28 @@ static async Task<int> Publish(string resultPath, string redactedPath, string co
     var action = await new StickyComment(http, repository, pullRequest).UpsertAsync(body);
     Console.WriteLine($"Comment {action.ToString().ToLowerInvariant()} for commit {commit}.");
     return 0;
+}
+
+// A failure exits non-zero, and the workflow then says "not reviewed" with its own token (D39).
+static async Task<int> Submit(string redactedPath, string commit, string configPath)
+{
+    if (await ReadOrNull(redactedPath) is not { } plan)
+    {
+        return 1;
+    }
+
+    // Long enough for a cold start, and a retry gets a new token and asks again.
+    using var api = new HttpClient { BaseAddress = new Uri(Required("TF_REVIEW_API_URL").TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(90) };
+    using var github = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+    var tokenUrl = Required("ACTIONS_ID_TOKEN_REQUEST_URL");
+    var tokenSecret = Required("ACTIONS_ID_TOKEN_REQUEST_TOKEN");
+
+    var submitter = new ReviewSubmitter(
+        api,
+        cancellationToken => ActionsIdToken.GetAsync(github, tokenUrl, tokenSecret, ReviewSubmitter.Audience, cancellationToken),
+        Task.Delay,
+        Console.WriteLine);
+    return await submitter.SubmitAsync(plan, commit, configPath) ? 0 : 1;
 }
 
 // No model configured means the agent reports "not reviewed", rather than the whole review failing.
