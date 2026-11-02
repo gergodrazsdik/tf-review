@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+    <PackageReference Include="TUnit" />
+    <ProjectReference Include="../../src/TfReview.Api/TfReview.Api.csproj" />
+  </ItemGroup>
+</Project>

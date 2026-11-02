@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using TfReview.Agents;
+using TfReview.Api;
 using TfReview.Core;
 using TfReview.GitHub;
 using TfReview.Rag;
@@ -10,6 +11,7 @@ const string Usage = """
     usage: tfreview redact <plan.json> <redacted.json>
            tfreview review <redacted.json> <config.yml> <result.json> <commit>
            tfreview publish <result.json> <redacted.json> <commit>
+           tfreview serve
     """;
 
 switch (args)
@@ -20,6 +22,9 @@ switch (args)
         return await Review(redacted, config, output, commit);
     case ["publish", var result, var redacted, var commit] when IsCommit(commit):
         return await Publish(result, redacted, commit);
+    case ["serve"]:
+        await ReviewApi.RunAsync();
+        return 0;
     default:
         Console.Error.WriteLine(Usage);
         return 2;
