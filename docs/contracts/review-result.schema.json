@@ -77,6 +77,19 @@
       "type": "object",
       "additionalProperties": { "type": "integer", "minimum": 1 }
     },
+    "risk_order": {
+      "description": "Every change, riskiest first. Deletes and replacements always lead. A reason says why one deserves a look.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["resource_address"],
+        "properties": {
+          "resource_address": { "type": "string", "minLength": 1 },
+          "reason": { "type": "string" }
+        }
+      }
+    },
     "cost": {
       "description": "What the plan costs a month in US dollars at list prices, without usage-based charges. Absent when cost isn't enabled or couldn't be worked out. Totals count only priced resources.",
       "type": "object",

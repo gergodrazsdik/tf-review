@@ -1,0 +1,191 @@
+{
+  "currency": "USD",
+  "summary": {
+    "projects": 1,
+    "resources": 2,
+    "costed_resources": 1,
+    "free_resources": 1,
+    "total_monthly_cost": "14.718625",
+    "finops_policies": 2,
+    "failing_finops_policies": 2,
+    "distinct_failing_finops_resources": 1,
+    "tagging_policies": 1,
+    "failing_tagging_policies": 1,
+    "distinct_failing_tagging_resources": 2
+  },
+  "projects": [
+    {
+      "project_name": "before.json",
+      "path": "before.json",
+      "finops_results": [
+        {
+          "policy_id": "00000000-0000-0000-0000-000000000000",
+          "policy_name": "Database - consider removing geo-redundant backups in non-production projects",
+          "policy_slug": "azure-disable-geo-redundant-db-backups-outside-prod",
+          "policy_message": "Consider removing geo-redundant backups from non-production databases to reduce costs. By eliminating unnecessary data replication, you can cut costs by up to half.",
+          "failing_resources": [
+            {
+              "name": "azurerm_mssql_database.main",
+              "issues": [
+                {
+                  "description": "Set `storage_account_type` to `Local` (for v3+ providers) or `LRS` (for older providers)",
+                  "yearly_savings": "0",
+                  "monthly_carbon_savings_grams_co2e": "0",
+                  "monthly_water_savings_liters": "0",
+                  "address": "azurerm_mssql_database.main",
+                  "attribute": "storage_account_type"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "policy_id": "00000000-0000-0000-0000-000000000000",
+          "policy_name": "SQL - consider using serverless with auto-pause in non-production",
+          "policy_slug": "azure-sql-serverless-autopause-in-nonprod-policy",
+          "policy_message": "Consider using a serverless instance with auto-pause in non-production projects. This will pause the instance automatically when it's inactive. When the database is paused, the compute cost is zero and only storage costs are incurred. The database is automatically resumed when a connection is made.",
+          "failing_resources": [
+            {
+              "name": "azurerm_mssql_database.main",
+              "issues": [
+                {
+                  "description": "Consider using serverless compute tier (GP_S) with auto-pause enabled in non-production projects",
+                  "yearly_savings": "0",
+                  "monthly_carbon_savings_grams_co2e": "0",
+                  "monthly_water_savings_liters": "0",
+                  "address": "azurerm_mssql_database.main",
+                  "attribute": "sku_name"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "tagging_results": [
+        {
+          "policy_id": "00000000-0000-0000-0000-000000000000",
+          "policy_name": "FinOps tags",
+          "message": "This example Tagging policy shows how you can enforce required FinOps tag keys/values in pull requests. This example checks for the tags 'Service' (can have any value) and 'Environment' (must be Dev/Stage/Prod) on all taggable resources being changed in the pull request. You can adjust it from https://dashboard.infracost.io \u003e Governance \u003e Tagging policies. You have a 14 day trial of this feature as it's part of Infracost Cloud.",
+          "tag_schema": [
+            {
+              "key": "Environment",
+              "valid_values": [
+                "Dev",
+                "Prod",
+                "Stage"
+              ],
+              "mandatory": true
+            },
+            {
+              "key": "Service",
+              "mandatory": true
+            }
+          ],
+          "failing_resources": [
+            {
+              "address": "azurerm_mssql_database.main",
+              "resource_type": "azurerm_mssql_database",
+              "invalid_tags": [
+                {
+                  "key": "Environment",
+                  "value": ""
+                }
+              ],
+              "path": "",
+              "line": 0,
+              "missing_mandatory_tags": [
+                "Service"
+              ],
+              "propagation_problems": []
+            },
+            {
+              "address": "azurerm_virtual_network.main",
+              "resource_type": "azurerm_virtual_network",
+              "invalid_tags": [
+                {
+                  "key": "Environment",
+                  "value": ""
+                }
+              ],
+              "path": "",
+              "line": 0,
+              "missing_mandatory_tags": [
+                "Service"
+              ],
+              "propagation_problems": []
+            }
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "name": "azurerm_mssql_database.main",
+          "type": "azurerm_mssql_database",
+          "is_supported": true,
+          "is_free": false,
+          "cost_components": [
+            {
+              "name": "Compute (S0)",
+              "unit": "hours",
+              "price": "0.0201625",
+              "quantity": "730",
+              "base_monthly_cost": "14.718625",
+              "usage_monthly_cost": "0",
+              "total_monthly_cost": "14.718625",
+              "monthly_carbon_savings_grams_co2e": "0",
+              "monthly_water_savings_liters": "0"
+            },
+            {
+              "name": "Long-term retention (RA-GRS)",
+              "unit": "GB",
+              "price": "0.05",
+              "quantity": "0",
+              "base_monthly_cost": "0",
+              "usage_monthly_cost": "0",
+              "total_monthly_cost": "0",
+              "monthly_carbon_savings_grams_co2e": "0",
+              "monthly_water_savings_liters": "0",
+              "usage_based": true
+            },
+            {
+              "name": "PITR backup storage (RA-GRS)",
+              "unit": "GB",
+              "price": "0.2",
+              "quantity": "0",
+              "base_monthly_cost": "0",
+              "usage_monthly_cost": "0",
+              "total_monthly_cost": "0",
+              "monthly_carbon_savings_grams_co2e": "0",
+              "monthly_water_savings_liters": "0",
+              "usage_based": true
+            }
+          ],
+          "tags": {
+            "environment": "prod",
+            "owner": "platform-team",
+            "project": "payments"
+          },
+          "supports_tags": true,
+          "metadata": {
+            "deep_checksum": "708b3ee0e0b17e07"
+          }
+        },
+        {
+          "name": "azurerm_virtual_network.main",
+          "type": "azurerm_virtual_network",
+          "is_supported": true,
+          "is_free": true,
+          "tags": {
+            "environment": "prod",
+            "owner": "platform-team",
+            "project": "payments"
+          },
+          "supports_tags": true,
+          "metadata": {
+            "deep_checksum": "801d38470f4cc8e3"
+          }
+        }
+      ]
+    }
+  ]
+}

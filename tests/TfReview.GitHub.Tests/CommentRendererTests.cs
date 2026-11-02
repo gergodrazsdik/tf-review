@@ -110,6 +110,57 @@ public class CommentRendererTests
     }
 
     [Test]
+    public async Task Says_what_to_look_at_first_as_inert_text()
+    {
+        var result = Linked("adr/x.md") with
+        {
+            RiskOrder = [new RiskItem("a.b") { Reason = "See [this](https://evil.example)" }, new RiskItem("a.c")],
+        };
+
+        var comment = CommentRenderer.Render(result, Counts);
+
+        await Assert.That(comment).Contains("Look at first:");
+        await Assert.That(comment).Contains("- `a.b`: `See [this](https://evil.example)`");
+        await Assert.That(comment).DoesNotContain("`a.c`");
+    }
+
+    [Test]
+    public async Task Says_nothing_about_risk_when_nothing_deserves_a_look()
+    {
+        var result = Linked("adr/x.md") with { RiskOrder = [new RiskItem("a.c")] };
+
+        await Assert.That(CommentRenderer.Render(result, Counts)).DoesNotContain("Look at first");
+    }
+
+    [Test]
+    public async Task Limits_what_to_look_at_first()
+    {
+        var result = Linked("adr/x.md") with { RiskOrder = [.. Enumerable.Range(0, 8).Select(i => new RiskItem($"a.r{i}") { Reason = "Why." })] };
+
+        await Assert.That(CommentRenderer.Render(result, Counts)).DoesNotContain("a.r5");
+    }
+
+    [Test]
+    public async Task A_merged_row_names_its_other_rules_as_inert_text()
+    {
+        var result = Linked("adr/x.md");
+        result = result with { Findings = [result.Findings[0] with { RelatedRules = ["CKV_AZURE_190", "[x](https://evil.example)"] }] };
+
+        var comment = CommentRenderer.Render(result, Counts);
+
+        await Assert.That(comment).Contains(", also `CKV_AZURE_190`, `[x](https://evil.example)`");
+    }
+
+    [Test]
+    public async Task A_scanner_rule_is_labelled_as_a_scanner()
+    {
+        var result = Linked("adr/x.md");
+        result = result with { Findings = [result.Findings[0] with { Rule = "CKV_AZURE_190", Deterministic = true, Agent = Reporter.Scanner }] };
+
+        await Assert.That(CommentRenderer.Render(result, Counts)).Contains("| scanner |");
+    }
+
+    [Test]
     public async Task Links_a_cited_doc_at_the_pinned_commit()
     {
         var comment = CommentRenderer.Render(Linked("adr/ADR-002-tags.md"), Counts);

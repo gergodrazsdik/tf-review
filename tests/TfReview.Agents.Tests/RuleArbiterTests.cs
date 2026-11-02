@@ -97,6 +97,15 @@ public class RuleArbiterTests
             .IsEqualTo(CanonicalJson.Write(System.Text.Json.Nodes.JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(backward))));
     }
 
+    [Test]
+    public async Task Within_a_severity_the_riskiest_resource_comes_first()
+    {
+        var arbitration = await new RuleArbiter().ArbitrateAsync(
+            [Scanner("a.first", "ADR-001", Severity.High), Scanner("z.last", "ADR-001", Severity.High)], Plan, ["z.last", "a.first"]);
+
+        await Assert.That(arbitration.Findings[0].ResourceAddress).IsEqualTo("z.last");
+    }
+
     private static Task<Arbitration> Arbitrate(params Finding[] findings) => new RuleArbiter().ArbitrateAsync(findings, Plan);
 
     private static Finding Scanner(string address, string rule, Severity severity) =>

@@ -1,0 +1,12 @@
+{
+  "risk_first": "azurerm_mssql_database.main",
+  "first_finding": "azurerm_mssql_database.main",
+  "findings": [
+    {
+      "resource_address": "azurerm_mssql_database.main",
+      "rule": "POL-004",
+      "agent": "security",
+      "deterministic": true
+    }
+  ]
+}

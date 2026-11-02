@@ -53,6 +53,11 @@
       }
     },
     "suggestion": { "type": "string" },
+    "related_rules": {
+      "description": "Other rules this finding also stands for, after an arbiter merged findings about one problem.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
     "monthly_cost_delta_usd": {
       "description": "Cost agent only.",
       "type": "number"

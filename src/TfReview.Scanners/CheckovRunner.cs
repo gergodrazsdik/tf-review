@@ -60,14 +60,15 @@ public sealed class CheckovRunner(IProcessRunner processes, string program = "ch
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(3);
 
-    // What each check protects against. Checks that would need `configuration` don't belong here.
-    private static readonly Dictionary<string, Severity> Allowlist = new(StringComparer.Ordinal)
+    // Checks worth a row, in words that say what's wrong, since Checkov's own titles read like advice ("Ensure
+    // that..."). Checks that would need `configuration` don't belong here.
+    private static readonly Dictionary<string, (Severity Severity, string Title)> Allowlist = new(StringComparer.Ordinal)
     {
-        ["CKV_AZURE_9"] = Severity.High, // RDP open to the internet
-        ["CKV_AZURE_10"] = Severity.High, // SSH open to the internet, though it misses 0.0.0.0/0
-        ["CKV_AZURE_44"] = Severity.Medium, // Storage below the latest TLS version
-        ["CKV_AZURE_59"] = Severity.High, // Storage that allows public network access
-        ["CKV_AZURE_190"] = Severity.High, // Blobs that allow public access
+        ["CKV_AZURE_9"] = (Severity.High, "RDP is open to the internet."),
+        ["CKV_AZURE_10"] = (Severity.High, "SSH is open to the internet."),
+        ["CKV_AZURE_44"] = (Severity.Medium, "The storage account allows an old TLS version."),
+        ["CKV_AZURE_59"] = (Severity.High, "The storage account allows public network access."),
+        ["CKV_AZURE_190"] = (Severity.High, "The storage account allows public access to blobs."),
     };
 
     public async Task<CheckovOutcome> RunAsync(RedactedPlan plan, CancellationToken cancellationToken = default)
@@ -144,10 +145,9 @@ public sealed class CheckovRunner(IProcessRunner processes, string program = "ch
                 }
 
                 var checkId = failure.GetProperty("check_id").GetString() ?? throw new JsonException();
-                if (Allowlist.TryGetValue(checkId, out var severity))
+                if (Allowlist.TryGetValue(checkId, out var check))
                 {
-                    violations.Add(new CheckovViolation(
-                        checkId, address, severity, failure.GetProperty("check_name").GetString() ?? checkId, Attribute(failure)));
+                    violations.Add(new CheckovViolation(checkId, address, check.Severity, check.Title, Attribute(failure)));
                 }
             }
         }

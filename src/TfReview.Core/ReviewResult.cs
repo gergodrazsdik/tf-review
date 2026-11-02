@@ -120,6 +120,11 @@ public sealed record Finding(
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Suggestion { get; init; }
 
+    /// <summary>Other rules this row also stands for, after an arbiter merged findings about one problem.</summary>
+    [JsonPropertyName("related_rules")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? RelatedRules { get; init; }
+
     [JsonPropertyName("monthly_cost_delta_usd")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public decimal? MonthlyCostDeltaUsd { get; init; }
@@ -148,6 +153,14 @@ public sealed record TokenUsage(
     [JsonPropertyName("latency_ms")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public long? LatencyMs { get; init; }
+}
+
+/// <summary>One change, in the order to look at them, and why it deserves a look if it does.</summary>
+public sealed record RiskItem([property: JsonPropertyName("resource_address")] string ResourceAddress)
+{
+    [JsonPropertyName("reason")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Reason { get; init; }
 }
 
 /// <summary>What one resource costs a month before and after the plan, in US dollars, at list prices.</summary>
@@ -187,6 +200,10 @@ public sealed record ReviewResult(
     [JsonPropertyName("omitted_docs")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<string>? OmittedDocs { get; init; }
+
+    [JsonPropertyName("risk_order")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<RiskItem>? RiskOrder { get; init; }
 
     [JsonPropertyName("cost")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

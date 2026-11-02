@@ -21,6 +21,15 @@ public class CheckovRunnerTests
         await Assert.That(violation.Address).IsEqualTo(Storage);
     }
 
+    // Checkov's own titles read like advice ("Ensure that...") rather than saying what's wrong.
+    [Test]
+    public async Task Uses_our_words_for_a_finding()
+    {
+        var outcome = (CheckovRan)CheckovRunner.Parse(Output(Canary, Failure(Storage, "CKV_AZURE_190", "Ensure that Storage blobs restrict public access", null)));
+
+        await Assert.That(outcome.Violations.Single().Title).IsEqualTo("The storage account allows public access to blobs.");
+    }
+
     // D34: the spike's storage account failed 11 checks, most of them about related resources.
     [Test]
     public async Task Drops_checks_outside_the_allowlist()

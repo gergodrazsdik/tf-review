@@ -53,7 +53,7 @@ Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET S
 
 ## Decision log
 
-All 34 decisions are settled as of 2026-11-01; D19–D29 came from the M1 design council and D31–D34 from M2's spike. Changing one means editing its row and the sections it affects in the same commit.
+All 36 decisions are settled as of 2026-11-02; D19–D29 came from the M1 design council, D31–D34 from M2's spike and D35–D36 from building its orchestrator and arbiter. Changing one means editing its row and the sections it affects in the same commit.
 
 | # | Decision | Choice | Why |
 | --- | --- | --- | --- |
@@ -76,7 +76,7 @@ All 34 decisions are settled as of 2026-11-01; D19–D29 came from the M1 design
 | D17 | Image registry | GitHub Container Registry, public image, cosign-signed, consumers pin by digest | Free for public images; no registry bill in Azure |
 | D18 | Infracost | CLI v2 with checksum-pinned plugins; token in pass locally, in Key Vault for the service | v0.10 is being retired; plugins are unsigned, so they're pinned |
 | D19 | M1 scanner and model role | conftest moves to M1 and its results are the conventions agent's input; the gate adds a case Rego misses | Matches the agent design, so the baseline carries into M2; without the extra case the gate wouldn't test the LLM |
-| D20 | M1 arbiter | Rule-based behind `IArbiter` (severity sort, verdict); LLM arbiter in M2 | With one agent there's nothing to arbitrate, and it halves the LLM calls |
+| D20 | M1 arbiter | Rule-based behind `IArbiter` (severity sort, verdict); LLM arbiter in M2, limited by D36 | With one agent there's nothing to arbitrate, and it halves the LLM calls |
 | D21 | LLM credentials | Two jobs: the plan job runs PR code and uploads only a redacted plan; the review job runs no PR code and uses its own identity, federated on `environment:review` | `tofu plan` runs code a PR controls, which could otherwise mint the LLM credentials; this doesn't stop someone who can edit the workflow |
 | D22 | Evidence pointers | Address-keyed: `/resource_changes/<escaped address>/...`, composed by code and checked against `resource_address` | Array indexes shift with slices and no-op drops, and would break M4's cached findings |
 | D23 | Image pinning | Two tags: `image-v*` builds and signs, a PR pins the digest on `main`, `v*` publishes the workflow; dev images are a separate signed package passed through an `image` input | A tag's workflow can't contain its own image digest; `main` always holds a valid one |
@@ -91,6 +91,8 @@ All 34 decisions are settled as of 2026-11-01; D19–D29 came from the M1 design
 | D32 | Scanner input | Checkov and Infracost read a plan rebuilt from the redacted one. Infracost reporting no resources for a plan that has some counts as failed, and every Checkov scan includes a canary that always fails, whose absence counts as failed | Both exit 0 with an empty result on a plan they don't recognize, which looks exactly like a clean scan, and Checkov also needs `terraform_version`. Zero results is legitimate for Checkov on types with no checks, so only a canary can prove it ran. Scanners never see the raw plan, so a value marked sensitive can't be priced or checked |
 | D33 | C4 and C7 fixtures | Hand-built in `tests/fixtures/cases`, with no seeded PR | Both need an existing resource that a plan updates or replaces, and keeping a VM or database deployed for it would cost money. The other cases remain real seeded PRs |
 | D34 | Checkov findings | Only an allowlist of checks becomes findings, each with a severity set in code | One storage account failed 11 checks in the spike, and checks that look for related resources can't pass without `configuration`, so reporting everything would bury C1–C3 and fail C8 and C10 |
+| D35 | Orchestrator | Code routes, by each agent's retrieved standards; an LLM call only orders the changes and explains the riskiest, inside rule-based tiers (deletes and replacements, access, network, everything else), with those rules as its fallback | `applies_to` and topics already pick what each agent sees, so an LLM router would either duplicate that or risk silently skipping a review. An order is safe to get wrong, and a model can't bury a destructive change |
+| D36 | LLM arbiter limits | It proposes merges, an order within a severity, and dropping model findings; code refuses anything else: adding a finding, dropping a policy or scanner finding, merging across resources, merging a model finding into a deterministic one, or ranking a lower severity above a higher one. Invalid output keeps the rule-based result | Plan text can steer a model, and a merged row counts as deterministic, so an unguarded merge could make a model's opinion blocking |
 
 ## Architecture
 
@@ -160,11 +162,11 @@ Five LLM roles by M2 (M1 has only the conventions agent, D19–D20), each a Micr
 
 | Agent | Gets | Retrieves | Model (v1) | Returns |
 | --- | --- | --- | --- | --- |
-| Orchestrator | Condensed diff: addresses, types, actions | Nothing | gpt-5.4-mini | Resource-to-agent routing, skipped agents, risk order (deletes, replacements, IAM, network first) |
+| Orchestrator | Addresses, types and actions, with no values | Nothing | gpt-5.4-mini | Risk order within code's tiers, and reasons for the riskiest. Code does the routing (D35) |
 | Security | Its slice plus the Checkov and conftest results for it | Accepted policies and ADRs whose `applies_to` matches the slice | Stronger model once granted; gpt-5.4-mini until then | Findings |
 | Cost | Its slice plus Infracost per-resource cost and delta | ADRs tagged as cost guidance | gpt-5.4-mini | Findings with monthly delta |
 | Conventions | Its slice plus conftest naming and tag results | Accepted docs with its topics (`naming`, `tagging`) whose `applies_to` matches | gpt-5.4-mini | Findings |
-| Arbiter (from M2; rule-based in M1) | All surviving findings plus the condensed diff | Nothing | Stronger model once granted; gpt-5.4-mini until then | Ranked, deduplicated findings and a verdict |
+| Arbiter (from M2; rule-based in M1) | All surviving findings, with no plan values beyond what titles quote | Nothing | Stronger model once granted; gpt-5.4-mini until then | Proposed merges, order and drops, within what code allows (D36). Code sets the verdict |
 
 **Rules every agent run follows**
 
@@ -549,10 +551,10 @@ Work runs in this order, so the deterministic findings exist before the agents t
 
 *5. Orchestrator and arbiter*
 
-- [ ] Orchestrator: routing by resource type and risk order, and a code fallback that sends everything everywhere if its output is invalid, so routing can't silently skip a review
-- [ ] LLM arbiter behind `IArbiter` (D20), which can only rank and drop what the evidence check kept, never add; the rule-based merge stays as its input and its fallback
-- [ ] Seeded case C7 as a hand-built fixture (D33)
-- [ ] Comment: risk order; the monthly cost delta is there since part 2
+- [x] Orchestrator (D35): code routes, so each agent sees only the resources its standards cover; an LLM orders changes by risk inside rule-based tiers, and the rules stand alone if its answer is unusable
+- [x] LLM arbiter behind `IArbiter` (D36), within code's limits; the rule-based merge stays as its input and its fallback
+- [x] Seeded case C7 as a hand-built fixture (D33), citing the new POL-004
+- [x] Comment: what to look at first, merged rows naming their other rules, a `scanner` source label, and our own words for Checkov's checks; the monthly cost delta is there since part 2
 
 *6. Evaluation and gate*
 
