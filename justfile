@@ -80,17 +80,23 @@ cost plan:
     export INFRACOST_CLI_AUTHENTICATION_TOKEN
     infracost scan "{{ plan }}" --json --no-color --currency USD
 
-# Copy the Infracost token from pass into each onboarded repo's Actions secrets; yours to run, never an agent's
-[confirm('Copy the Infracost token into the Actions secrets of tf-review and tf-review-demo?')]
+# Copy the Infracost token into each onboarded repo's Actions secrets, and it and the GitHub App's key into Key Vault; yours to run, never an agent's
+[confirm('Copy the Infracost token into the Actions secrets of tf-review and tf-review-demo, and it and the GitHub App key into Key Vault?')]
 [group('bootstrap')]
 secrets-sync:
     #!/usr/bin/env bash
     set -euo pipefail
     token="$(pass show tf-review/infracost/cli-token)"
+    key="$(pass show tf-review/github-app/private-key)"
     for repo in gergodrazsdik/tf-review gergodrazsdik/tf-review-demo; do
       gh secret set INFRACOST_CLI_AUTHENTICATION_TOKEN -R "$repo" <<<"$token"
       echo "$repo: set"
     done
+    # From stdin so values stay out of the process list, and no output because az prints the value it set.
+    az keyvault secret set --vault-name kv-tf-review-prod --name infracost-cli-token --file /dev/stdin --output none <<<"$token"
+    echo "Key Vault: infracost-cli-token set"
+    az keyvault secret set --vault-name kv-tf-review-prod --name github-app-private-key --file /dev/stdin --output none <<<"$key"
+    echo "Key Vault: github-app-private-key set"
 
 # Build the review image with podman; it can't run from a recipe in the Claude sandbox
 [group('dev')]

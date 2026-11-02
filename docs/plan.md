@@ -360,6 +360,7 @@ One storage account holds every repo's state, created once by a bootstrap projec
 | Apply | `repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:prod` | Write on the target scope, gated by environment approval |
 | Review (M1–M2) | `repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:review` | Cognitive Services OpenAI User on the Foundry resource group; nothing else (D21, D24) |
 | Reviewer submit (M3) | No Azure identity: the API checks the GitHub OIDC token itself (D45) | Call the review API only |
+| Service (M3) | None: a managed identity on the service's container apps | LLM, queue, blobs, reading secrets and, from `infra/`, Cosmos, all in `tf-review`'s resource group |
 
 **Reviewer infrastructure** (`tf-review/infra`; Foundry from M1, the rest from M3)
 
@@ -370,7 +371,7 @@ The grown corpus raises Cosmos storage and request units and takes one round of 
 | Resource | Purpose | Tier | From |
 | --- | --- | --- | --- |
 | Azure OpenAI in Foundry | gpt-5.4-mini Data Zone deployment; later gpt-6.1-sol and `text-embedding-3-small`; a project so the new portal can open the account, which the review itself doesn't use | Pay-as-you-go, key auth disabled | M1 |
-| Role assignments (in bootstrap, D24) | Cognitive Services OpenAI User at resource group scope for each onboarded repo's review identity (M1–M2) and the service identity (M3) | — | M1 |
+| Role assignments (in bootstrap, D24) | Cognitive Services OpenAI User at resource group scope for each onboarded repo's review identity (M1–M2) and the service identity (M3), which also gets Storage Queue and Blob Data Contributor and Key Vault Secrets User there | — | M1 |
 | Cosmos DB for NoSQL | Vectors, review history, result cache, feedback | Free tier (1,000 RU/s, 25 GB), key auth disabled | M3 |
 | Storage account | Review queue and redacted plans (lifecycle rule deletes after 7 days) | Standard LRS | M3 |
 | Container Apps | Review API (scale to zero) and the queue-scaled review job | Consumption-only environment, public ingress | M3 |
@@ -613,13 +614,15 @@ Work runs in this order, so the unknowns surface before anything depends on them
 *2. Infrastructure*
 
 - [x] `infra/`: Storage (queue, redacted plans with a 7-day lifecycle rule), Key Vault, Container Apps environment, App Insights with a daily cap, the embedding deployment, and Cosmos on the free tier with vector search. **You:** approve `prod`
-- [ ] Bootstrap: the service's managed identity with its LLM role, and the allowlist from the `repos` map (D40), with the released commits on it updated by the release flow (D45). **You:** `bootstrap-plan`, `bootstrap-apply`
+- [x] Bootstrap: the service's managed identity with its LLM, queue, blob and secret roles at resource group scope, your right to write the vault's secrets, and the allowlist from the `repos` map (D40) as the `TF_REVIEW_ALLOWED_REPOSITORY_IDS` variable on this repo. **You:** `bootstrap-plan`, `bootstrap-apply`
 - [x] **You:** create the GitHub App, private to your account, and store its key with `pass insert -m tf-review/github-app/private-key`
 - [ ] **You:** `just secrets-sync` into Key Vault, once the vault exists
 - [x] Delete the `removed` and `import` blocks that hand the Cosmos account to azapi (D46), once applied, and check the next plan shows no changes
 
 *3. The service*
 
+- [ ] The released commits for D45: a file in `infra/`, because bootstrap would mean you running it each release. A commit can't name itself, so the release flow adds a tag's commit in a PR after tagging, and the demo repins once that's applied
+- [ ] Cosmos data-plane roles for the service identity, in `infra/`, because they need the account and Contributor can create them
 - [ ] `TfReview.Api`: `POST /reviews` checks the token against D45, with a test per refused case including a fork's commit, redacts again, stores the plan, enqueues, and answers `202`; `GET /reviews/{id}`; size limits and a rate limit per repo, because ingress is public
 - [ ] `TfReview.Worker`: the review job, reading the config at the base commit through the App, running today's `ReviewRunner`, then posting the sticky comment and check run. A failed job posts "not reviewed"
 - [ ] Reusable workflow: the review job runs `tfreview submit` and no agents, retrying through the API's cold start. On any failure it posts "not reviewed" with its own token (D39), with no App needed
