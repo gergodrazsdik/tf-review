@@ -53,7 +53,7 @@ Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET S
 
 ## Decision log
 
-All 44 decisions are settled as of 2026-11-02; D19–D29 came from the M1 design council, D31–D34 from M2's spike, D35–D36 from building its orchestrator and arbiter, and D37–D44 from planning M3. Changing one means editing its row and the sections it affects in the same commit.
+All 45 decisions are settled as of 2026-11-02; D19–D29 came from the M1 design council, D31–D34 from M2's spike, D35–D36 from building its orchestrator and arbiter, and D37–D45 from planning M3. Changing one means editing its row and the sections it affects in the same commit.
 
 | # | Decision | Choice | Why |
 | --- | --- | --- | --- |
@@ -101,6 +101,7 @@ All 44 decisions are settled as of 2026-11-02; D19–D29 came from the M1 design
 | D42 | Reference docs | A new `reference` doc type: imports are retrieved to inform findings and can't create one by being broken. Only a team's own accepted docs can. A team promotes an imported rule by writing an ADR or policy | "Accepted" means a team decided it. Hundreds of imported rules as standards would flood every PR and fail the clean eval cases |
 | D43 | Reference storage | Imported docs live only in Cosmos, as documents with their vectors. `corpus/sources.yml` in `tf-review` pins each source repo and commit, and the azurerm versions to index. No copy of them in any git repo | Azure Policy alone is 5,179 files and azurerm over 1,400 per version, and a review refuses a standards download over 5,000 entries or 20 MB, so they can't go in `tf-standards`. Everything in Cosmos can be rebuilt from the pins, so a second copy in git would add no safety |
 | D44 | Refreshing the corpus | Changing `corpus/sources.yml` is the only trigger: on a PR a dry run reports what would change, with no credentials, and on merge indexing runs. A team's rules aren't indexed, because reviews read them at their pinned commit (D42) | One path, in the repo that owns the corpus's use. Sources change slowly, so a person choosing a commit is enough, and a pin change is a reviewable, revertible PR |
+| D45 | API trust | The API accepts a GitHub OIDC token only with this audience, `event_name` `pull_request`, `environment` `review`, a `repository_id` on the allowlist, and a `job_workflow_ref` naming `tf-review`'s `tf-review.yml` at a commit on a list of released commits. It takes the PR number from `ref`, never from the request | Real tokens showed `environment` refuses the plan job, which runs PR code, and `job_workflow_ref` refuses a job a PR adds to its own workflow. GitHub resolves a fork's commit through its parent repo, so a commit SHA alone in `tf-review`'s name proves nothing, hence the list of released commits |
 
 ## Architecture
 
@@ -357,7 +358,7 @@ One storage account holds every repo's state, created once by a bootstrap projec
 | Plan | `repo:<owner>@<owner-id>/<repo>@<repo-id>:pull_request` | Reader on the target scope, Blob Data Contributor on its own state container |
 | Apply | `repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:prod` | Write on the target scope, gated by environment approval |
 | Review (M1–M2) | `repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:review` | Cognitive Services OpenAI User on the Foundry resource group; nothing else (D21, D24) |
-| Reviewer submit (M3) | Customised subject incl. `job_workflow_ref` | Call the review API only |
+| Reviewer submit (M3) | No Azure identity: the API checks the GitHub OIDC token itself (D45) | Call the review API only |
 
 **Reviewer infrastructure** (`tf-review/infra`; Foundry from M1, the rest from M3)
 
@@ -602,19 +603,21 @@ Work runs in this order, so the unknowns surface before anything depends on them
 
 *1. Prove the unknowns*
 
-- [ ] Check what the design assumes: Cosmos's free tier and vector search in Germany West Central, and whether the subscription still has its one free account; `text-embedding-3-small` quota; a Container Apps job scaled by a Storage queue, with a managed identity, on the read-only filesystem. Re-price the design against the €30 budget (D15)
-- [ ] Spike the API's trust in a caller (D21, D40): a GitHub OIDC token's `repository`, `job_workflow_ref` and audience, proving a token minted by the plan job, which runs PR code, is refused. If it can't be refused, the design changes before anything else
+- [x] Check what the design assumes (2026-11-02): the subscription has no Cosmos account, so its free tier is available, and has to be chosen at creation. Vector search needs the `EnableNoSQLVectorSearch` capability and doesn't work with shared throughput, so containers get their own RU/s, which share the free 1,000. `text-embedding-3-small` has 1,000K TPM of Data Zone quota. Container Apps is in the region, but `Microsoft.App` isn't registered. **You:** `az provider register -n Microsoft.App`
+- [x] Re-price against the €30 budget (D15), as an estimate until the first real index: about 11,000 chunks with one azurerm version, around 150 MB against the free 25 GB, so storage stays free even with several versions. A full embed is around 4M tokens, about 10 cents. Writing them at the free tier's rate should take minutes. Compute scales to zero, so the budget holds
+- [ ] A Container Apps job scaled by a Storage queue, with a managed identity, on the read-only filesystem: proved when it's first deployed in part 2
+- [x] Spike the API's trust in a caller (D21, D40, `tf-review-demo` PR #30, 2026-11-02): real tokens from three kinds of job show the claims tell them apart (D45). The claims were read, not yet enforced: part 3's API has to refuse each one in a test
 - [ ] Spike the App's tokens: minting an installation token scoped to one repo from Key Vault, and how a comment and a check run look when the App posts them
 
 *2. Infrastructure*
 
-- [ ] `infra/`: Storage (queue, redacted plans with a 7-day lifecycle rule), Key Vault, Container Apps environment, App Insights with a daily cap, and the embedding deployment. **You:** approve `prod`
-- [ ] Bootstrap: submit identity per repo in place of the review identity, the service's managed identity with its LLM role, and the allowlist from the `repos` map (D40). **You:** `bootstrap-plan`, `bootstrap-apply`
+- [ ] `infra/`: Storage (queue, redacted plans with a 7-day lifecycle rule), Key Vault, Container Apps environment, App Insights with a daily cap, the embedding deployment, and Cosmos on the free tier with vector search. **You:** approve `prod`
+- [ ] Bootstrap: the service's managed identity with its LLM role, and the allowlist from the `repos` map (D40), with the released commits on it updated by the release flow (D45). **You:** `bootstrap-plan`, `bootstrap-apply`
 - [ ] **You:** create the GitHub App, private to your account, and store its key with `pass insert -m tf-review/github-app/private-key`, then `just secrets-sync` into Key Vault
 
 *3. The service*
 
-- [ ] `TfReview.Api`: `POST /reviews` checks the token and allowlist, redacts again, stores the plan, enqueues, and answers `202`; `GET /reviews/{id}`; size limits and a rate limit per repo, because ingress is public
+- [ ] `TfReview.Api`: `POST /reviews` checks the token against D45, with a test per refused case including a fork's commit, redacts again, stores the plan, enqueues, and answers `202`; `GET /reviews/{id}`; size limits and a rate limit per repo, because ingress is public
 - [ ] `TfReview.Worker`: the review job, reading the config at the base commit through the App, running today's `ReviewRunner`, then posting the sticky comment and check run. A failed job posts "not reviewed"
 - [ ] Reusable workflow: the review job runs `tfreview submit` and no agents, retrying through the API's cold start. On any failure it posts "not reviewed" with its own token (D39), with no App needed
 - [ ] OpenTelemetry to App Insights: tokens, cached tokens, latency and cost per agent call, findings per agent, evidence-check drops
