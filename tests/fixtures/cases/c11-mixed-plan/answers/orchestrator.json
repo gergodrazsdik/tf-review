@@ -1,0 +1,4 @@
+{
+  "prompt_version": 1,
+  "text": "{\"resources\":[{\"resource_address\":\"azurerm_storage_account.public\",\"reason\":\"This could expose data publicly if configured incorrectly.\"},{\"resource_address\":\"azurerm_virtual_network.untagged\",\"reason\":null},{\"resource_address\":\"azurerm_virtual_network.wrong_env\",\"reason\":null}]}"
+}

@@ -1,4 +1,4 @@
 {
-  "prompt_version": 2,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_virtual_network.seed\",\"doc_id\":\"ADR-002\",\"attribute\":\"tags\",\"title\":\"azurerm_virtual_network.seed has tags set to null, so the required \\\"owner\\\", \\\"environment\\\", and \\\"project\\\" tags are missing.\",\"suggestion\":\"Add non-empty tags for owner, environment, and project.\"}]}"
+  "prompt_version": 4,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_virtual_network.seed\",\"doc_id\":\"ADR-002\",\"attribute\":\"tags\",\"title\":\"azurerm_virtual_network.seed has tags set to \\\"null\\\", so the required \\\"owner\\\", \\\"environment\\\", and \\\"project\\\" tags are missing.\",\"suggestion\":\"Set the resource tags to non-empty values for owner, environment, and project.\",\"breaks_standard\":true}]}"
 }

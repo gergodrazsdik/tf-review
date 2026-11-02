@@ -1,0 +1,1 @@
+{"currency": "USD", "projects": [{"project_name": "plan.json", "resources": [{"name": "azurerm_network_security_rule.rdp", "type": "azurerm_network_security_rule", "is_supported": true, "is_free": true}, {"name": "azurerm_role_assignment.owner", "type": "azurerm_role_assignment", "is_supported": true, "is_free": true}]}]}

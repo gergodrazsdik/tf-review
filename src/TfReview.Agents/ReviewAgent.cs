@@ -15,7 +15,11 @@ public closed record AgentOutcome(int PromptVersion, IReadOnlyList<AgentCall> Ca
 
 /// <summary>The model answered. The findings still have to pass the evidence check.</summary>
 public sealed record AgentReviewed(int PromptVersion, IReadOnlyList<AgentCall> Calls, IReadOnlyList<Finding> Findings)
-    : AgentOutcome(PromptVersion, Calls);
+    : AgentOutcome(PromptVersion, Calls)
+{
+    /// <summary>Resources the model listed while saying they don't break the standard.</summary>
+    public int Retracted { get; init; }
+}
 
 /// <summary>The slice wasn't reviewed, and the comment says so instead of guessing.</summary>
 public sealed record AgentFailed(int PromptVersion, IReadOnlyList<AgentCall> Calls, NotReviewedReason Reason)
@@ -47,9 +51,10 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
                   "doc_id": { "type": "string" },
                   "attribute": { "type": "string" },
                   "title": { "type": "string" },
-                  "suggestion": { "type": ["string", "null"] }
+                  "suggestion": { "type": ["string", "null"] },
+                  "breaks_standard": { "type": "boolean" }
                 },
-                "required": ["resource_address", "doc_id", "attribute", "title", "suggestion"],
+                "required": ["resource_address", "doc_id", "attribute", "title", "suggestion", "breaks_standard"],
                 "additionalProperties": false
               }
             }
@@ -93,8 +98,8 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
             timeout,
             cancellationToken);
 
-        return result.Value is { } findings
-            ? new AgentReviewed(prompt.Version, result.Calls, findings)
+        return result.Value is { } parsed
+            ? new AgentReviewed(prompt.Version, result.Calls, parsed.Findings) { Retracted = parsed.Retracted }
             : new AgentFailed(prompt.Version, result.Calls, result.Failure ?? NotReviewedReason.InvalidOutput);
     }
 
@@ -145,6 +150,9 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
                     ["before_usd"] = cost.BeforeUsd,
                     ["after_usd"] = cost.AfterUsd,
                     ["delta_usd"] = cost.AfterUsd - cost.BeforeUsd,
+
+                    // Worked out here, because the model got ADR-003's share rule wrong doing it itself.
+                    ["increase_percent"] = cost.BeforeUsd > 0 ? Math.Round((cost.AfterUsd - cost.BeforeUsd) / cost.BeforeUsd * 100, 1) : null,
                 }),
             ]);
 
@@ -155,7 +163,7 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
     }
 
     /// <summary>The findings in an answer, or null if it doesn't match the wire schema exactly.</summary>
-    private Finding[]? ParseFindings(string text, IReadOnlyList<StandardsDoc> docs, IReadOnlyList<ResourceCostChange>? costs)
+    private ParsedFindings? ParseFindings(string text, IReadOnlyList<StandardsDoc> docs, IReadOnlyList<ResourceCostChange>? costs)
     {
         var output = StructuredCall.ParseWire<WireOutput>(text);
         if (output is null || output.Findings.Any(finding => finding.ResourceAddress.Length == 0 || finding.Title.Trim().Length == 0))
@@ -163,7 +171,12 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
             return null;
         }
 
-        return [.. output.Findings.Select(finding => ToFinding(finding, docs, costs))];
+        // On C13 the model judged a resource fine and listed it anyway, however the prompt was worded, so the
+        // model answers the question and code acts on it. The field comes last in the schema, because when it
+        // came first the model committed to true before reasoning, and then wrote a title saying the opposite.
+        return new ParsedFindings(
+            [.. output.Findings.Where(finding => finding.BreaksStandard).Select(finding => ToFinding(finding, docs, costs))],
+            output.Findings.Count(finding => !finding.BreaksStandard));
     }
 
     private Finding ToFinding(WireFinding wire, IReadOnlyList<StandardsDoc> docs, IReadOnlyList<ResourceCostChange>? costs)
@@ -190,7 +203,10 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
 
     private sealed record WireOutput([property: JsonPropertyName("findings")] IReadOnlyList<WireFinding> Findings);
 
+    private sealed record ParsedFindings(IReadOnlyList<Finding> Findings, int Retracted);
+
     private sealed record WireFinding(
+        [property: JsonPropertyName("breaks_standard")] bool BreaksStandard,
         [property: JsonPropertyName("resource_address")] string ResourceAddress,
         [property: JsonPropertyName("doc_id")] string DocId,
         [property: JsonPropertyName("attribute")] string Attribute,

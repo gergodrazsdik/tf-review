@@ -1,0 +1,11 @@
+{
+  "held_out": true,
+  "findings": [
+    {
+      "resource_address": "azurerm_virtual_network.main",
+      "rule": "ADR-002",
+      "agent": "conventions",
+      "deterministic": false
+    }
+  ]
+}

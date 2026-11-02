@@ -1,0 +1,4 @@
+{
+  "prompt_version": 4,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_network_security_rule.ssh\",\"doc_id\":\"POL-002\",\"attribute\":\"source_address_prefix\",\"title\":\"The inbound SSH rule allows port 22 from the private range \\\"10.0.0.0/8\\\", which does not violate the no-admin-ports-from-the-internet rule but still needs review for whether it is appropriately restricted.\",\"suggestion\":\"No fix is required to satisfy POL-002, but consider limiting SSH further to a bastion host or a narrower trusted subnet if appropriate.\",\"breaks_standard\":false}]}"
+}

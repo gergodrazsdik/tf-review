@@ -1,0 +1,4 @@
+{
+  "prompt_version": 4,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_virtual_network.untagged\",\"doc_id\":\"ADR-002\",\"attribute\":\"tags\",\"title\":\"azurerm_virtual_network.untagged has tags set to null, so required tags are missing.\",\"suggestion\":\"Set non-empty owner, environment, and project tags on the virtual network.\",\"breaks_standard\":true},{\"resource_address\":\"azurerm_virtual_network.wrong_env\",\"doc_id\":\"ADR-002\",\"attribute\":\"tags\",\"title\":\"azurerm_virtual_network.wrong_env has required tag \\\"environment\\\" set to \\\"production\\\", which is not an allowed value.\",\"suggestion\":\"Change the environment tag to one of dev, test, or prod.\",\"breaks_standard\":true}]}"
+}

@@ -1,0 +1,4 @@
+{
+  "prompt_version": 1,
+  "text": "{\"resources\":[{\"resource_address\":\"azurerm_role_assignment.owner\",\"reason\":\"This changes who has owner-level access and should be reviewed carefully.\"},{\"resource_address\":\"azurerm_network_security_rule.rdp\",\"reason\":\"This opens network access and could expose the service if the rule is too broad.\"}]}"
+}

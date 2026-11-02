@@ -1,0 +1,11 @@
+{
+  "held_out": true,
+  "findings": [
+    {
+      "resource_address": "azurerm_network_security_rule.ssh",
+      "rule": "POL-002",
+      "agent": "security",
+      "deterministic": false
+    }
+  ]
+}

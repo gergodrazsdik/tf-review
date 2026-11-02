@@ -5,9 +5,6 @@ namespace TfReview.Agents;
 /// <summary>The findings to report, ranked, and the verdict they lead to.</summary>
 public sealed record Arbitration(Verdict Verdict, IReadOnlyList<Finding> Findings)
 {
-    /// <summary>Model findings an arbiter removed.</summary>
-    public int Dropped { get; init; }
-
     public IReadOnlyList<AgentCall> Calls { get; init; } = [];
 
     public int? PromptVersion { get; init; }

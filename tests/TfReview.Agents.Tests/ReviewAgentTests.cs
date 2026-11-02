@@ -12,7 +12,7 @@ public class ReviewAgentTests
     private const string Empty = """{"findings":[]}""";
 
     private const string OneFinding = """
-        {"findings":[{"resource_address":"azurerm_virtual_network.main","doc_id":"ADR-002","attribute":"tags",
+        {"findings":[{"breaks_standard":true,"resource_address":"azurerm_virtual_network.main","doc_id":"ADR-002","attribute":"tags",
         "title":"environment is production","suggestion":"Use prod."}]}
         """;
 
@@ -40,10 +40,10 @@ public class ReviewAgentTests
 
     // A model that tries to claim more gets treated like any other malformed answer.
     [Test]
-    [Arguments("""{"findings":[{"resource_address":"a.b","doc_id":"ADR-002","attribute":"tags","title":"t","suggestion":null,"deterministic":true}]}""")]
-    [Arguments("""{"findings":[{"resource_address":"a.b","doc_id":"ADR-002","attribute":"tags","title":"t","suggestion":null,"severity":"high"}]}""")]
-    [Arguments("""{"findings":[{"resource_address":"a.b","doc_id":"ADR-002","attribute":"tags","title":"t"}]}""")]
-    [Arguments("""{"findings":[{"resource_address":"a.b","doc_id":"ADR-002","attribute":"tags","title":"  ","suggestion":null}]}""")]
+    [Arguments("""{"findings":[{"breaks_standard":true,"resource_address":"a.b","doc_id":"ADR-002","attribute":"tags","title":"t","suggestion":null,"deterministic":true}]}""")]
+    [Arguments("""{"findings":[{"breaks_standard":true,"resource_address":"a.b","doc_id":"ADR-002","attribute":"tags","title":"t","suggestion":null,"severity":"high"}]}""")]
+    [Arguments("""{"findings":[{"breaks_standard":true,"resource_address":"a.b","doc_id":"ADR-002","attribute":"tags","title":"t"}]}""")]
+    [Arguments("""{"findings":[{"breaks_standard":true,"resource_address":"a.b","doc_id":"ADR-002","attribute":"tags","title":"  ","suggestion":null}]}""")]
     [Arguments("""{"findings":null}""")]
     [Arguments("""{}""")]
     [Arguments("not json")]
@@ -69,6 +69,22 @@ public class ReviewAgentTests
         await Assert.That(outcome.Calls.Select(call => call.InputTokens)).IsEquivalentTo([100L, 200L]);
     }
 
+    // C13: the model judged a resource fine and listed it anyway, however the prompt was worded.
+    [Test]
+    public async Task Removes_what_the_model_says_doesnt_break_the_standard()
+    {
+        const string Answered = """
+            {"findings":[
+            {"breaks_standard":false,"resource_address":"a.fine","doc_id":"ADR-002","attribute":"tags","title":"This does not violate the rule.","suggestion":null},
+            {"breaks_standard":true,"resource_address":"a.bad","doc_id":"ADR-002","attribute":"tags","title":"This does.","suggestion":null}]}
+            """;
+
+        var outcome = (AgentReviewed)await Review(new FakeChat(FakeChat.Answer(Answered)));
+
+        await Assert.That(outcome.Findings.Single().ResourceAddress).IsEqualTo("a.bad");
+        await Assert.That(outcome.Retracted).IsEqualTo(1);
+    }
+
     // Models write these naturally, and the evidence check needs the attribute itself.
     [Test]
     [Arguments("tags.environment")]
@@ -78,7 +94,7 @@ public class ReviewAgentTests
     public async Task Points_at_the_top_level_attribute(string attribute)
     {
         var json = System.Text.Json.JsonSerializer.Serialize(attribute);
-        var answer = $$"""{"findings":[{"resource_address":"a.b","doc_id":"ADR-002","attribute":{{json}},"title":"t","suggestion":null}]}""";
+        var answer = $$"""{"findings":[{"breaks_standard":true,"resource_address":"a.b","doc_id":"ADR-002","attribute":{{json}},"title":"t","suggestion":null}]}""";
 
         var outcome = await Review(new FakeChat(FakeChat.Answer(answer)));
 
@@ -89,7 +105,7 @@ public class ReviewAgentTests
     [Test]
     public async Task An_empty_attribute_leaves_nothing_for_the_evidence_check_to_accept()
     {
-        const string Answered = """{"findings":[{"resource_address":"azurerm_virtual_network.main","doc_id":"ADR-002","attribute":"","title":"t","suggestion":null}]}""";
+        const string Answered = """{"findings":[{"breaks_standard":true,"resource_address":"azurerm_virtual_network.main","doc_id":"ADR-002","attribute":"","title":"t","suggestion":null}]}""";
 
         var outcome = (AgentReviewed)await Review(new FakeChat(FakeChat.Answer(Answered)));
         var check = EvidenceChecker.Check(outcome.Findings, Plan, [Tagging]);
@@ -101,7 +117,7 @@ public class ReviewAgentTests
     [Test]
     public async Task An_invented_doc_is_dropped_by_the_evidence_check()
     {
-        const string Answered = """{"findings":[{"resource_address":"azurerm_virtual_network.main","doc_id":"POL-999","attribute":"name","title":"t","suggestion":null}]}""";
+        const string Answered = """{"findings":[{"breaks_standard":true,"resource_address":"azurerm_virtual_network.main","doc_id":"POL-999","attribute":"name","title":"t","suggestion":null}]}""";
 
         var outcome = (AgentReviewed)await Review(new FakeChat(FakeChat.Answer(Answered)));
         var check = EvidenceChecker.Check(outcome.Findings, Plan, [Tagging]);
@@ -160,6 +176,18 @@ public class ReviewAgentTests
         await Assert.That(outcome.Findings.Single().MonthlyCostDeltaUsd).IsEqualTo(109.792m);
         await Assert.That(chat.Requests.Single().User).Contains("<cost_data>");
         await Assert.That(chat.Requests.Single().User).Contains("109.792");
+    }
+
+    [Test]
+    public async Task Works_out_the_percentage_so_the_model_doesnt_have_to()
+    {
+        var chat = new FakeChat(FakeChat.Answer(Empty));
+        ResourceCostChange[] costs = [new(Address, 100m, 120m, true), new("a.new", 0m, 50m, true)];
+
+        await new ReviewAgent(chat, AgentProfile.Cost).ReviewAsync(Plan, [Tagging], [], costs);
+
+        await Assert.That(chat.Requests.Single().User).Contains("\"increase_percent\":20.0");
+        await Assert.That(chat.Requests.Single().User).Contains("\"increase_percent\":null");
     }
 
     [Test]

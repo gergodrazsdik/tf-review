@@ -7,18 +7,15 @@ using TfReview.Core;
 namespace TfReview.Agents;
 
 /// <summary>
-/// Proposes merging findings about one problem, an order within each severity, and which model findings to
-/// drop (D36). Code enforces what it can't do, because plan text can steer a model: it can't add a finding,
-/// drop a policy or scanner finding, merge across resources, merge a model opinion into a deterministic
-/// finding, which could make it blocking, or rank a lower severity above a higher one. Without a usable
-/// answer the rule-based result stands.
+/// Proposes merging findings about one problem, and an order within each severity (D36). It has no way to
+/// remove a finding: on a live run it dropped a correct model finding, and a redundant row costs less than
+/// a missing one. Code enforces the rest, because plan text can steer a model: it can't add a finding, merge
+/// across resources, merge a model opinion into a deterministic finding, which could make it blocking, or
+/// rank a lower severity above a higher one. Without a usable answer the rule-based result stands.
 /// </summary>
 public sealed partial class LlmArbiter(IChatClient chat, IArbiter? fallback = null, TimeSpan? attemptTimeout = null) : IArbiter
 {
     public const string Name = "arbiter";
-
-    /// <summary>The evidence_drops key for model findings this arbiter removed.</summary>
-    public const string ArbiterDropped = "arbiter_dropped";
 
     private const string Schema = """
         {
@@ -33,10 +30,9 @@ public sealed partial class LlmArbiter(IChatClient chat, IArbiter? fallback = nu
                 "additionalProperties": false
               }
             },
-            "drop": { "type": "array", "items": { "type": "string" } },
             "order": { "type": "array", "items": { "type": "string" } }
           },
-          "required": ["groups", "drop", "order"],
+          "required": ["groups", "order"],
           "additionalProperties": false
         }
         """;
@@ -50,7 +46,7 @@ public sealed partial class LlmArbiter(IChatClient chat, IArbiter? fallback = nu
     {
         var merged = await fallback.ArbitrateAsync(findings, plan, riskOrder, cancellationToken);
 
-        // With fewer than two there's nothing to merge or order, and dropping the only finding isn't this role's job.
+        // With fewer than two there's nothing to merge or order.
         if (merged.Findings.Count < 2)
         {
             return merged;
@@ -115,19 +111,7 @@ public sealed partial class LlmArbiter(IChatClient chat, IArbiter? fallback = nu
             rows.Add((members[0], Merge([.. members.Select(id => byId[id])])));
         }
 
-        var dropped = 0;
-        var drops = answer.Drop.ToHashSet(StringComparer.Ordinal);
-        foreach (var (id, finding) in byId.Where(item => !claimed.Contains(item.Key)))
-        {
-            if (drops.Contains(id) && !finding.Deterministic)
-            {
-                dropped++;
-            }
-            else
-            {
-                rows.Add((id, finding));
-            }
-        }
+        rows.AddRange(byId.Where(item => !claimed.Contains(item.Key)).Select(item => (item.Key, item.Value)));
 
         var modelRanks = answer.Order
             .Select((id, index) => (id, index))
@@ -145,7 +129,7 @@ public sealed partial class LlmArbiter(IChatClient chat, IArbiter? fallback = nu
                 .Select(row => row.Finding),
         ];
 
-        return new Arbitration(ordered.Length == 0 ? Verdict.NoFindings : Verdict.Findings, ordered) { Dropped = dropped };
+        return new Arbitration(Verdict.Findings, ordered);
     }
 
     private static bool CanMerge(IReadOnlyList<Finding> findings) =>
@@ -177,7 +161,6 @@ public sealed partial class LlmArbiter(IChatClient chat, IArbiter? fallback = nu
 
     private sealed record WireOutput(
         [property: JsonPropertyName("groups")] IReadOnlyList<WireGroup> Groups,
-        [property: JsonPropertyName("drop")] IReadOnlyList<string> Drop,
         [property: JsonPropertyName("order")] IReadOnlyList<string> Order);
 
     private sealed record WireGroup([property: JsonPropertyName("finding_ids")] IReadOnlyList<string> FindingIds);

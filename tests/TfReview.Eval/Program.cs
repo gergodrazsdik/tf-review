@@ -206,7 +206,12 @@ async Task<List<string>> Problems(string directory, ReviewResult result)
     problems.AddRange(expected.Findings.Except(actual)
         .Where(finding => !folded.Contains((finding.ResourceAddress, finding.Rule)))
         .Select(finding => $"missing: {finding}"));
-    problems.AddRange(actual.Except(expected.Findings).Select(finding => $"unexpected: {finding}"));
+
+    // With the wording, because a false positive's reasoning is what a prompt fix needs. Evals only see fixtures,
+    // so nothing private reaches these logs.
+    problems.AddRange(result.Findings
+        .Where(finding => !expected.Findings.Contains(new ExpectedFinding(finding.ResourceAddress, finding.Rule, Name(finding.Agent), finding.Deterministic)))
+        .Select(finding => $"unexpected: {finding.ResourceAddress} {finding.Rule} from {Name(finding.Agent)}, deterministic {finding.Deterministic}: {finding.Title}"));
 
     if (expected.RiskFirst is { } riskFirst && result.RiskOrder?.FirstOrDefault()?.ResourceAddress != riskFirst)
     {

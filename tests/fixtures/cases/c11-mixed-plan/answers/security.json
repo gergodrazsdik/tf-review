@@ -1,0 +1,4 @@
+{
+  "prompt_version": 4,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_storage_account.public\",\"doc_id\":\"POL-001\",\"attribute\":\"allow_nested_items_to_be_public\",\"title\":\"azurerm_storage_account.public sets allow_nested_items_to_be_public to \\\"true\\\", which violates the requirement to keep blob containers non-public and prevents anonymous access.\",\"suggestion\":\"Set allow_nested_items_to_be_public to false.\",\"breaks_standard\":true}]}"
+}
