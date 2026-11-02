@@ -1,7 +1,7 @@
 ---
 name: tf-review
 
-# Reviews a PR's OpenTofu plan in two jobs (D21 in docs/plan.md). The plan job runs code the PR
+# Reviews a PR's OpenTofu or Terraform plan in two jobs (D21 in docs/plan.md). The plan job runs code the PR
 # controls, so it gets the plan identity and only passes on a redacted result. The review job runs
 # no PR code and treats that result as untrusted. Callers grant contents: read, id-token: write and
 # pull-requests: write, and pass the secrets below, with secrets: inherit for same-owner repos.
@@ -9,9 +9,13 @@ on:
   workflow_call:
     inputs:
       working-directory:
-        description: The OpenTofu project to plan. Its name also sets the state key.
+        description: The project to plan. Its name also sets the state key.
         type: string
         default: infra
+      tool:
+        description: What plans the project, opentofu or terraform. A project's lock file has to be from the same tool.
+        type: string
+        default: opentofu
       config-path:
         description: Path of the config, read from the PR's base commit so a PR can't weaken its own review.
         type: string
@@ -58,7 +62,20 @@ jobs:
       ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       PROJECT: ${{ inputs.working-directory }}
+      TOOL: ${{ inputs.tool }}
+      # Stops Terraform calling HashiCorp's version check. It has no effect on OpenTofu.
+      CHECKPOINT_DISABLE: "1"
     steps:
+      - name: Choose the tool
+        run: |
+          case $TOOL in
+            opentofu) echo "BIN=tofu" >>"$GITHUB_ENV" ;;
+            terraform) echo "BIN=terraform" >>"$GITHUB_ENV" ;;
+            *)
+              echo "The tool must be opentofu or terraform." >&2
+              exit 1
+              ;;
+          esac
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
       # Before any PR code runs, so PR code can't interfere with the check.
       - &verify-image
@@ -78,7 +95,7 @@ jobs:
             --certificate-identity-regexp "$workflows/$workflow\$" \
             "$IMAGE" >/dev/null
           docker pull --quiet "$IMAGE"
-      - name: Read the OpenTofu version from the base commit
+      - name: Read the tool version from the base commit
         id: config
         env:
           GH_TOKEN: ${{ github.token }}
@@ -89,35 +106,45 @@ jobs:
             "repos/$GITHUB_REPOSITORY/contents/$CONFIG_PATH?ref=$BASE_SHA" 2>/dev/null \
             | yq '.tool_version // ""' || true)
           if [[ ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            version=1.13.2
+            if [ "$TOOL" = terraform ]; then
+              version=1.17.1
+            else
+              version=1.13.2
+            fi
           fi
           echo "tool-version=$version" >>"$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        if: inputs.tool == 'opentofu'
         with:
           tofu_version: ${{ steps.config.outputs.tool-version }}
           tofu_wrapper: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        if: inputs.tool == 'terraform'
+        with:
+          terraform_version: ${{ steps.config.outputs.tool-version }}
+          terraform_wrapper: false
       - name: Init
         env:
           TF_STATE_RESOURCE_GROUP: ${{ vars.TF_STATE_RESOURCE_GROUP }}
           TF_STATE_STORAGE_ACCOUNT: ${{ vars.TF_STATE_STORAGE_ACCOUNT }}
           TF_STATE_CONTAINER: ${{ vars.TF_STATE_CONTAINER }}
         run: |
-          tofu -chdir="$PROJECT" init -input=false -lockfile=readonly \
+          "$BIN" -chdir="$PROJECT" init -input=false -lockfile=readonly \
             -backend-config="resource_group_name=$TF_STATE_RESOURCE_GROUP" \
             -backend-config="storage_account_name=$TF_STATE_STORAGE_ACCOUNT" \
             -backend-config="container_name=$TF_STATE_CONTAINER" \
             -backend-config="key=${PROJECT##*/}.tfstate" \
             -backend-config="use_azuread_auth=true"
       - name: Plan
-        run: tofu -chdir="$PROJECT" plan -input=false -no-color -lock-timeout=5m -out="$RUNNER_TEMP/out.tfplan"
+        run: '"$BIN" -chdir="$PROJECT" plan -input=false -no-color -lock-timeout=5m -out="$RUNNER_TEMP/out.tfplan"'
       - name: Redact
         run: |
           work="$RUNNER_TEMP/tf-review"
           mkdir -p "$work"
-          tofu -chdir="$PROJECT" show -json "$RUNNER_TEMP/out.tfplan" >"$work/plan.json"
+          "$BIN" -chdir="$PROJECT" show -json "$RUNNER_TEMP/out.tfplan" >"$work/plan.json"
           docker run --rm --read-only --tmpfs /tmp --user "$(id -u):$(id -g)" -v "$work:/work" \
             "$IMAGE" redact /work/plan.json /work/redacted.json
           rm -f "$work/plan.json" "$RUNNER_TEMP/out.tfplan"

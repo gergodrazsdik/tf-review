@@ -6,7 +6,7 @@ Nov 1, 2026 · @Drazsdik Gergő
 
 Build a multi-agent, RAG-backed review board that comments on OpenTofu (later also Terraform) pull requests, reusable by any repo through one reusable GitHub workflow, at roughly $5–30/month on Azure. Deterministic tools find issues; LLM agents explain them, rank them and tie them to the team's own standards. One container image runs the whole review: in the GitHub runner during M1–M2, in Azure Container Apps from M3.
 
-Status: v1, every decision taken (see the Decision log); M0's and M1's gates have passed and M2 is next. This document now lives in `tf-review/docs/plan.md` and is maintained there.
+Status: v1, every decision taken (see the Decision log); M0's, M1's and M2's gates have passed, stronger models wait on quota, and M3 is next. This document now lives in `tf-review/docs/plan.md` and is maintained there.
 
 **Goals**
 
@@ -237,7 +237,7 @@ tf-review/
 
 **Contracts owned by `tf-review`** (versioned with tags, JSON Schema where possible)
 
-1. Reusable workflow inputs, secrets and outputs (`working-directory`, `config-path`, `image`; `tool` from M2; gate mode comes from the config's `gate.mode`; the Azure IDs are passed as secrets, with `secrets: inherit` for same-owner repos and explicitly otherwise)
+1. Reusable workflow inputs, secrets and outputs (`working-directory`, `config-path`, `image`, `tool`; gate mode comes from the config's `gate.mode`; the Azure IDs are passed as secrets, with `secrets: inherit` for same-owner repos and explicitly otherwise)
 2. `.tf-review.yml` schema: enabled agents, severity thresholds, gate mode, standards source
 3. Finding schema: resource address, severity, evidence (an address-keyed plan pointer, and a doc ID when no scanner backs the finding), suggestion, agent (`scanner` when no LLM agent reported it)
 4. Corpus frontmatter schema: `id`, `type`, `status`, `superseded_by`, `applies_to`, `topics`, `severity`, `rego`
@@ -521,7 +521,7 @@ Work runs in this order, so unknowns surface first and a real comment lands befo
 - [x] `just e2e` as the Stop hook in `.claude/settings.json`. A failure blocks the stop once, and a hook that fires again while Claude is already responding to it steps aside, so it can't loop
 - [x] Gate: 3 of 3 `just e2e-live` runs per case: C5, C6 and C9 found with exact address, rule and citation; C8 and C10 `reviewed` with no findings, where `not_reviewed` fails; plus one real PR with a sticky comment. Agent findings are asserted before any conftest backstop. Passed 2026-11-01 on prompt v2: three samples of 15 runs passed in a row, the last on the code in `image-v0.0.5`, and `tf-review-demo` PR #15 is the real PR. 3 of 3 is weak evidence, and these samples came straight after tuning on the same five cases, so M2's baseline still has to confirm it. The rendered step summary hasn't been checked
 
-**M2 · Full board**
+**M2 · Full board** (gate passed 2026-11-02)
 
 Work runs in this order, so the deterministic findings exist before the agents that use them. Steps marked **you** can only be run by you.
 
@@ -560,9 +560,9 @@ Work runs in this order, so the deterministic findings exist before the agents t
 
 - [x] Prompt-cache layout; `cached_tokens` logged per call. Measured on 2026-11-02: a quarter of input tokens were cached on an `e2e-live` run, so the layout works and needs no change. Real reviews show none, because they rarely repeat a prompt within minutes, so caching won't save much until M4's re-push flow
 - [ ] gpt-6.1-sol deployed for security and arbiter, and gpt-6-luna compared with gpt-5.4-mini on the eval suite, if quota is granted; each new model first passes the structured output smoke test, because Microsoft's supported list stops at the GPT-5.1 generation; models set per agent
-- [ ] Terraform support through the `tool` input (D1)
+- [x] Terraform support through the `tool` input (D1): a project's lock file has to come from the tool that plans it, because the two record different provider registries, so moving a project between them isn't just a flag
 - [x] Eval suite in CI (`e2e-live`, 5 runs per case) with the baseline recorded in `docs/evals/baseline.md`, including held-out cases whose expected results were fixed before any model saw them. 5 of the first 6 passed; later samples found the security agent listing resources it had judged fine, and the arbiter dropping a correct finding, both fixed in code. Now 83 of 85 runs, and the cost agent's handling of ADR-003 is the known weak spot
-- [ ] Gate: C1–C10 run in CI, baseline recorded
+- [x] Gate: C1–C10 run in CI, baseline recorded. Passed 2026-11-02: `e2e-live` runs 17 cases, five times each, on any PR that changes the agents, prompts, fixtures or `TfReview.Core`, and `docs/evals/baseline.md` holds the results. The stronger models above stay open until quota allows
 
 **M3 · Central service**
 
