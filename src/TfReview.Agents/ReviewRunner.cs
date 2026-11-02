@@ -265,6 +265,8 @@ public sealed class ReviewRunner(
     {
         foreach (var call in calls)
         {
+            ReviewMetrics.RecordCall(
+                name, promptVersion, model?.Deployment, call.Finish, call.InputTokens, call.CachedInputTokens, call.OutputTokens, call.Latency);
             log?.Invoke(
                 $"{name}: prompt v{promptVersion}, model {model?.Deployment}, attempt {call.Attempt}, "
                 + $"finish {call.Finish}, {call.InputTokens} in ({call.CachedInputTokens} cached), {call.OutputTokens} out, "

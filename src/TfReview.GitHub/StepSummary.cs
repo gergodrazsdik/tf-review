@@ -10,15 +10,6 @@ namespace TfReview.GitHub;
 /// </summary>
 public static class StepSummary
 {
-    private const decimal TokensPerPrice = 1_000_000m;
-
-    // US dollars per million tokens, from third-party listings of the Data Zone Standard rate, not an
-    // invoice. M2 replaces this estimate with measured cost per PR.
-    private static readonly Dictionary<string, (decimal Input, decimal CachedInput, decimal Output)> Prices = new(StringComparer.Ordinal)
-    {
-        ["gpt-5.4-mini"] = (0.825m, 0.0825m, 4.95m),
-    };
-
     public static string Render(ReviewResult result)
     {
         var summary = new StringBuilder()
@@ -48,17 +39,8 @@ public static class StepSummary
     }
 
     /// <summary>The estimated cost in US dollars, or null for a model with no known price.</summary>
-    public static decimal? EstimateCost(TokenUsage usage)
-    {
-        if (usage.Model is null || !Prices.TryGetValue(usage.Model, out var price))
-        {
-            return null;
-        }
-
-        var cached = Math.Min(usage.CachedInputTokens ?? 0, usage.InputTokens);
-        var cost = ((usage.InputTokens - cached) * price.Input) + (cached * price.CachedInput) + (usage.OutputTokens * price.Output);
-        return cost / TokensPerPrice;
-    }
+    public static decimal? EstimateCost(TokenUsage usage) =>
+        ModelPrices.Estimate(usage.Model, usage.InputTokens, usage.CachedInputTokens ?? 0, usage.OutputTokens);
 
     private static void AppendUsage(StringBuilder summary, TokenUsage usage)
     {

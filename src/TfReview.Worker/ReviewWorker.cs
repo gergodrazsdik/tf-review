@@ -120,6 +120,7 @@ public sealed class ReviewWorker(
             return this.Status(job, ReviewState.Superseded);
         }
 
+        ReviewMetrics.RecordResult(result, job.Repository);
         await PostAsync(session, job, result, Counts(plan), cancellationToken);
         return this.Status(job, ReviewState.Done) with { Verdict = VerdictName(result) };
     }

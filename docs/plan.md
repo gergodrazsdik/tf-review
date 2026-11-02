@@ -631,7 +631,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 - [x] `TfReview.Worker`, run by `tfreview work` in the same image: the review job takes one message, and reads the PR and the config at the base commit through the App, with a token limited to that repo. It runs today's `ReviewRunner`, then posts the sticky comment and the check run, success for no findings and neutral otherwise, because a check is advisory (D9). A commit no longer at the PR's head is dropped, checked before and after the review. A failure leaves the message to come back, and after 3 tries it posts "not reviewed". The workflow's token and the App each update the other's comment, which a real PR has to prove. Key Vault and the real App are proved when it's deployed
 - [x] `tfreview submit`, retrying through the API's cold start for up to 5 minutes with a new token each time. A refusal isn't retried, because it won't change
 - [x] Reusable workflow: the review job runs `tfreview submit` and no agents. On any failure it posts "not reviewed" with its own token (D39), with no App needed
-- [ ] OpenTelemetry to App Insights: tokens, cached tokens, latency and cost per agent call, findings per agent, evidence-check drops
+- [x] OpenTelemetry to App Insights: tokens, cached tokens, latency and cost per agent call, findings per agent, evidence-check drops, and what wasn't reviewed, as metrics with names and counts only. The job flushes them as it exits. Proved by the next real review
 - [ ] Remove what the service replaced from each repo: the review identity, and the Infracost token, which moves to Key Vault (D38)
 - [ ] `e2e-live` against the real service as well as the eval harness, and a real demo PR, before the corpus changes
 
