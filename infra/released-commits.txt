@@ -1,0 +1,3 @@
+# Commits of tf-review that callers may pin the reusable workflow to, one per line (D45). GitHub resolves a fork's
+# commit through its parent repo, so only this list proves one is really ours. A commit can't name itself, so each
+# release adds its commit here in a PR after tagging, and callers repin once that's applied.
