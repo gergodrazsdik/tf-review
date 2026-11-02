@@ -607,13 +607,14 @@ Work runs in this order, so the unknowns surface before anything depends on them
 - [x] Re-price against the €30 budget (D15), as an estimate until the first real index: about 11,000 chunks with one azurerm version, around 150 MB against the free 25 GB, so storage stays free even with several versions. A full embed is around 4M tokens, about 10 cents. Writing them at the free tier's rate should take minutes. Compute scales to zero, so the budget holds
 - [ ] A Container Apps job scaled by a Storage queue, with a managed identity, on the read-only filesystem: proved when it's first deployed in part 2
 - [x] Spike the API's trust in a caller (D21, D40, `tf-review-demo` PR #30, 2026-11-02): real tokens from three kinds of job show the claims tell them apart (D45). The claims were read, not yet enforced: part 3's API has to refuse each one in a test
-- [ ] Spike the App's tokens: minting an installation token scoped to one repo from Key Vault, and how a comment and a check run look when the App posts them
+- [x] Spike the App's tokens (`tf-review-demo` PR #31, 2026-11-02): a token limited to one repo posted a comment and a neutral check run, read the config, couldn't reach another repo or write code, and stopped working once revoked. The key came from pass for the spike, and Key Vault is tested when the worker reads it. `StickyComment` only updates `github-actions[bot]`'s comments, so it has to learn the App's login. App ID 5584299, installation 177936120
 
 *2. Infrastructure*
 
-- [ ] `infra/`: Storage (queue, redacted plans with a 7-day lifecycle rule), Key Vault, Container Apps environment, App Insights with a daily cap, the embedding deployment, and Cosmos on the free tier with vector search. **You:** approve `prod`
+- [x] `infra/`: Storage (queue, redacted plans with a 7-day lifecycle rule), Key Vault, Container Apps environment, App Insights with a daily cap, the embedding deployment, and Cosmos on the free tier with vector search. **You:** approve `prod`
 - [ ] Bootstrap: the service's managed identity with its LLM role, and the allowlist from the `repos` map (D40), with the released commits on it updated by the release flow (D45). **You:** `bootstrap-plan`, `bootstrap-apply`
-- [ ] **You:** create the GitHub App, private to your account, and store its key with `pass insert -m tf-review/github-app/private-key`, then `just secrets-sync` into Key Vault
+- [x] **You:** create the GitHub App, private to your account, and store its key with `pass insert -m tf-review/github-app/private-key`
+- [ ] **You:** `just secrets-sync` into Key Vault, once the vault exists
 
 *3. The service*
 
@@ -632,6 +633,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 *5. Retrieval*
 
 - [ ] Indexing workflow, as described under "Refreshing the corpus": a dry run on PRs changing `corpus/sources.yml`, indexing on merge with a switch to the new version only once it's complete, and a by-hand rebuild. **You:** bootstrap for its identity, then approve its environment
+- [ ] The vector container, which azurerm 5.12 can't declare because its container has no vector policy, and a vector policy can't be changed later. Decide between a newer provider, the azapi provider or creating it from the indexing job
 - [ ] `CosmosRetriever` behind `IRetriever`: a team's rules always come through filtering, as they do today, so coverage can't depend on a ranking. Reference chunks are ranked by vector or hybrid search within a separate token budget
 - [ ] Prompts: reference material in its own fence, marked as context rather than rules, which needs a new version of each agent's prompt
 
