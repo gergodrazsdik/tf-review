@@ -150,6 +150,9 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
                     ["before_usd"] = cost.BeforeUsd,
                     ["after_usd"] = cost.AfterUsd,
                     ["delta_usd"] = cost.AfterUsd - cost.BeforeUsd,
+
+                    // Worked out here, because the model got ADR-003's share rule wrong doing it itself.
+                    ["increase_percent"] = cost.BeforeUsd > 0 ? Math.Round((cost.AfterUsd - cost.BeforeUsd) / cost.BeforeUsd * 100, 1) : null,
                 }),
             ]);
 

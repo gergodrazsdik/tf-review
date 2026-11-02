@@ -179,6 +179,18 @@ public class ReviewAgentTests
     }
 
     [Test]
+    public async Task Works_out_the_percentage_so_the_model_doesnt_have_to()
+    {
+        var chat = new FakeChat(FakeChat.Answer(Empty));
+        ResourceCostChange[] costs = [new(Address, 100m, 120m, true), new("a.new", 0m, 50m, true)];
+
+        await new ReviewAgent(chat, AgentProfile.Cost).ReviewAsync(Plan, [Tagging], [], costs);
+
+        await Assert.That(chat.Requests.Single().User).Contains("\"increase_percent\":20.0");
+        await Assert.That(chat.Requests.Single().User).Contains("\"increase_percent\":null");
+    }
+
+    [Test]
     public async Task A_cost_finding_on_a_resource_with_no_figure_is_dropped_by_the_evidence_check()
     {
         var chat = new FakeChat(FakeChat.Answer(OneFinding));
