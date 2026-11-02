@@ -27,7 +27,7 @@
       }
     },
     "agents": {
-      "description": "What to run. conventions is an agent. cost prices the plan with Infracost, which needs the INFRACOST_CLI_AUTHENTICATION_TOKEN secret. security runs Checkov. Only what exists is allowed: the security and cost agents join in M2, along with the orchestrator and the LLM arbiter, which always run.",
+      "description": "The specialists to run. cost prices the plan with Infracost and judges the result, which needs the INFRACOST_CLI_AUTHENTICATION_TOKEN secret. security runs Checkov and judges the plan against the security standards. The orchestrator and the LLM arbiter join in M2 and always run.",
       "type": "array",
       "uniqueItems": true,
       "items": { "enum": ["conventions", "cost", "security"] },

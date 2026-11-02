@@ -543,15 +543,16 @@ Work runs in this order, so the deterministic findings exist before the agents t
 
 *4. Agents*
 
-- [ ] `tf-standards`: network and identity policies for C1 and C3, with Rego where a rule is exact
-- [ ] Security and cost agents, each with a versioned prompt, its own wire schema and low reasoning effort; config contract for the new agents
-- [ ] Seeded cases C1–C3 as real PRs, and C4 and C7 as hand-built fixtures (D33), in `e2e` and `e2e-live`
+- [x] `tf-standards`: POL-002 and POL-003 for C1 and C3, with Rego, and ADR-003 for cost, which has none because a policy can't see prices. A helper named `violation` passed `conftest verify` and would have failed every real review, so `just policy-test` now also runs `conftest test`
+- [x] Security and cost agents: one `ReviewAgent` with a profile each, a versioned prompt per agent, the shared wire schema and low reasoning effort. Each agent's findings are checked against the documents in its own prompt. Prices come from Infracost, and a cost finding on a resource with no increase is dropped
+- [x] Seeded cases C1–C3 as real PRs (`tf-review-demo` #20–22), and C4 as a hand-built fixture (D33), in `e2e` and `e2e-live`, with recorded Checkov and Infracost output from `just record-scans`. All nine cases passed 3 of 3 on the first live run. C7 moves to part 5, because it tests the orchestrator and arbiter
 
 *5. Orchestrator and arbiter*
 
 - [ ] Orchestrator: routing by resource type and risk order, and a code fallback that sends everything everywhere if its output is invalid, so routing can't silently skip a review
 - [ ] LLM arbiter behind `IArbiter` (D20), which can only rank and drop what the evidence check kept, never add; the rule-based merge stays as its input and its fallback
-- [ ] Comment: monthly cost delta and risk order
+- [ ] Seeded case C7 as a hand-built fixture (D33)
+- [ ] Comment: risk order; the monthly cost delta is there since part 2
 
 *6. Evaluation and gate*
 

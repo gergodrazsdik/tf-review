@@ -15,8 +15,8 @@ public sealed partial record TfReviewConfig(string Repository, string Commit, IR
 {
     private static readonly string[] KnownAgents = ["conventions", "cost", "security"];
 
-    // Cost needs a secret a repo has to set up first, so a repo opts in. Security stays out of this list until
-    // its agent exists, because a repo's PRs would otherwise change without its config changing.
+    // A repo opts in to the rest: cost needs a secret set up first, and security can add findings a repo's
+    // PRs didn't have, so neither should appear because the reviewer's version moved.
     private static readonly string[] DefaultAgents = ["conventions"];
 
     private static readonly IDeserializer Yaml = new DeserializerBuilder()
