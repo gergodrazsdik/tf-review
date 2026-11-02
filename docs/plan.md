@@ -558,7 +558,7 @@ Work runs in this order, so the deterministic findings exist before the agents t
 
 *6. Evaluation and gate*
 
-- [ ] Prompt-cache layout; `cached_tokens` logged per call
+- [x] Prompt-cache layout; `cached_tokens` logged per call. Measured on 2026-11-02: a quarter of input tokens were cached on an `e2e-live` run, so the layout works and needs no change. Real reviews show none, because they rarely repeat a prompt within minutes, so caching won't save much until M4's re-push flow
 - [ ] gpt-6.1-sol deployed for security and arbiter, and gpt-6-luna compared with gpt-5.4-mini on the eval suite, if quota is granted; each new model first passes the structured output smoke test, because Microsoft's supported list stops at the GPT-5.1 generation; models set per agent
 - [ ] Terraform support through the `tool` input (D1)
 - [x] Eval suite in CI (`e2e-live`, 5 runs per case) with the baseline recorded in `docs/evals/baseline.md`, including held-out cases whose expected results were fixed before any model saw them. 5 of the first 6 passed; later samples found the security agent listing resources it had judged fine, and the arbiter dropping a correct finding, both fixed in code. Now 83 of 85 runs, and the cost agent's handling of ADR-003 is the known weak spot

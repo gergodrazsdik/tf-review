@@ -126,6 +126,8 @@ async Task<int> Live(int runs, string? recordDirectory)
 
     var failures = 0;
     var totalCost = 0m;
+    var inputTokens = 0L;
+    var cachedTokens = 0L;
     foreach (var directory in cases)
     {
         var name = Path.GetFileName(directory);
@@ -137,6 +139,8 @@ async Task<int> Live(int runs, string? recordDirectory)
             var problems = await Problems(directory, result);
             failures += Report(name, run, problems);
             totalCost += result.Usage is { } usage ? StepSummary.EstimateCost(usage) ?? 0 : 0;
+            inputTokens += result.Usage?.InputTokens ?? 0;
+            cachedTokens += result.Usage?.CachedInputTokens ?? 0;
 
             if (result.EvidenceDrops.Count > 0)
             {
@@ -166,6 +170,7 @@ async Task<int> Live(int runs, string? recordDirectory)
 
     var versions = string.Join(", ", profiles.Select(profile => $"{profile} v{Prompts.Load(profile).Version}"));
     Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"Prompts {versions}, model {deployment}, estimated cost ~${totalCost:0.0000}."));
+    Console.WriteLine($"Input tokens: {inputTokens}, of which cached: {cachedTokens}.");
     Console.WriteLine(failures == 0 ? $"PASS: {cases.Length} case(s), {runs} run(s) each." : $"FAIL: {failures} failed run(s).");
     return failures == 0 ? 0 : 1;
 }
