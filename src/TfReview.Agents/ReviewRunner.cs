@@ -59,6 +59,7 @@ public sealed class ReviewRunner(
             var outcome = await conftest.RunAsync(redacted.Plan, directory.FullName, cancellationToken);
             if (outcome is not ConftestRan ran)
             {
+                log?.Invoke($"conftest: {(outcome as ConftestFailed)?.Reason}.");
                 return ReviewResult.Failed(commit, ReviewScope.Plan, NotReviewedReason.ScannerFailed) with
                 {
                     StandardsCommit = config.Commit,
@@ -187,9 +188,14 @@ public sealed class ReviewRunner(
             return ([], new NotReviewed(ReviewScope.Security, NotReviewedReason.Unavailable));
         }
 
-        return await checkov.RunAsync(redacted, cancellationToken) is CheckovRan ran
-            ? (ran.ToFindings(plan), null)
-            : ([], new NotReviewed(ReviewScope.Security, NotReviewedReason.ScannerFailed));
+        var outcome = await checkov.RunAsync(redacted, cancellationToken);
+        if (outcome is CheckovRan ran)
+        {
+            return (ran.ToFindings(plan), null);
+        }
+
+        log?.Invoke($"checkov: {(outcome as CheckovFailed)?.Reason}.");
+        return ([], new NotReviewed(ReviewScope.Security, NotReviewedReason.ScannerFailed));
     }
 
     // A cost failure stays separate: the policies and the conventions agent still count without it.
@@ -200,8 +206,10 @@ public sealed class ReviewRunner(
             return (null, new NotReviewed(ReviewScope.Cost, NotReviewedReason.Unavailable));
         }
 
-        if (await infracost.RunAsync(plan, cancellationToken) is not InfracostRan ran)
+        var outcome = await infracost.RunAsync(plan, cancellationToken);
+        if (outcome is not InfracostRan ran)
         {
+            log?.Invoke($"infracost: {(outcome as InfracostFailed)?.Reason}.");
             return (null, new NotReviewed(ReviewScope.Cost, NotReviewedReason.ScannerFailed));
         }
 

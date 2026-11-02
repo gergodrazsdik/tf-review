@@ -96,6 +96,18 @@ public class ReviewRunnerCostTests
         await Assert.That(result.NotReviewed.Single()).IsEqualTo(new NotReviewed(ReviewScope.Cost, NotReviewedReason.ScannerFailed));
     }
 
+    // The comment can only say a scanner failed, so the log has to say how, and it holds nothing from the plan.
+    [Test]
+    public async Task A_failed_scan_logs_why()
+    {
+        var log = new List<string>();
+        var runner = new ReviewRunner(new EmptySource(), new ConftestRunner(new FakeProcesses(NoViolations)), log: log.Add, infracost: new InfracostRunner(new FakeScans("not json", "not json")));
+
+        await runner.RunAsync(Plan, WithCost, Commit);
+
+        await Assert.That(log.Single(line => line.StartsWith("infracost:", StringComparison.Ordinal))).Matches("^infracost: [A-Za-z]+\\.$");
+    }
+
     [Test]
     public async Task An_unpriced_resource_isnt_counted_as_free()
     {

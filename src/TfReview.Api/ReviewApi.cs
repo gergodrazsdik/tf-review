@@ -41,7 +41,11 @@ public static partial class ReviewApi
     /// <summary>Runs the service's API from its environment. An empty list refuses everyone.</summary>
     public static async Task RunAsync()
     {
-        var app = WebApplication.CreateBuilder().Build();
+        var builder = WebApplication.CreateBuilder();
+
+        // Each request's framework lines would use up the daily log cap, and these say nothing the app's own don't.
+        builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
+        var app = builder.Build();
         var options = new ApiOptions(List("TF_REVIEW_ALLOWED_REPOSITORY_IDS"), List("TF_REVIEW_RELEASED_COMMITS"));
         app.MapReviews(options, GitHubTokens.ForGitHub(ApiOptions.Audience), ServiceStores.FromEnvironment());
         await app.RunAsync();

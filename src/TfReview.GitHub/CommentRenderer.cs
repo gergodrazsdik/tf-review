@@ -230,7 +230,7 @@ public static partial class CommentRenderer
         NotReviewedReason.Timeout => "timed out",
         NotReviewedReason.InvalidConfig => "the config is invalid",
         NotReviewedReason.StandardsUnavailable => "the standards couldn't be fetched",
-        NotReviewedReason.ScannerFailed => "a policy check failed to run",
+        NotReviewedReason.ScannerFailed => "a scanner failed to run",
         NotReviewedReason.PlanTooLarge => "the plan is too large for one model call",
         _ => throw new ArgumentOutOfRangeException(nameof(reason)),
     };
