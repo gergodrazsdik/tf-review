@@ -1,4 +1,4 @@
 {
   "prompt_version": 1,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_role_assignment.seed\",\"doc_id\":\"POL-003\",\"attribute\":\"role_definition_name\",\"title\":\"azurerm_role_assignment.seed grants \\\"Owner\\\" at subscription scope, which can be used to control access across the whole subscription.\",\"suggestion\":\"Change the role to a narrower one or limit the scope to a resource group or specific resource.\"}]}"
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_role_assignment.seed\",\"doc_id\":\"POL-003\",\"attribute\":\"role_definition_name\",\"title\":\"azurerm_role_assignment.seed grants \\\"Owner\\\" at subscription scope, which can give one identity control over everything under that subscription.\",\"suggestion\":\"Change the role to a narrower one or reduce the scope to a resource group or individual resource.\"}]}"
 }

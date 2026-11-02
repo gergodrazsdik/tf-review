@@ -1,10 +1,7 @@
-using System.ClientModel;
-using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using TfReview.Core;
 using TfReview.Rag;
@@ -32,10 +29,6 @@ public sealed record AgentFailed(int PromptVersion, IReadOnlyList<AgentCall> Cal
 /// </summary>
 public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan? attemptTimeout = null)
 {
-    private const string SchemaName = "review_output";
-    private const int MaxOutputTokens = 4_000;
-    private const int MaxAttempts = 2;
-
     // Above this the 30K TPM limit would reject the call, whatever the retries. M4 splits large plans.
     private const int MaxUserMessageTokens = 20_000;
 
@@ -66,13 +59,6 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
         }
         """;
 
-    private static readonly JsonSerializerOptions WireOptions = new()
-    {
-        RespectRequiredConstructorParameters = true,
-        RespectNullableAnnotations = true,
-        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
-    };
-
     private readonly TimeSpan timeout = attemptTimeout ?? TimeSpan.FromMinutes(3);
 
     public async Task<AgentOutcome> ReviewAsync(
@@ -97,63 +83,19 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
             return new AgentFailed(prompt.Version, calls, NotReviewedReason.PlanTooLarge);
         }
 
-        var system = SystemMessage(prompt, docs);
-        var maxOutputTokens = MaxOutputTokens;
-        var last = NotReviewedReason.InvalidOutput;
+        var result = await StructuredCall.RunAsync(
+            chat,
+            profile.Name,
+            SystemMessage(prompt, docs),
+            user,
+            Schema,
+            text => ParseFindings(text, docs, costs),
+            timeout,
+            cancellationToken);
 
-        for (var attempt = 1; attempt <= MaxAttempts; attempt++)
-        {
-            var capture = new ResponseCapture(chat);
-            var stopwatch = Stopwatch.StartNew();
-            try
-            {
-                using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                deadline.CancelAfter(timeout);
-                await NewAgent(capture, profile.Name, system, maxOutputTokens).RunAsync(user, cancellationToken: deadline.Token);
-            }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-                calls.Add(Call(attempt, "timeout", null, stopwatch.Elapsed));
-                return new AgentFailed(prompt.Version, calls, NotReviewedReason.Timeout);
-            }
-            catch (Exception e) when (e is not OperationCanceledException)
-            {
-                // The SDK has already retried what's transient. Any failure here has to become a "not
-                // reviewed" for this commit, and only the type is logged, as messages can quote the request.
-                calls.Add(Call(attempt, e.GetType().Name, null, stopwatch.Elapsed));
-                return new AgentFailed(prompt.Version, calls, Classify(e));
-            }
-
-            var response = capture.Response;
-            calls.Add(Call(attempt, response?.FinishReason?.ToString() ?? "unknown", response, stopwatch.Elapsed));
-
-            if (response?.FinishReason == ChatFinishReason.ContentFilter)
-            {
-                return new AgentFailed(prompt.Version, calls, NotReviewedReason.ContentFilter);
-            }
-
-            if (response is not null && IsRefusal(response))
-            {
-                return new AgentFailed(prompt.Version, calls, NotReviewedReason.Refused);
-            }
-
-            // The same limit would cut it off again, so the one retry gets more room.
-            if (response?.FinishReason == ChatFinishReason.Length)
-            {
-                last = NotReviewedReason.Truncated;
-                maxOutputTokens *= 2;
-                continue;
-            }
-
-            if (response is not null && ParseFindings(response.Text, docs, costs) is { } findings)
-            {
-                return new AgentReviewed(prompt.Version, calls, findings);
-            }
-
-            last = NotReviewedReason.InvalidOutput;
-        }
-
-        return new AgentFailed(prompt.Version, calls, last);
+        return result.Value is { } findings
+            ? new AgentReviewed(prompt.Version, result.Calls, findings)
+            : new AgentFailed(prompt.Version, result.Calls, result.Failure ?? NotReviewedReason.InvalidOutput);
     }
 
     /// <summary>The standards are sorted and nothing here varies per run, so the prefix can be cached from M2.</summary>
@@ -171,11 +113,7 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
         return system.ToString();
     }
 
-    /// <summary>
-    /// Plan text and policy messages come from the PR. Escaping these characters keeps the JSON valid and
-    /// means no value can close the fence around it. An agent only sees findings for the standards it was
-    /// given, because it couldn't cite any others.
-    /// </summary>
+    /// <summary>Plan text and policy messages come from the PR. An agent only sees findings for the standards it can cite.</summary>
     private static string UserMessage(
         CondensedPlan plan, IReadOnlyList<StandardsDoc> docs, IReadOnlyList<Finding> policyFindings, IReadOnlyList<ResourceCostChange>? costs)
     {
@@ -193,7 +131,7 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
 
         var message = new StringBuilder()
             .AppendLine("<policy_findings>")
-            .AppendLine(Escape(CanonicalJson.Write(policies)))
+            .AppendLine(StructuredCall.Escape(CanonicalJson.Write(policies)))
             .AppendLine("</policy_findings>")
             .AppendLine();
 
@@ -210,80 +148,16 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
                 }),
             ]);
 
-            message.AppendLine("<cost_data>").AppendLine(Escape(CanonicalJson.Write(figures))).AppendLine("</cost_data>").AppendLine();
+            message.AppendLine("<cost_data>").AppendLine(StructuredCall.Escape(CanonicalJson.Write(figures))).AppendLine("</cost_data>").AppendLine();
         }
 
-        return message.AppendLine("<plan_data>").AppendLine(Escape(plan.ToCanonicalJson())).Append("</plan_data>").ToString();
+        return message.AppendLine("<plan_data>").AppendLine(StructuredCall.Escape(plan.ToCanonicalJson())).Append("</plan_data>").ToString();
     }
-
-    private static string Escape(string json) => json
-        .Replace("&", "\\u0026", StringComparison.Ordinal)
-        .Replace("<", "\\u003c", StringComparison.Ordinal)
-        .Replace(">", "\\u003e", StringComparison.Ordinal);
-
-    private static ChatClientAgent NewAgent(IChatClient client, string name, string system, int maxOutputTokens) => new(
-        client,
-        new ChatClientAgentOptions
-        {
-            Name = name,
-            ChatOptions = new ChatOptions
-            {
-                Instructions = system,
-                MaxOutputTokens = maxOutputTokens,
-
-                // gpt-5.4-mini defaults to none, and without any reasoning it fails valid names on the evals.
-                Reasoning = new ReasoningOptions { Effort = ReasoningEffort.Low },
-                ResponseFormat = ChatResponseFormat.ForJsonSchema(JsonDocument.Parse(Schema).RootElement, SchemaName),
-                AdditionalProperties = new AdditionalPropertiesDictionary { ["strict"] = true },
-            },
-        });
-
-    private static AgentCall Call(int attempt, string finish, ChatResponse? response, TimeSpan latency) => new(
-        attempt,
-        finish,
-        response?.Usage?.InputTokenCount ?? 0,
-        response?.Usage?.OutputTokenCount ?? 0,
-        response?.Usage?.CachedInputTokenCount ?? 0,
-        latency);
-
-    private static NotReviewedReason Classify(Exception exception) => exception switch
-    {
-        ClientResultException { Status: 429 } => NotReviewedReason.RateLimited,
-        ClientResultException { Status: 408 } => NotReviewedReason.Timeout,
-        ClientResultException { Status: 400 } failure when MentionsContentFilter(failure) => NotReviewedReason.ContentFilter,
-        _ => NotReviewedReason.Unavailable,
-    };
-
-    // Azure rejects a filtered prompt with a 400 and this code, rather than with a finish reason.
-    private static bool MentionsContentFilter(ClientResultException failure)
-    {
-        try
-        {
-            return failure.GetRawResponse()?.Content.ToString().Contains("content_filter", StringComparison.Ordinal) == true;
-        }
-        catch (InvalidOperationException)
-        {
-            // The body wasn't buffered, so it can't be read.
-            return false;
-        }
-    }
-
-    private static bool IsRefusal(ChatResponse response) =>
-        response.Messages.SelectMany(message => message.Contents).OfType<ErrorContent>().Any(error => error.ErrorCode == "Refusal");
 
     /// <summary>The findings in an answer, or null if it doesn't match the wire schema exactly.</summary>
     private Finding[]? ParseFindings(string text, IReadOnlyList<StandardsDoc> docs, IReadOnlyList<ResourceCostChange>? costs)
     {
-        WireOutput? output;
-        try
-        {
-            output = JsonSerializer.Deserialize<WireOutput>(text, WireOptions);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-
+        var output = StructuredCall.ParseWire<WireOutput>(text);
         if (output is null || output.Findings.Any(finding => finding.ResourceAddress.Length == 0 || finding.Title.Trim().Length == 0))
         {
             return null;
@@ -322,17 +196,4 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
         [property: JsonPropertyName("attribute")] string Attribute,
         [property: JsonPropertyName("title")] string Title,
         [property: JsonPropertyName("suggestion")] string? Suggestion);
-
-    /// <summary>Keeps the response, because Agent Framework's own doesn't expose the finish reason.</summary>
-    private sealed class ResponseCapture(IChatClient inner) : DelegatingChatClient(inner)
-    {
-        public ChatResponse? Response { get; private set; }
-
-        public override async Task<ChatResponse> GetResponseAsync(
-            IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
-        {
-            Response = await base.GetResponseAsync(messages, options, cancellationToken);
-            return Response;
-        }
-    }
 }

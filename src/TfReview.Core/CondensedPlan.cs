@@ -2,6 +2,9 @@ using System.Text.Json.Nodes;
 
 namespace TfReview.Core;
 
+/// <summary>One change: where it is, what kind of resource, and what the plan does to it.</summary>
+public sealed record PlanChange(string Address, string Type, IReadOnlyList<string> Actions);
+
 /// <summary>
 /// What the agents see: only real changes, keyed by address, with unchanged attributes removed. Findings
 /// point into this form, and keying by address keeps a pointer valid across slices and re-pushes. Agents
@@ -97,6 +100,24 @@ public sealed class CondensedPlan
 
         return CanonicalJson.Write(before[attribute]) == CanonicalJson.Write(after[attribute]);
     }
+
+    /// <summary>A plan holding only the resources whose type passes, so an agent sees what its standards cover.</summary>
+    public CondensedPlan OnlyTypes(Func<string, bool> keep) => new(new JsonObject
+    {
+        [ResourceChanges] = new JsonObject(
+            root[ResourceChanges]!.AsObject()
+                .Where(resource => resource.Value?["type"]?.GetValue<string>() is { } type && keep(type))
+                .Select(resource => KeyValuePair.Create(resource.Key, resource.Value?.DeepClone()))),
+    });
+
+    /// <summary>The changes in this plan, sorted by address, without any of their values.</summary>
+    public IReadOnlyList<PlanChange> Changes() =>
+    [
+        .. root[ResourceChanges]!.AsObject().Select(resource => new PlanChange(
+            resource.Key,
+            resource.Value?["type"]?.GetValue<string>() ?? string.Empty,
+            [.. resource.Value![Change]!["actions"]!.AsArray().Select(action => action!.GetValue<string>())])),
+    ];
 
     /// <summary>The resource type at an address, or null if the plan has no such change.</summary>
     public string? TypeOf(string address) =>

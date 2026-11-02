@@ -24,7 +24,7 @@ const string Config = $"""
     agents: [conventions, security, cost]
     """;
 
-AgentProfile[] profiles = [AgentProfile.Conventions, AgentProfile.Security, AgentProfile.Cost];
+string[] profiles = [AgentProfile.Conventions.Name, AgentProfile.Security.Name, AgentProfile.Cost.Name, RiskOrchestrator.Name, LlmArbiter.Name];
 
 // Relaxed escaping keeps recorded answers readable in a diff. These files are never rendered as HTML.
 JsonSerializerOptions fileOptions = new() { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
@@ -36,7 +36,7 @@ var standardsDirectory = Environment.GetEnvironmentVariable("TF_STANDARDS_DIR")
 return args switch
 {
     ["replay"] => await Replay(),
-    ["record-scans"] => await RecordScans(),
+    ["record-scans", .. var names] => await RecordScans(names),
     ["live", "--runs", var runs] => await Live(int.Parse(runs, CultureInfo.InvariantCulture), null),
     ["live", "--runs", var runs, "--record", var directory] => await Live(int.Parse(runs, CultureInfo.InvariantCulture), directory),
     _ => Usage(),
@@ -44,7 +44,7 @@ return args switch
 
 static int Usage()
 {
-    Console.Error.WriteLine("usage: eval replay\n       eval record-scans\n       eval live --runs <n> [--record <dir>]");
+    Console.Error.WriteLine("usage: eval replay\n       eval record-scans [case...]\n       eval live --runs <n> [--record <dir>]");
     return 2;
 }
 
@@ -57,17 +57,17 @@ async Task<int> Replay()
         var stale = new List<string>();
         foreach (var profile in profiles)
         {
-            var path = Path.Combine(directory, "answers", $"{profile.Name}.json");
+            var path = Path.Combine(directory, "answers", $"{profile}.json");
             if (File.Exists(path))
             {
                 var answer = JsonSerializer.Deserialize<RecordedAnswer>(await File.ReadAllTextAsync(path))!;
-                var version = Prompts.Load(profile.Name).Version;
+                var version = Prompts.Load(profile).Version;
                 if (answer.PromptVersion != version)
                 {
-                    stale.Add($"{profile.Name} was recorded with prompt v{answer.PromptVersion}, and the prompt is v{version}: re-record it with the live run");
+                    stale.Add($"{profile} was recorded with prompt v{answer.PromptVersion}, and the prompt is v{version}: re-record it with the live run");
                 }
 
-                answers[profile.Name] = answer.Text;
+                answers[profile] = answer.Text;
             }
         }
 
@@ -79,10 +79,11 @@ async Task<int> Replay()
     return failures == 0 ? 0 : 1;
 }
 
-// Saves what the real scanners say about each case's plan. It needs Checkov on PATH and the Infracost token.
-async Task<int> RecordScans()
+// Saves what the real scanners say about each named case's plan, or all of them if none is named. It needs
+// Checkov on PATH and the Infracost token.
+async Task<int> RecordScans(string[] names)
 {
-    foreach (var directory in cases)
+    foreach (var directory in cases.Where(directory => names.Length == 0 || names.Contains(Path.GetFileName(directory), StringComparer.Ordinal)))
     {
         foreach (var stale in Directory.GetFiles(directory, "*.scan"))
         {
@@ -163,7 +164,7 @@ async Task<int> Live(int runs, string? recordDirectory)
         Console.WriteLine($"{name}: {passes} of {runs}");
     }
 
-    var versions = string.Join(", ", profiles.Select(profile => $"{profile.Name} v{Prompts.Load(profile.Name).Version}"));
+    var versions = string.Join(", ", profiles.Select(profile => $"{profile} v{Prompts.Load(profile).Version}"));
     Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"Prompts {versions}, model {deployment}, estimated cost ~${totalCost:0.0000}."));
     Console.WriteLine(failures == 0 ? $"PASS: {cases.Length} case(s), {runs} run(s) each." : $"FAIL: {failures} failed run(s).");
     return failures == 0 ? 0 : 1;
@@ -197,8 +198,25 @@ async Task<List<string>> Problems(string directory, ReviewResult result)
         .Select(finding => new ExpectedFinding(finding.ResourceAddress, finding.Rule, Name(finding.Agent), finding.Deterministic))
         .ToList();
 
-    problems.AddRange(expected.Findings.Except(actual).Select(finding => $"missing: {finding}"));
+    // An arbiter can merge rows about one problem, so a rule it folded into another row still counts as reported.
+    var folded = result.Findings
+        .SelectMany(finding => (finding.RelatedRules ?? []).Select(rule => (finding.ResourceAddress, Rule: rule)))
+        .ToHashSet();
+
+    problems.AddRange(expected.Findings.Except(actual)
+        .Where(finding => !folded.Contains((finding.ResourceAddress, finding.Rule)))
+        .Select(finding => $"missing: {finding}"));
     problems.AddRange(actual.Except(expected.Findings).Select(finding => $"unexpected: {finding}"));
+
+    if (expected.RiskFirst is { } riskFirst && result.RiskOrder?.FirstOrDefault()?.ResourceAddress != riskFirst)
+    {
+        problems.Add($"risk order: expected {riskFirst} first, and got {result.RiskOrder?.FirstOrDefault()?.ResourceAddress ?? "nothing"}");
+    }
+
+    if (expected.FirstFinding is { } firstFinding && result.Findings.FirstOrDefault()?.ResourceAddress != firstFinding)
+    {
+        problems.Add($"expected a finding on {firstFinding} first, and got {result.Findings.FirstOrDefault()?.ResourceAddress ?? "nothing"}");
+    }
 
     foreach (var finding in result.Findings)
     {
@@ -238,7 +256,14 @@ static string Name(Reporter reporter) => JsonSerializer.Serialize(reporter).Trim
 static string Required(string name) => Environment.GetEnvironmentVariable(name)
     ?? throw new InvalidOperationException($"{name} isn't set.");
 
-internal sealed record ExpectedCase([property: JsonPropertyName("findings")] IReadOnlyList<ExpectedFinding> Findings);
+internal sealed record ExpectedCase([property: JsonPropertyName("findings")] IReadOnlyList<ExpectedFinding> Findings)
+{
+    [JsonPropertyName("risk_first")]
+    public string? RiskFirst { get; init; }
+
+    [JsonPropertyName("first_finding")]
+    public string? FirstFinding { get; init; }
+}
 
 internal sealed record ExpectedFinding(
     [property: JsonPropertyName("resource_address")] string ResourceAddress,
@@ -298,12 +323,12 @@ internal sealed partial class RecordingScans(IProcessRunner inner, string direct
 /// <summary>Works out which agent a request is from, because each has its own prompt.</summary>
 internal static class AgentOf
 {
-    public static string? Request(ChatOptions? options, IEnumerable<AgentProfile> profiles) =>
-        profiles.FirstOrDefault(profile => options?.Instructions?.StartsWith(Prompts.Load(profile.Name).Body, StringComparison.Ordinal) == true)?.Name;
+    public static string? Request(ChatOptions? options, IEnumerable<string> profiles) =>
+        profiles.FirstOrDefault(profile => options?.Instructions?.StartsWith(Prompts.Load(profile).Body, StringComparison.Ordinal) == true);
 }
 
 /// <summary>Gives each agent its recorded answer, for runs that mustn't reach the model. No answer is a failure.</summary>
-internal sealed class ReplayChat(IReadOnlyDictionary<string, string> answers, IEnumerable<AgentProfile> profiles) : IChatClient
+internal sealed class ReplayChat(IReadOnlyDictionary<string, string> answers, IEnumerable<string> profiles) : IChatClient
 {
     public Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
@@ -329,7 +354,7 @@ internal sealed class ReplayChat(IReadOnlyDictionary<string, string> answers, IE
 }
 
 /// <summary>Keeps each agent's last answer, so a passing run can become a replay.</summary>
-internal sealed class RecordingChat(IChatClient inner, IEnumerable<AgentProfile> profiles) : DelegatingChatClient(inner)
+internal sealed class RecordingChat(IChatClient inner, IEnumerable<string> profiles) : DelegatingChatClient(inner)
 {
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> answers = new(StringComparer.Ordinal);
 

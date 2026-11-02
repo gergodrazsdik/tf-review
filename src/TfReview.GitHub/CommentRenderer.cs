@@ -15,6 +15,7 @@ public static partial class CommentRenderer
 
     private const int MaxRows = 50;
     private const int MaxUnpriced = 10;
+    private const int MaxRiskItems = 5;
     private const int MaxTextLength = 300;
 
     public static string Render(ReviewResult result, PlanCounts? counts)
@@ -34,6 +35,8 @@ public static partial class CommentRenderer
         {
             AppendCost(comment, cost);
         }
+
+        AppendRisk(comment, result);
 
         if (result.Findings.Count > 0)
         {
@@ -92,6 +95,22 @@ public static partial class CommentRenderer
         return $"{fence}{padded.Replace("|", "\\|", StringComparison.Ordinal)}{fence}";
     }
 
+    // Only what has a reason: most changes are routine, and a full list would bury the few that aren't.
+    private static void AppendRisk(StringBuilder comment, ReviewResult result)
+    {
+        var worthALook = result.RiskOrder?.Where(item => item.Reason is not null).Take(MaxRiskItems).ToList() ?? [];
+        if (worthALook.Count == 0)
+        {
+            return;
+        }
+
+        comment.AppendLine().AppendLine("Look at first:").AppendLine();
+        foreach (var item in worthALook)
+        {
+            comment.AppendLine($"- {Code(item.ResourceAddress)}: {Code(item.Reason!)}");
+        }
+    }
+
     private static void AppendCost(StringBuilder comment, CostSummary cost)
     {
         var delta = cost.AfterUsd - cost.BeforeUsd;
@@ -122,7 +141,7 @@ public static partial class CommentRenderer
         {
             var suggestion = finding.Suggestion is null ? string.Empty : Code(finding.Suggestion);
             comment.AppendLine(
-                $"| {Name(finding.Severity)} | {Code(finding.ResourceAddress)} | {Rule(finding, result)} | {Code(finding.Title)} | {suggestion} | {Source(finding)} |");
+                $"| {Name(finding.Severity)} | {Code(finding.ResourceAddress)} | {Rules(finding, result)} | {Code(finding.Title)} | {suggestion} | {Source(finding)} |");
         }
 
         if (findings.Count > MaxRows)
@@ -148,6 +167,14 @@ public static partial class CommentRenderer
         return Code(finding.Rule);
     }
 
+    private static string Rules(Finding finding, ReviewResult result)
+    {
+        var rule = Rule(finding, result);
+        return finding.RelatedRules is { Count: > 0 } related
+            ? $"{rule}, also {string.Join(", ", related.Select(Code))}"
+            : rule;
+    }
+
     private static string Headline(ReviewResult result) => result.Verdict switch
     {
         Verdict.NoFindings => "**No findings**",
@@ -169,6 +196,7 @@ public static partial class CommentRenderer
     private static string Source(Finding finding) => finding switch
     {
         { Deterministic: false } => "model",
+        _ when !DocId().IsMatch(finding.Rule) => "scanner",
         { Agent: Reporter.Scanner } => "policy",
         _ => "policy and model",
     };

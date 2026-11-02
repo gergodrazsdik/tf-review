@@ -8,5 +8,11 @@
   },
   "cost": {
     "1": "f44ce4576ef16faff995c89ff0d6136d79f228b63aea55dd7299a4461bb6695c"
+  },
+  "orchestrator": {
+    "1": "6219f6196c0ad178f3899ea237fecf1661e88e3703b048b3ae262f075008fc26"
+  },
+  "arbiter": {
+    "1": "a5c6f45a9dbf4cfa64bd541abdd74d53afe3aa1edacb986dda904ce399800f9d"
   }
 }
