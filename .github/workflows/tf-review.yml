@@ -3,7 +3,8 @@ name: tf-review
 
 # Reviews a PR's OpenTofu or Terraform plan in two jobs (D21 in docs/plan.md). The plan job runs code the PR
 # controls, so it gets the plan identity and only passes on a redacted result. The review job runs
-# no PR code and treats that result as untrusted. Callers grant contents: read, id-token: write and
+# no PR code, and hands that result to the review service, which answers on the PR through its GitHub App
+# (D38). Callers pin this file to a released commit's full SHA (D45), grant contents: read, id-token: write and
 # pull-requests: write, and pass the secrets below, with secrets: inherit for same-owner repos.
 on:
   workflow_call:
@@ -23,19 +24,18 @@ on:
       image:
         description: Review image by digest. Only tf-review's signed release and dev packages are accepted.
         type: string
-        default: ghcr.io/gergodrazsdik/tf-review@sha256:27efc022fa13d50c9e97a204dc9868943e7c389d399f2076c3402e56b17f4b91
+        default: ghcr.io/gergodrazsdik/tf-review@sha256:21bcd484dc1b967d0500d42049943ba34295f1b85d4f15a6a1eb9efdec01e6e5
+      api-url:
+        description: The review service.
+        type: string
+        default: https://ca-tf-review-api-prod.yellowpebble-7ff92100.germanywestcentral.azurecontainerapps.io
     secrets:
       AZURE_CLIENT_ID_PLAN:
-        required: true
-      AZURE_CLIENT_ID_REVIEW:
         required: true
       AZURE_TENANT_ID:
         required: true
       AZURE_SUBSCRIPTION_ID:
         required: true
-      INFRACOST_CLI_AUTHENTICATION_TOKEN:
-        description: Needed only when the config enables cost. Without it, cost is reported as not reviewed.
-        required: false
 
 permissions:
   contents: read
@@ -158,12 +158,13 @@ jobs:
   review:
     needs: plan
     # Runs even when the plan failed, so the PR always gets a result for this commit. It isn't a
-    # required check, so a model outage can't block merges (D9).
+    # required check, so an outage can't block merges (D9).
     if: ${{ !cancelled() && needs.plan.result != 'skipped' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    # The API only accepts a token from this environment, which the plan job doesn't have (D45).
     environment: review
-    # Cancelled when superseded, so an older run can't overwrite a newer comment.
+    # Cancelled when superseded. The service also drops any review of a commit no longer at the PR's head.
     concurrency:
       group: tf-review-review-${{ github.event.pull_request.number }}
       cancel-in-progress: true
@@ -182,48 +183,24 @@ jobs:
         with:
           name: tf-review-plan
           path: ${{ runner.temp }}/tf-review
-      - name: Read the config from the base commit
+      # The service reads the config itself, at the base commit, so a PR can't weaken its own review.
+      - name: Submit
+        id: submit
         continue-on-error: true
         env:
-          GH_TOKEN: ${{ github.token }}
+          TF_REVIEW_API_URL: ${{ inputs.api-url }}
           CONFIG_PATH: ${{ inputs.config-path }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           work="$RUNNER_TEMP/tf-review"
           mkdir -p "$work"
-          gh api -H 'Accept: application/vnd.github.raw+json' \
-            "repos/$GITHUB_REPOSITORY/contents/$CONFIG_PATH?ref=$BASE_SHA" >"$work/config.yml"
-      # The image has no az, so DefaultAzureCredential uses workload identity through this file. If this
-      # fails, the agent reports "not reviewed" and the policy findings still get posted.
-      - name: Get a federated token
-        continue-on-error: true
-        run: |
-          install -m 600 /dev/null "$RUNNER_TEMP/federated-token"
-          token=$(curl -fsS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r .value)
-          echo "::add-mask::$token"
-          printf '%s' "$token" >"$RUNNER_TEMP/federated-token"
-      - name: Review
-        continue-on-error: true
-        env:
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID_REVIEW }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          INFRACOST_CLI_AUTHENTICATION_TOKEN: ${{ secrets.INFRACOST_CLI_AUTHENTICATION_TOKEN }}
-          TF_REVIEW_OPENAI_ENDPOINT: ${{ vars.TF_REVIEW_OPENAI_ENDPOINT }}
-          TF_REVIEW_OPENAI_DEPLOYMENT: ${{ vars.TF_REVIEW_OPENAI_DEPLOYMENT }}
-        run: |
-          work="$RUNNER_TEMP/tf-review"
-          mkdir -p "$work"
-          touch "$RUNNER_TEMP/federated-token"
           docker run --rm --read-only --tmpfs /tmp --user "$(id -u):$(id -g)" -v "$work:/work" \
-            -e HOME=/tmp -e AZURE_CLIENT_ID -e AZURE_TENANT_ID \
-            -e AZURE_FEDERATED_TOKEN_FILE=/run/federated-token \
-            -e TF_REVIEW_OPENAI_ENDPOINT -e TF_REVIEW_OPENAI_DEPLOYMENT \
-            -e INFRACOST_CLI_AUTHENTICATION_TOKEN \
-            -v "$RUNNER_TEMP/federated-token:/run/federated-token:ro" \
-            "$IMAGE" review /work/redacted.json /work/config.yml /work/result.json "$COMMIT"
-      - name: Publish
-        if: ${{ !cancelled() }}
+            -e HOME=/tmp -e TF_REVIEW_API_URL \
+            -e ACTIONS_ID_TOKEN_REQUEST_URL -e ACTIONS_ID_TOKEN_REQUEST_TOKEN \
+            "$IMAGE" submit /work/redacted.json "$COMMIT" "$CONFIG_PATH"
+      # With its own token and no result, which says "not reviewed", so an older result can't stand for this
+      # commit (D39). A re-run reviews it once the service is back.
+      - name: Say not reviewed
+        if: ${{ !cancelled() && steps.submit.outcome != 'success' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -232,8 +209,4 @@ jobs:
           mkdir -p "$work"
           docker run --rm --read-only --tmpfs /tmp --user "$(id -u):$(id -g)" -v "$work:/work" \
             -e GITHUB_TOKEN -e GITHUB_REPOSITORY -e GITHUB_API_URL -e PR_NUMBER \
-            -e GITHUB_STEP_SUMMARY=/work/summary.md \
-            "$IMAGE" publish /work/result.json /work/redacted.json "$COMMIT"
-          if [ -f "$work/summary.md" ]; then
-            cat "$work/summary.md" >>"$GITHUB_STEP_SUMMARY"
-          fi
+            "$IMAGE" publish /work/no-result.json /work/redacted.json "$COMMIT"
