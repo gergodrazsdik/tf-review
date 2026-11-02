@@ -47,14 +47,14 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
               "items": {
                 "type": "object",
                 "properties": {
-                  "breaks_standard": { "type": "boolean" },
                   "resource_address": { "type": "string" },
                   "doc_id": { "type": "string" },
                   "attribute": { "type": "string" },
                   "title": { "type": "string" },
-                  "suggestion": { "type": ["string", "null"] }
+                  "suggestion": { "type": ["string", "null"] },
+                  "breaks_standard": { "type": "boolean" }
                 },
-                "required": ["breaks_standard", "resource_address", "doc_id", "attribute", "title", "suggestion"],
+                "required": ["resource_address", "doc_id", "attribute", "title", "suggestion", "breaks_standard"],
                 "additionalProperties": false
               }
             }
@@ -169,7 +169,8 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
         }
 
         // On C13 the model judged a resource fine and listed it anyway, however the prompt was worded, so the
-        // model answers the question and code acts on it.
+        // model answers the question and code acts on it. The field comes last in the schema, because when it
+        // came first the model committed to true before reasoning, and then wrote a title saying the opposite.
         return new ParsedFindings(
             [.. output.Findings.Where(finding => finding.BreaksStandard).Select(finding => ToFinding(finding, docs, costs))],
             output.Findings.Count(finding => !finding.BreaksStandard));

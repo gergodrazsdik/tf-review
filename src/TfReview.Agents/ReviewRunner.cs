@@ -119,11 +119,6 @@ public sealed class ReviewRunner(
                 drops[ModelRetracted] = retracted;
             }
 
-            if (arbitration.Dropped > 0)
-            {
-                drops[LlmArbiter.ArbiterDropped] = arbitration.Dropped;
-            }
-
             return new ReviewResult(1, commit, arbitration.Verdict, arbitration.Findings, notReviewed, drops)
             {
                 RiskOrder = risk.Order.Count == 0 ? null : risk.Order,

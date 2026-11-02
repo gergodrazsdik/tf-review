@@ -15,9 +15,9 @@ on:
   workflow_dispatch:
     inputs:
       runs:
-        description: Runs per case. The gate needs 3.
+        description: Runs per case.
         type: number
-        default: 3
+        default: 5
 
 permissions:
   contents: read
@@ -58,7 +58,7 @@ jobs:
           printf '%s' "$token" >"$RUNNER_TEMP/federated-token"
       - name: Run the cases against the model
         env:
-          RUNS: ${{ inputs.runs || 3 }}
+          RUNS: ${{ inputs.runs || 5 }}
           TF_STANDARDS_DIR: ${{ github.workspace }}/standards
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID_REVIEW }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
