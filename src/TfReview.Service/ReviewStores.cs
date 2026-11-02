@@ -38,9 +38,15 @@ public interface IPlanStore
     Task<string?> ReadAsync(string reviewId, CancellationToken cancellationToken = default);
 }
 
+/// <summary>A message taken off the queue, which comes back unless it's completed. A job of null couldn't be read.</summary>
+public sealed record ReceivedJob(ReviewJob? Job, long DequeueCount, Func<CancellationToken, Task> CompleteAsync);
+
 public interface IReviewQueue
 {
     Task EnqueueAsync(ReviewJob job, CancellationToken cancellationToken = default);
+
+    /// <summary>The next message, hidden from others for this long, or null if the queue is empty.</summary>
+    Task<ReceivedJob?> ReceiveAsync(TimeSpan visibility, CancellationToken cancellationToken = default);
 }
 
 public interface IReviewStatusStore

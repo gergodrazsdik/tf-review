@@ -12,8 +12,11 @@ public enum CommentAction
 /// <summary>Keeps one comment per PR, found by its hidden marker and rewritten on each push.</summary>
 public sealed class StickyComment(HttpClient http, string repository, int pullRequest)
 {
-    // Anyone can post a comment containing the marker, so only this bot's own comments count.
-    private const string BotLogin = "github-actions[bot]";
+    // Anyone can post a comment containing the marker, so only these two count: the App the service posts as, and
+    // the workflow's own token, which says "not reviewed" when the service is down (D39). Either replaces the other's,
+    // so an older result can't stand for a newer commit.
+    private static readonly HashSet<string> BotLogins = ["tf-review-gergodrazsdik[bot]", "github-actions[bot]"];
+
     private const int PageSize = 100;
 
     public static HttpClient CreateClient(Uri apiUrl, string token)
@@ -51,7 +54,7 @@ public sealed class StickyComment(HttpClient http, string repository, int pullRe
             {
                 var author = comment.GetProperty("user").GetProperty("login").GetString();
                 var text = comment.GetProperty("body").GetString();
-                if (author == BotLogin && text?.StartsWith(CommentRenderer.Marker, StringComparison.Ordinal) == true)
+                if (author is not null && BotLogins.Contains(author) && text?.StartsWith(CommentRenderer.Marker, StringComparison.Ordinal) == true)
                 {
                     return comment.GetProperty("id").GetInt64();
                 }

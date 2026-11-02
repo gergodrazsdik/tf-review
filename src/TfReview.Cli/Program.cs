@@ -6,12 +6,14 @@ using TfReview.Core;
 using TfReview.GitHub;
 using TfReview.Rag;
 using TfReview.Scanners;
+using TfReview.Worker;
 
 const string Usage = """
     usage: tfreview redact <plan.json> <redacted.json>
            tfreview review <redacted.json> <config.yml> <result.json> <commit>
            tfreview publish <result.json> <redacted.json> <commit>
            tfreview serve
+           tfreview work
     """;
 
 switch (args)
@@ -25,6 +27,8 @@ switch (args)
     case ["serve"]:
         await ReviewApi.RunAsync();
         return 0;
+    case ["work"]:
+        return await WorkerHost.RunAsync();
     default:
         Console.Error.WriteLine(Usage);
         return 2;

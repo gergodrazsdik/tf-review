@@ -8,6 +8,7 @@
     <Project Path="src/TfReview.Rag/TfReview.Rag.csproj" />
     <Project Path="src/TfReview.Scanners/TfReview.Scanners.csproj" />
     <Project Path="src/TfReview.Service/TfReview.Service.csproj" />
+    <Project Path="src/TfReview.Worker/TfReview.Worker.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/TfReview.Agents.Tests/TfReview.Agents.Tests.csproj" />
@@ -17,5 +18,6 @@
     <Project Path="tests/TfReview.GitHub.Tests/TfReview.GitHub.Tests.csproj" />
     <Project Path="tests/TfReview.Rag.Tests/TfReview.Rag.Tests.csproj" />
     <Project Path="tests/TfReview.Scanners.Tests/TfReview.Scanners.Tests.csproj" />
+    <Project Path="tests/TfReview.Worker.Tests/TfReview.Worker.Tests.csproj" />
   </Folder>
 </Solution>

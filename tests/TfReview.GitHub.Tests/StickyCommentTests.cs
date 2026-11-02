@@ -23,6 +23,31 @@ public class StickyCommentTests
         await Assert.That(github.Writes.Single().Body).IsEqualTo("new body");
     }
 
+    // The service posts as the App, and the workflow as itself when the service is down (D39). Neither can leave
+    // the other's older result standing.
+    [Test]
+    [Arguments("tf-review-gergodrazsdik[bot]")]
+    [Arguments("github-actions[bot]")]
+    public async Task Updates_a_comment_from_either_of_its_identities(string login)
+    {
+        var github = new FakeGitHub(Comment(42, login, Marked));
+
+        var action = await Upsert(github, "new body");
+
+        await Assert.That(action).IsEqualTo(CommentAction.Updated);
+        await Assert.That(github.Writes.Single().Path).IsEqualTo("/repos/owner/repo/issues/comments/42");
+    }
+
+    [Test]
+    public async Task Ignores_the_marker_from_another_bot()
+    {
+        var github = new FakeGitHub(Comment(42, "someone-else[bot]", Marked));
+
+        var action = await Upsert(github, "new body");
+
+        await Assert.That(action).IsEqualTo(CommentAction.Created);
+    }
+
     [Test]
     public async Task Updates_its_own_comment()
     {
