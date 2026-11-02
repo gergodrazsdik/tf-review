@@ -18,4 +18,7 @@ provider "azurerm" {
 
   # The identities only hold roles on one resource group, so they can't register providers.
   resource_provider_registrations = "none"
+
+  # The service's storage account has access keys off, so the provider has to use its identity.
+  storage_use_azuread = true
 }
