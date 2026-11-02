@@ -166,33 +166,6 @@ resource "azapi_resource" "review_job" {
   }
 }
 
-# Hands the existing apps from azurerm to azapi without touching them. Delete these once applied.
-removed {
-  from = azurerm_container_app.api
-
-  lifecycle {
-    destroy = false
-  }
-}
-
-removed {
-  from = azurerm_container_app_job.review
-
-  lifecycle {
-    destroy = false
-  }
-}
-
-import {
-  to = azapi_resource.api
-  id = "${data.azurerm_resource_group.target.id}/providers/Microsoft.App/containerApps/ca-tf-review-api-prod?api-version=2025-07-01"
-}
-
-import {
-  to = azapi_resource.review_job
-  id = "${data.azurerm_resource_group.target.id}/providers/Microsoft.App/jobs/caj-tf-review-prod?api-version=2025-07-01"
-}
-
 output "api_url" {
   description = "Where the reusable workflow submits reviews."
   value       = "https://${azapi_resource.api.output.properties.configuration.ingress.fqdn}"
