@@ -27,7 +27,9 @@ public static class WorkerHost
         // doesn't reach /proc, and only the Infracost runner passes it on.
         var secrets = new SecretClient(new Uri($"https://{Required("TF_REVIEW_KEY_VAULT")}.vault.azure.net/"), new DefaultAzureCredential());
         var appKey = (await secrets.GetSecretAsync(AppKeySecret, cancellationToken: deadline.Token)).Value.Value;
-        var infracost = (await secrets.GetSecretAsync(InfracostSecret, cancellationToken: deadline.Token)).Value.Value;
+
+        // A newline stored with a token makes it invalid as a header, and Infracost then can't run at all.
+        var infracost = (await secrets.GetSecretAsync(InfracostSecret, cancellationToken: deadline.Token)).Value.Value.Trim();
         Environment.SetEnvironmentVariable(InfracostVariable, infracost);
 
         var stores = ServiceStores.FromEnvironment();

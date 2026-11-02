@@ -99,10 +99,11 @@ secrets-sync:
       gh secret set INFRACOST_CLI_AUTHENTICATION_TOKEN -R "$repo" <<<"$token"
       echo "$repo: set"
     done
-    # From stdin so values stay out of the process list, and no output because az prints the value it set.
-    az keyvault secret set --vault-name kv-tf-review-prod --name infracost-cli-token --file /dev/stdin --output none <<<"$token"
+    # From stdin so values stay out of the process list, and no output because az prints the value it set. Not
+    # with <<<, which adds a newline: az stores it, and a token with one can't be sent as a header.
+    printf '%s' "$token" | az keyvault secret set --vault-name kv-tf-review-prod --name infracost-cli-token --file /dev/stdin --output none
     echo "Key Vault: infracost-cli-token set"
-    az keyvault secret set --vault-name kv-tf-review-prod --name github-app-private-key --file /dev/stdin --output none <<<"$key"
+    printf '%s' "$key" | az keyvault secret set --vault-name kv-tf-review-prod --name github-app-private-key --file /dev/stdin --output none
     echo "Key Vault: github-app-private-key set"
 
 # Build the review image with podman; it can't run from a recipe in the Claude sandbox

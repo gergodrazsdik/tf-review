@@ -314,7 +314,7 @@ public class CommentRendererTests
     [Test]
     [Arguments(NotReviewedReason.InvalidConfig, "the config is invalid")]
     [Arguments(NotReviewedReason.StandardsUnavailable, "the standards couldn't be fetched")]
-    [Arguments(NotReviewedReason.ScannerFailed, "a policy check failed to run")]
+    [Arguments(NotReviewedReason.ScannerFailed, "a scanner failed to run")]
     [Arguments(NotReviewedReason.RedactionRefused, "redaction refused the plan")]
     public async Task Explains_why_a_review_failed(NotReviewedReason reason, string text)
     {
