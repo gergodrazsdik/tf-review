@@ -112,6 +112,7 @@ resource "azurerm_container_app_environment" "service" {
   name                       = "cae-tf-review-prod"
   resource_group_name        = data.azurerm_resource_group.target.name
   location                   = data.azurerm_resource_group.target.location
+  logs_destination           = "log-analytics"
   log_analytics_workspace_id = azurerm_log_analytics_workspace.service.id
   tags                       = local.service_tags
 }
