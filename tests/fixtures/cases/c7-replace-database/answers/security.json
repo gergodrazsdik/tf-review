@@ -1,4 +1,4 @@
 {
-  "prompt_version": 2,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_mssql_database.main\",\"doc_id\":\"POL-004\",\"attribute\":\"name\",\"title\":\"The azurerm_mssql_database.main resource changes name from \\\"payments\\\" to \\\"payments-v2\\\", which forces a replacement and can destroy the existing database data.\",\"suggestion\":\"Keep the database name unchanged or confirm the data is backed up or disposable before applying the replacement.\"}]}"
+  "prompt_version": 4,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_mssql_database.main\",\"doc_id\":\"POL-004\",\"attribute\":\"name\",\"title\":\"The value \\\"payments-v2\\\" forces replacement of the database, which would delete the existing data-holding resource and risk data loss.\",\"suggestion\":\"Avoid changing the immutable name in place, or back up and explicitly approve the replacement before applying it.\",\"breaks_standard\":true}]}"
 }

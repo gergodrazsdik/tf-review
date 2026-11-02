@@ -1,4 +1,4 @@
 {
   "prompt_version": 1,
-  "text": "{\"resources\":[{\"resource_address\":\"azurerm_mssql_database.main\",\"reason\":\"This is a database replacement, so a mistake could destroy or replace data.\"},{\"resource_address\":\"azurerm_virtual_network.main\",\"reason\":\"null\"}]}"
+  "text": "{\"resources\":[{\"resource_address\":\"azurerm_mssql_database.main\",\"reason\":\"This is a replacement of a database resource, so a mistake could cause data loss or downtime.\"},{\"resource_address\":\"azurerm_virtual_network.main\",\"reason\":\"null\"}]}"
 }

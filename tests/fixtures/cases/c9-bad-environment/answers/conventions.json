@@ -1,4 +1,4 @@
 {
-  "prompt_version": 2,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_virtual_network.main\",\"doc_id\":\"ADR-002\",\"attribute\":\"tags\",\"title\":\"The tag value \\\"production\\\" for \\\"environment\\\" is not allowed; it must be \\\"dev\\\", \\\"test\\\", or \\\"prod\\\".\",\"suggestion\":\"Change the \\\"environment\\\" tag to \\\"prod\\\".\"}]}"
+  "prompt_version": 4,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_virtual_network.main\",\"doc_id\":\"ADR-002\",\"attribute\":\"tags\",\"title\":\"The tag value \\\"production\\\" for \\\"environment\\\" does not match the required values dev, test, or prod.\",\"suggestion\":\"Change the \\\"environment\\\" tag to one of \\\"dev\\\", \\\"test\\\", or \\\"prod\\\"; for example, use \\\"prod\\\".\",\"breaks_standard\":true}]}"
 }

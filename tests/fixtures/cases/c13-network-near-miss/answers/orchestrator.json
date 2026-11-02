@@ -1,4 +1,4 @@
 {
   "prompt_version": 1,
-  "text": "{\"resources\":[{\"resource_address\":\"azurerm_network_security_rule.ssh\",\"reason\":\"Allows SSH access, which can expose administrative entry points if misconfigured.\"},{\"resource_address\":\"azurerm_network_security_rule.https\",\"reason\":null}]}"
+  "text": "{\"resources\":[{\"resource_address\":\"azurerm_network_security_rule.ssh\",\"reason\":\"This opens SSH access and could expose administrative access if the rule is too broad.\"},{\"resource_address\":\"azurerm_network_security_rule.https\",\"reason\":null}]}"
 }

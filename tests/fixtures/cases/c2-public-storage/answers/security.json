@@ -1,4 +1,4 @@
 {
-  "prompt_version": 2,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_storage_account.seed\",\"doc_id\":\"POL-001\",\"attribute\":\"allow_nested_items_to_be_public\",\"title\":\"azurerm_storage_account.seed sets allow_nested_items_to_be_public to \\\"true\\\", but POL-001 requires false to prevent anonymous blob access.\",\"suggestion\":\"Change allow_nested_items_to_be_public to false.\"}]}"
+  "prompt_version": 4,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_storage_account.seed\",\"doc_id\":\"POL-001\",\"attribute\":\"allow_nested_items_to_be_public\",\"title\":\"azurerm_storage_account.seed sets \\\"allow_nested_items_to_be_public\\\" to true, which breaks the requirement to disable anonymous blob access.\",\"suggestion\":\"Set allow_nested_items_to_be_public to false.\",\"breaks_standard\":true}]}"
 }

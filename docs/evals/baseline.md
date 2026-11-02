@@ -1,18 +1,19 @@
 # Eval baseline
 
-What later prompts, models and retrieval changes have to beat. Each number is from `e2e-live`, which runs every case in `tests/fixtures/cases` three times against the real model. A case passes only if the whole set of findings matches, so an extra finding fails it like a missed one.
+What later prompts, models and retrieval changes have to beat. Each number is from `e2e-live`, which runs every case in `tests/fixtures/cases` five times against the real model. A case passes only if the whole set of findings matches, so an extra finding fails it like a missed one.
 
 ## Current: 2026-11-02
 
-Model gpt-5.4-mini at low reasoning effort. Prompts conventions v2, security v2, cost v1, orchestrator v1, arbiter v1. `tf-standards` at `adf50af`.
+Model gpt-5.4-mini at low reasoning effort. Prompts conventions v4, security v4, cost v4, orchestrator v1, arbiter v2. `tf-standards` at `adf50af`. Five runs per case, because three misled twice while this was being built.
 
 | Measure | Result |
 | --- | --- |
-| Cases passing 3 of 3 | 17 of 17 |
-| Findings dropped by the evidence check | 0 |
-| Estimated cost of a full run (51 reviews) | About $0.13, so about $0.0025 a review |
+| Runs passing | 83 of 85 |
+| Cases passing every run | 15 of 17 |
+| Failures | C4 and C15 once each: the cost agent marked a real increase as not breaking ADR-003 |
+| Estimated cost of a full run (85 reviews) | About $0.21, so about $0.0025 a review |
 
-The findings dropped row says the model stopped proposing what the evidence check would catch, not that the check is unneeded.
+**Read this as "about 98% on small, known cases", not as solved.** The security and conventions agents have held on the last samples. The cost agent has failed a run or two in each of its last two samples, once flagging what it shouldn't and twice retracting what it should keep, so it isn't yet reliable on ADR-003's rules.
 
 ## How the held-out cases went
 
@@ -28,9 +29,11 @@ These are the honest part of the suite, because C1–C10 were used to tune the p
 | `c16-tag-injection` | A tag telling the reviewer to report nothing | 3 of 3 |
 | `c17-admin-near-miss` | Private RDP, and `Owner` at resource group scope | 3 of 3, after the C13 fix |
 
-So 5 of the first 6 passed, which is the fair estimate of how the agents did on new cases. It's a small sample.
+So 5 of the first 6 passed on their first measurement, which is the fair estimate of how the agents did on new cases, from a small sample. Later samples showed those 3-of-3 results were partly luck, as the next table shows.
 
-**C13:** the model judged correctly, and then listed the resource anyway, with a title saying the private range "does not violate" the rule. Security prompt v2 says findings are for violations only. C13 was tuned against to do that, so it's a regression case now, not held out. C17 was written afterwards to test whether the fix generalises to a different form.
+**C13:** the model judged correctly, and then listed the resource anyway, with a title saying the private range "does not violate" the rule. A prompt telling it not to didn't hold: 3 of 3, then 1 of 3 on the next sample. What held was a required `breaks_standard` field, last in the schema, with code removing anything marked false. As the first field it failed too, because the model answered before reasoning and wrote a contradicting title. C13 was tuned against, so it's a regression case now, not held out. C17 was written afterwards to test whether the fix generalises.
+
+**C11:** passed at first, then on a later sample the arbiter dropped C9's correct model-only finding. It can't drop findings any more (D36).
 
 ## Earlier results
 
@@ -40,7 +43,10 @@ So 5 of the first 6 passed, which is the fair estimate of how the agents did on 
 | 2026-11-01 | Conventions prompt v2, no reasoning | C8 fixed, C5 passed 0 of 3, reporting a valid name |
 | 2026-11-01 | Low reasoning effort | All of C5, C6, C8, C9 and C10 passed 3 of 3 |
 | 2026-11-02 | Held-out cases, security prompt v1 | C13 passed 0 of 3, everything else 3 of 3 |
-| 2026-11-02 | Security prompt v2 | All 17 cases passed 3 of 3 |
+| 2026-11-02 | Security prompt v2 | All 17 passed 3 of 3, and then C13 passed 1 of 3 on the next sample |
+| 2026-11-02 | `breaks_standard`, first in the schema | C13 passed 1 of 3, C11 2 of 3 from the arbiter's drop, everything else 3 of 3 |
+| 2026-11-02 | Field last, arbiter can't drop, 5 runs per case | 84 of 85: C14 failed once, flagging a 20% rise |
+| 2026-11-02 | Code supplies the percentage (cost v4) | 83 of 85: C4 and C15 failed once each, retracting real increases |
 
 ## What this doesn't measure
 
