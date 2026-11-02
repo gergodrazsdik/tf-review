@@ -1,0 +1,11 @@
+{
+  "held_out": true,
+  "findings": [
+    {
+      "resource_address": "azurerm_linux_virtual_machine.main",
+      "rule": "ADR-003",
+      "agent": "cost",
+      "deterministic": false
+    }
+  ]
+}

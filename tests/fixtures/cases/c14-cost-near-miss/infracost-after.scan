@@ -1,0 +1,1 @@
+{"currency": "USD", "projects": [{"project_name": "plan.json", "resources": [{"name": "azurerm_linux_virtual_machine.main", "type": "azurerm_linux_virtual_machine", "is_supported": true, "is_free": false, "cost_components": [{"name": "Instance usage", "total_monthly_cost": "120"}]}]}]}

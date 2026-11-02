@@ -1,0 +1,35 @@
+{
+  "held_out": true,
+  "findings": [
+    {
+      "resource_address": "azurerm_virtual_network.untagged",
+      "rule": "ADR-002",
+      "agent": "conventions",
+      "deterministic": true
+    },
+    {
+      "resource_address": "azurerm_virtual_network.wrong_env",
+      "rule": "ADR-002",
+      "agent": "conventions",
+      "deterministic": false
+    },
+    {
+      "resource_address": "azurerm_storage_account.public",
+      "rule": "POL-001",
+      "agent": "security",
+      "deterministic": true
+    },
+    {
+      "resource_address": "azurerm_storage_account.public",
+      "rule": "CKV_AZURE_190",
+      "agent": "scanner",
+      "deterministic": true
+    },
+    {
+      "resource_address": "azurerm_storage_account.public",
+      "rule": "CKV_AZURE_59",
+      "agent": "scanner",
+      "deterministic": true
+    }
+  ]
+}
