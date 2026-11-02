@@ -237,7 +237,7 @@ tf-review/
 
 **Contracts owned by `tf-review`** (versioned with tags, JSON Schema where possible)
 
-1. Reusable workflow inputs, secrets and outputs (`working-directory`, `config-path`, `image`; `tool` from M2; gate mode comes from the config's `gate.mode`; the Azure IDs are passed as secrets, with `secrets: inherit` for same-owner repos and explicitly otherwise)
+1. Reusable workflow inputs, secrets and outputs (`working-directory`, `config-path`, `image`, `tool`; gate mode comes from the config's `gate.mode`; the Azure IDs are passed as secrets, with `secrets: inherit` for same-owner repos and explicitly otherwise)
 2. `.tf-review.yml` schema: enabled agents, severity thresholds, gate mode, standards source
 3. Finding schema: resource address, severity, evidence (an address-keyed plan pointer, and a doc ID when no scanner backs the finding), suggestion, agent (`scanner` when no LLM agent reported it)
 4. Corpus frontmatter schema: `id`, `type`, `status`, `superseded_by`, `applies_to`, `topics`, `severity`, `rego`
@@ -560,7 +560,7 @@ Work runs in this order, so the deterministic findings exist before the agents t
 
 - [ ] Prompt-cache layout; `cached_tokens` logged per call
 - [ ] gpt-6.1-sol deployed for security and arbiter, and gpt-6-luna compared with gpt-5.4-mini on the eval suite, if quota is granted; each new model first passes the structured output smoke test, because Microsoft's supported list stops at the GPT-5.1 generation; models set per agent
-- [ ] Terraform support through the `tool` input (D1)
+- [x] Terraform support through the `tool` input (D1): a project's lock file has to come from the tool that plans it, because the two record different provider registries, so moving a project between them isn't just a flag
 - [x] Eval suite in CI (`e2e-live`, 5 runs per case) with the baseline recorded in `docs/evals/baseline.md`, including held-out cases whose expected results were fixed before any model saw them. 5 of the first 6 passed; later samples found the security agent listing resources it had judged fine, and the arbiter dropping a correct finding, both fixed in code. Now 83 of 85 runs, and the cost agent's handling of ADR-003 is the known weak spot
 - [ ] Gate: C1–C10 run in CI, baseline recorded
 
