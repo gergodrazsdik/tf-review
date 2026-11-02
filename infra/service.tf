@@ -1,6 +1,11 @@
 # The review service's supporting resources (M3). Nothing here runs between PRs: the API and the review job
 # arrive with the service itself, and scale to zero, so these only cost what they store and log.
 
+variable "tenant_id" {
+  description = "Entra tenant, for Key Vault. A variable because the azurerm_client_config data source prints an ID that encodes the subscription, tenant and client IDs in base64, which log masking can't catch (D30)."
+  type        = string
+}
+
 locals {
   service_tags = {
     owner       = "gergodrazsdik"
@@ -72,7 +77,7 @@ resource "azurerm_key_vault" "service" {
   name                       = "kv-tf-review-prod"
   resource_group_name        = data.azurerm_resource_group.target.name
   location                   = data.azurerm_resource_group.target.location
-  tenant_id                  = data.azurerm_client_config.current.tenant_id
+  tenant_id                  = var.tenant_id
   sku_name                   = "standard"
   rbac_authorization_enabled = true
   purge_protection_enabled   = false
@@ -83,8 +88,6 @@ resource "azurerm_key_vault" "service" {
     prevent_destroy = true
   }
 }
-
-data "azurerm_client_config" "current" {}
 
 resource "azurerm_log_analytics_workspace" "service" {
   name                = "log-tf-review-prod"
@@ -115,6 +118,14 @@ resource "azurerm_container_app_environment" "service" {
   logs_destination           = "log-analytics"
   log_analytics_workspace_id = azurerm_log_analytics_workspace.service.id
   tags                       = local.service_tags
+
+  # Azure adds this profile itself, and it has no fixed fee. Left out, every plan would try to remove it.
+  workload_profile {
+    name                  = "Consumption"
+    workload_profile_type = "Consumption"
+    minimum_count         = 0
+    maximum_count         = 0
+  }
 }
 
 # The subscription's one free account, which can only be chosen when it's created. Access keys are off, and vector
@@ -147,20 +158,6 @@ resource "azapi_resource" "cosmos" {
   lifecycle {
     prevent_destroy = true
   }
-}
-
-# Hands the existing account from azurerm to azapi without touching it. Delete these two once applied.
-removed {
-  from = azurerm_cosmosdb_account.service
-
-  lifecycle {
-    destroy = false
-  }
-}
-
-import {
-  to = azapi_resource.cosmos
-  id = "${data.azurerm_resource_group.target.id}/providers/Microsoft.DocumentDB/databaseAccounts/cosmos-tf-review-prod?api-version=2025-10-15"
 }
 
 resource "azurerm_cosmosdb_sql_database" "service" {
