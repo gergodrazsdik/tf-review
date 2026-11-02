@@ -8,9 +8,9 @@ Model gpt-5.4-mini at low reasoning effort. Prompts conventions v4, security v4,
 
 | Measure | Result |
 | --- | --- |
-| Runs passing | 83 of 85 |
-| Cases passing every run | 15 of 17 |
-| Failures | C4 and C15 once each: the cost agent marked a real increase as not breaking ADR-003 |
+| Runs passing | 83, 85 and 85 of 85, on three samples of this code |
+| Failures | C4 and C15 once each, on the first sample: the cost agent marked a real increase as not breaking ADR-003 |
+| Input tokens cached | About a quarter, because the same prompts repeat within minutes. Real reviews rarely do |
 | Estimated cost of a full run (85 reviews) | About $0.21, so about $0.0025 a review |
 
 **Read this as "about 98% on small, known cases", not as solved.** The security and conventions agents have held on the last samples. The cost agent has failed a run or two in each of its last two samples, once flagging what it shouldn't and twice retracting what it should keep, so it isn't yet reliable on ADR-003's rules.
