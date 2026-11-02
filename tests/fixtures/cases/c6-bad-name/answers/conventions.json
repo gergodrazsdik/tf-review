@@ -1,4 +1,4 @@
 {
   "prompt_version": 2,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_virtual_network.seed\",\"doc_id\":\"ADR-001\",\"attribute\":\"name\",\"title\":\"azurerm_virtual_network.seed has name \\\"MyBadNetwork\\\", which does not match the required vnet-<workload>-<environment> lowercase pattern.\",\"suggestion\":\"Rename it to a lowercase value like \\\"vnet-payments-prod\\\" that follows vnet-<workload>-<environment>.\"}]}"
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_virtual_network.seed\",\"doc_id\":\"ADR-001\",\"attribute\":\"name\",\"title\":\"ADR-001: azurerm_virtual_network.seed name \\\"MyBadNetwork\\\" does not match the required vnet-payments-prod style.\",\"suggestion\":\"Rename it to a lowercase value in the form \\\"vnet-<workload>-prod\\\", such as \\\"vnet-tf-review-demo-prod\\\".\"}]}"
 }

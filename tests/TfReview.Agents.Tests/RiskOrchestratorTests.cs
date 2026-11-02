@@ -64,6 +64,22 @@ public class RiskOrchestratorTests
         await Assert.That(ranking.Order[1].Reason).IsNull();
     }
 
+    // Seen on C7 from the real model: "reason":"null", as a string.
+    [Test]
+    [Arguments("null")]
+    [Arguments(" NULL ")]
+    [Arguments("none")]
+    [Arguments("  ")]
+    public async Task A_reason_that_says_nothing_isnt_a_reason(string reason)
+    {
+        var plan = TestPlans.Condensed(TestPlans.Create("a.first", "a", "{}"), TestPlans.Create("a.second", "a", "{}"));
+        var answer = $$"""{"resources":[{"resource_address":"a.first","reason":"{{reason}}"},{"resource_address":"a.second","reason":null}]}""";
+
+        var ranking = await new RiskOrchestrator(new FakeChat(FakeChat.Answer(answer))).RankAsync(plan);
+
+        await Assert.That(ranking.Order.All(item => item.Reason is null)).IsTrue();
+    }
+
     // Leaving a resource out can't drop it from the order, or add one that isn't there.
     [Test]
     public async Task Every_change_stays_in_the_order_whatever_the_model_lists()

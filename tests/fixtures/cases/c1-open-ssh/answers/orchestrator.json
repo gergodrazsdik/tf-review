@@ -1,0 +1,4 @@
+{
+  "prompt_version": 1,
+  "text": "{\"resources\":[{\"resource_address\":\"azurerm_network_security_rule.seed\",\"reason\":\"This directly controls network access and could unintentionally expose services.\"},{\"resource_address\":\"azurerm_network_security_group.seed\",\"reason\":null}]}"
+}

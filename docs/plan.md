@@ -561,7 +561,7 @@ Work runs in this order, so the deterministic findings exist before the agents t
 - [ ] Prompt-cache layout; `cached_tokens` logged per call
 - [ ] gpt-6.1-sol deployed for security and arbiter, and gpt-6-luna compared with gpt-5.4-mini on the eval suite, if quota is granted; each new model first passes the structured output smoke test, because Microsoft's supported list stops at the GPT-5.1 generation; models set per agent
 - [ ] Terraform support through the `tool` input (D1)
-- [ ] Eval suite in CI with the baseline recorded, including new cases the prompts weren't tuned on, because M1's five were
+- [ ] Eval suite in CI with the baseline recorded, including new cases the prompts weren't tuned on, because M1's five were. They have to cover what the seeded cases don't: the security agent finding what no policy does and holding back on a near miss, and a plan with several findings including a model-only one, because the arbiter only runs with two or more findings and so far has only seen C2
 - [ ] Gate: C1–C10 run in CI, baseline recorded
 
 **M3 · Central service**

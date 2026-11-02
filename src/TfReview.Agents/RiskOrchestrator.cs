@@ -95,12 +95,18 @@ public sealed class RiskOrchestrator(IChatClient chat, TimeSpan? attemptTimeout 
             .DistinctBy(rank => rank.ResourceAddress)
             .ToDictionary(rank => rank.ResourceAddress, rank => rank.index, StringComparer.Ordinal);
         var reasons = wanted
-            .Where(resource => !string.IsNullOrWhiteSpace(resource.Reason))
+            .Where(resource => HasReason(resource.Reason))
             .DistinctBy(resource => resource.ResourceAddress)
             .ToDictionary(resource => resource.ResourceAddress, resource => resource.Reason!.Trim(), StringComparer.Ordinal);
 
         return new RiskRanking(Order(changes, ranks, reasons), result.Calls, prompt.Version);
     }
+
+    // The live model sometimes writes the word "null" in quotes, which would otherwise reach the comment.
+    private static bool HasReason(string? reason) =>
+        !string.IsNullOrWhiteSpace(reason)
+        && !reason.Trim().Equals("null", StringComparison.OrdinalIgnoreCase)
+        && !reason.Trim().Equals("none", StringComparison.OrdinalIgnoreCase);
 
     private static List<RiskItem> Order(
         IReadOnlyList<PlanChange> changes, IReadOnlyDictionary<string, int> ranks, IReadOnlyDictionary<string, string> reasons) =>

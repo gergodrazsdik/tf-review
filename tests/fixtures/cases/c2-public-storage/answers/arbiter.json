@@ -1,0 +1,4 @@
+{
+  "prompt_version": 1,
+  "text": "{\"groups\":[{\"finding_ids\":[\"F1\",\"F3\"]}],\"drop\":[],\"order\":[\"F2\",\"F1\",\"F3\"]}"
+}
