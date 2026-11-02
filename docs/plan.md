@@ -53,7 +53,7 @@ Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET S
 
 ## Decision log
 
-All 45 decisions are settled as of 2026-11-02; D19–D29 came from the M1 design council, D31–D34 from M2's spike, D35–D36 from building its orchestrator and arbiter, and D37–D45 from planning M3. Changing one means editing its row and the sections it affects in the same commit.
+All 46 decisions are settled as of 2026-11-02; D19–D29 came from the M1 design council, D31–D34 from M2's spike, D35–D36 from building its orchestrator and arbiter, D37–D45 from planning M3, and D46 from applying its infrastructure. Changing one means editing its row and the sections it affects in the same commit.
 
 | # | Decision | Choice | Why |
 | --- | --- | --- | --- |
@@ -102,6 +102,7 @@ All 45 decisions are settled as of 2026-11-02; D19–D29 came from the M1 design
 | D43 | Reference storage | Imported docs live only in Cosmos, as documents with their vectors. `corpus/sources.yml` in `tf-review` pins each source repo and commit, and the azurerm versions to index. No copy of them in any git repo | Azure Policy alone is 5,179 files and azurerm over 1,400 per version, and a review refuses a standards download over 5,000 entries or 20 MB, so they can't go in `tf-standards`. Everything in Cosmos can be rebuilt from the pins, so a second copy in git would add no safety |
 | D44 | Refreshing the corpus | Changing `corpus/sources.yml` is the only trigger: on a PR a dry run reports what would change, with no credentials, and on merge indexing runs. A team's rules aren't indexed, because reviews read them at their pinned commit (D42) | One path, in the repo that owns the corpus's use. Sources change slowly, so a person choosing a commit is enough, and a pin change is a reviewable, revertible PR |
 | D45 | API trust | The API accepts a GitHub OIDC token only with this audience, `event_name` `pull_request`, `environment` `review`, a `repository_id` on the allowlist, and a `job_workflow_ref` naming `tf-review`'s `tf-review.yml` at a commit on a list of released commits. It takes the PR number from `ref`, never from the request | Real tokens showed `environment` refuses the plan job, which runs PR code, and `job_workflow_ref` refuses a job a PR adds to its own workflow. GitHub resolves a fork's commit through its parent repo, so a commit SHA alone in `tf-review`'s name proves nothing, hence the list of released commits |
+| D46 | Cosmos in `infra/` | The Cosmos account and its vector container use the azapi provider, and its database and other containers stay in azurerm. azurerm lists an account's keys on every read, even with keys disabled, so a Reader's plan fails with a 403, and it can't declare a vector policy. The alternative was giving the plan identity, which runs PR code, the right to list keys. With azapi it stays a Reader, and no keys reach the state |
 
 ## Architecture
 
@@ -615,6 +616,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 - [ ] Bootstrap: the service's managed identity with its LLM role, and the allowlist from the `repos` map (D40), with the released commits on it updated by the release flow (D45). **You:** `bootstrap-plan`, `bootstrap-apply`
 - [x] **You:** create the GitHub App, private to your account, and store its key with `pass insert -m tf-review/github-app/private-key`
 - [ ] **You:** `just secrets-sync` into Key Vault, once the vault exists
+- [ ] Delete the `removed` and `import` blocks that hand the Cosmos account to azapi (D46), once applied, and check the next plan shows no changes
 
 *3. The service*
 
@@ -633,7 +635,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 *5. Retrieval*
 
 - [ ] Indexing workflow, as described under "Refreshing the corpus": a dry run on PRs changing `corpus/sources.yml`, indexing on merge with a switch to the new version only once it's complete, and a by-hand rebuild. **You:** bootstrap for its identity, then approve its environment
-- [ ] The vector container, which azurerm 5.12 can't declare because its container has no vector policy, and a vector policy can't be changed later. Decide between a newer provider, the azapi provider or creating it from the indexing job
+- [ ] The vector container, through azapi (D46), because azurerm 5.12 has no vector policy on a container, and a policy can't be changed later
 - [ ] `CosmosRetriever` behind `IRetriever`: a team's rules always come through filtering, as they do today, so coverage can't depend on a ranking. Reference chunks are ranked by vector or hybrid search within a separate token budget
 - [ ] Prompts: reference material in its own fence, marked as context rather than rules, which needs a new version of each agent's prompt
 

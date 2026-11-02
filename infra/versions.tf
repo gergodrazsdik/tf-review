@@ -2,6 +2,10 @@ terraform {
   required_version = "~> 1.13"
 
   required_providers {
+    azapi = {
+      source  = "Azure/azapi"
+      version = "~> 2.13"
+    }
     azurerm = {
       source  = "hashicorp/azurerm"
       version = "~> 5.12"
@@ -13,6 +17,10 @@ terraform {
 }
 
 # Credentials come from the ARM_* variables and OIDC in the workflows.
+provider "azapi" {
+  skip_provider_registration = true
+}
+
 provider "azurerm" {
   features {}
 

@@ -117,52 +117,68 @@ resource "azurerm_container_app_environment" "service" {
   tags                       = local.service_tags
 }
 
-# The subscription's one free account, which can only be chosen when it's created. Access keys are off, and
-# vector search can't use shared throughput, so each container gets its own part of the free 1,000 RU/s.
-resource "azurerm_cosmosdb_account" "service" {
-  name                         = "cosmos-tf-review-prod"
-  resource_group_name          = data.azurerm_resource_group.target.name
-  location                     = data.azurerm_resource_group.target.location
-  offer_type                   = "Standard"
-  kind                         = "GlobalDocumentDB"
-  free_tier_enabled            = true
-  local_authentication_enabled = false
-  tags                         = local.service_tags
+# The subscription's one free account, which can only be chosen when it's created. Access keys are off, and vector
+# search can't use shared throughput, so each container gets its own part of the free 1,000 RU/s. In azapi because
+# azurerm lists the account's keys on every read, which the plan identity can't do and shouldn't (D46).
+resource "azapi_resource" "cosmos" {
+  type                   = "Microsoft.DocumentDB/databaseAccounts@2025-10-15"
+  name                   = "cosmos-tf-review-prod"
+  parent_id              = data.azurerm_resource_group.target.id
+  location               = data.azurerm_resource_group.target.location
+  tags                   = local.service_tags
+  response_export_values = []
 
-  capabilities {
-    name = "EnableNoSQLVectorSearch"
-  }
-
-  consistency_policy {
-    consistency_level = "Session"
-  }
-
-  geo_location {
-    location          = data.azurerm_resource_group.target.location
-    failover_priority = 0
+  body = {
+    kind = "GlobalDocumentDB"
+    properties = {
+      databaseAccountOfferType = "Standard"
+      enableFreeTier           = true
+      disableLocalAuth         = true
+      minimalTlsVersion        = "Tls12"
+      capabilities             = [{ name = "EnableNoSQLVectorSearch" }]
+      consistencyPolicy        = { defaultConsistencyLevel = "Session" }
+      locations = [{
+        locationName     = "Germany West Central"
+        failoverPriority = 0
+      }]
+    }
   }
 
   lifecycle {
     prevent_destroy = true
   }
+}
+
+# Hands the existing account from azurerm to azapi without touching it. Delete these two once applied.
+removed {
+  from = azurerm_cosmosdb_account.service
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+import {
+  to = azapi_resource.cosmos
+  id = "${data.azurerm_resource_group.target.id}/providers/Microsoft.DocumentDB/databaseAccounts/cosmos-tf-review-prod?api-version=2025-10-15"
 }
 
 resource "azurerm_cosmosdb_sql_database" "service" {
   name                = "tfreview"
   resource_group_name = data.azurerm_resource_group.target.name
-  account_name        = azurerm_cosmosdb_account.service.name
+  account_name        = azapi_resource.cosmos.name
 
   lifecycle {
     prevent_destroy = true
   }
 }
 
-# Review status and history. The vector container arrives with retrieval, and takes the remaining 600 RU/s. It
-# can't be declared with azurerm 5.12, which has no vector policy on a container (see docs/plan.md).
+# Review status and history. The vector container arrives with retrieval and takes the remaining 600 RU/s, through
+# azapi, because azurerm 5.12 has no vector policy on a container (D46).
 resource "azurerm_cosmosdb_sql_container" "reviews" {
   name                = "reviews"
   resource_group_name = data.azurerm_resource_group.target.name
-  account_name        = azurerm_cosmosdb_account.service.name
+  account_name        = azapi_resource.cosmos.name
   database_name       = azurerm_cosmosdb_sql_database.service.name
   partition_key_paths = ["/repository"]
   throughput          = 400
