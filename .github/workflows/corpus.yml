@@ -1,0 +1,86 @@
+---
+name: corpus
+
+# Builds the reference index from corpus/sources.yml (D44). A PR gets a dry run with no credentials, saying what the
+# change would add, change and remove, because the upstream text isn't in the diff. Merging indexes, behind the corpus
+# environment's approval, and a by-hand run can rebuild everything from the pins.
+on:
+  pull_request:
+    paths: &corpus-paths
+      - "corpus/**"
+      - "src/TfReview.Corpus/**"
+      - ".github/workflows/corpus.yml"
+  push:
+    branches: [main]
+    paths: *corpus-paths
+  workflow_dispatch:
+    inputs:
+      rebuild:
+        description: Embed everything again instead of reusing vectors, for recovering from a bad state.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - name: Report what would change
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git show "$BASE_SHA:corpus/sources.yml" >"$RUNNER_TEMP/base-sources.yml" 2>/dev/null \
+            || rm -f "$RUNNER_TEMP/base-sources.yml"
+          dotnet run --project src/TfReview.Corpus -- \
+            dry-run "$RUNNER_TEMP/base-sources.yml" corpus/sources.yml "$RUNNER_TEMP/report.md"
+          cat "$RUNNER_TEMP/report.md" >>"$GITHUB_STEP_SUMMARY"
+
+  index:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    # Its identity's credential only works in this environment, which only main can use, after approval.
+    environment: corpus
+    # Queued, never two at once: a second run would race the first to switch versions.
+    concurrency:
+      group: corpus-index
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - name: Get a federated token
+        run: |
+          install -m 600 /dev/null "$RUNNER_TEMP/federated-token"
+          token=$(curl -fsS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r .value)
+          echo "::add-mask::$token"
+          printf '%s' "$token" >"$RUNNER_TEMP/federated-token"
+      - name: Index
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID_INDEX }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          TF_REVIEW_COSMOS_ENDPOINT: https://cosmos-tf-review-prod.documents.azure.com:443/
+          TF_REVIEW_OPENAI_ENDPOINT: ${{ vars.TF_REVIEW_OPENAI_ENDPOINT }}
+          REBUILD: ${{ inputs.rebuild && '--rebuild' || '' }}
+        run: |
+          export AZURE_FEDERATED_TOKEN_FILE="$RUNNER_TEMP/federated-token"
+          # shellcheck disable=SC2086  # REBUILD is empty or one flag.
+          dotnet run --project src/TfReview.Corpus -- index corpus/sources.yml $REBUILD

@@ -27,6 +27,12 @@ public sealed record ReferenceChunk(
     [JsonPropertyName("provider_version")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ProviderVersion { get; init; }
+
+    /// <summary>What gets embedded: the text with what it's about, which a section's text alone often doesn't say.</summary>
+    public static string EmbeddingInput(string title, string heading, string text) => $"{title}\n{heading}\n{text}";
+
+    [JsonIgnore]
+    public string ToEmbed => EmbeddingInput(this.Title, this.Heading, this.Text);
 }
 
 /// <summary>What one document became: its title, what it's about, and its sections. Null if it isn't worth keeping.</summary>
@@ -190,7 +196,7 @@ public static partial class Importers
                 section.Heading,
                 doc.AppliesTo,
                 section.Text,
-                Hash($"{section.Text}\n{embeddingModel}\n{CorpusSources.ChunkerVersion}"))
+                Hash($"{ReferenceChunk.EmbeddingInput(doc.Title, section.Heading, section.Text)}\n{embeddingModel}\n{CorpusSources.ChunkerVersion}"))
             {
                 ProviderVersion = pin.ProviderVersion,
             });
