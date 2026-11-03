@@ -13,5 +13,6 @@
     <PackageReference Include="OpenAI" />
     <PackageReference Include="YamlDotNet" />
     <ProjectReference Include="../TfReview.Core/TfReview.Core.csproj" />
+    <ProjectReference Include="../TfReview.Service/TfReview.Service.csproj" />
   </ItemGroup>
 </Project>

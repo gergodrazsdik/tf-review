@@ -2,11 +2,13 @@ using System.Globalization;
 using System.Text.Json;
 using TfReview.Core;
 using TfReview.Corpus;
+using TfReview.Rag;
 
 const string Usage = """
     usage: tfreview-corpus import <sources.yml> <chunks.jsonl> [archive-directory]
            tfreview-corpus dry-run <base-sources.yml> <sources.yml> <report.md>
            tfreview-corpus index <sources.yml> [--rebuild]
+           tfreview-corpus search <text> <types> <azurerm-version|-> [vector|hybrid]
 
     import and dry-run need no credentials and write nothing to Azure. A base sources file that doesn't exist counts as
     no sources. An archive directory holds archives already downloaded, as <owner>_<repo>-<commit>.tar.gz.
@@ -23,6 +25,8 @@ try
         ["dry-run", var baseSources, var sources, var report] => await DryRunAsync(baseSources, sources, report),
         ["index", var sources] => await Index(sources, rebuild: false),
         ["index", var sources, "--rebuild"] => await Index(sources, rebuild: true),
+        ["search", var text, var types, var version] => await Search(text, types, version, ReferenceRanking.Hybrid),
+        ["search", var text, var types, var version, var ranking] => await Search(text, types, version, Enum.Parse<ReferenceRanking>(ranking, ignoreCase: true)),
         _ => Fail(),
     };
 }
@@ -100,6 +104,27 @@ static async Task<int> Index(string sourcesPath, bool rebuild)
     Console.WriteLine(
         $"Version {outcome.Version}: {outcome.Chunks} chunks, {outcome.Reused} reused, {outcome.Embedded} embedded, "
         + $"{(outcome.Switched ? "now in use" : "already in use")}, {outcome.Deleted.Count} old version(s) deleted.");
+    return 0;
+}
+
+// What a review would get, as whoever runs it, for trying the index and the retrieval evals: the index is read-only here.
+static async Task<int> Search(string text, string types, string version, ReferenceRanking ranking)
+{
+    var credential = IndexCredential.Create();
+    var container = new Microsoft.Azure.Cosmos.CosmosClient(
+            Required("TF_REVIEW_COSMOS_ENDPOINT"), credential, new Microsoft.Azure.Cosmos.CosmosClientOptions { ConnectionMode = Microsoft.Azure.Cosmos.ConnectionMode.Gateway })
+        .GetContainer("tfreview", "references");
+    var embedder = TfReview.Service.AzureQueryEmbedder.Create(new Uri(Required("TF_REVIEW_OPENAI_ENDPOINT")), "text-embedding-3-small", credential);
+    var retriever = new TfReview.Service.CosmosReferenceRetriever(container, embedder);
+
+    var result = await retriever.RetrieveAsync(new ReferenceQuery(
+        text, types.Split(',', StringSplitOptions.RemoveEmptyEntries), version == "-" ? null : version, TokenBudget: 3_000, ranking));
+    Console.WriteLine($"Corpus version {result.CorpusVersion}, provider docs missing: {result.ProviderDocsMissing}.");
+    foreach (var doc in result.Docs)
+    {
+        Console.WriteLine($"{doc.Id} {doc.Source} | {doc.Title} | {doc.Heading} | {TokenEstimate.Of(doc.Text)} tokens");
+    }
+
     return 0;
 }
 

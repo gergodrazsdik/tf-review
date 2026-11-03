@@ -67,6 +67,13 @@ fixtures *cases:
 corpus-import output="artifacts/chunks.jsonl":
     dotnet run --project src/TfReview.Corpus -- import corpus/sources.yml "{{ output }}"
 
+# Show what a review's references would be, from the index in use, as you; read-only, and costs a fraction of a cent
+[group('dev')]
+corpus-search text types version="5.12.0" ranking="hybrid":
+    AZURE_TOKEN_CREDENTIALS=dev TF_REVIEW_COSMOS_ENDPOINT=https://cosmos-tf-review-prod.documents.azure.com:443/ \
+      TF_REVIEW_OPENAI_ENDPOINT=https://ais-tf-review-prod.openai.azure.com/openai/v1/ \
+      dotnet run --project src/TfReview.Corpus -- search "{{ text }}" "{{ types }}" "{{ version }}" "{{ ranking }}"
+
 # Compare what the real service posted on the demo's seed PRs with what's expected; pass --rerun to review them again, which costs cents
 [group('dev')]
 service-eval *args:

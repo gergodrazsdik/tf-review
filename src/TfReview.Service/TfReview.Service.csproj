@@ -5,5 +5,10 @@
     <PackageReference Include="Azure.Storage.Queues" />
     <PackageReference Include="Microsoft.Azure.Cosmos" />
     <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="OpenAI" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../TfReview.Rag/TfReview.Rag.csproj" />
+    <InternalsVisibleTo Include="TfReview.Api.Tests" />
   </ItemGroup>
 </Project>
