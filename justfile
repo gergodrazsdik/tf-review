@@ -92,18 +92,14 @@ cost plan:
 conftest-capabilities opa_version:
     opa capabilities --version v{{ opa_version }} | jq -c 'del(.builtins[] | select(.name == "http.send" or .name == "opa.runtime" or .name == "net.lookup_ip_addr")) | .allow_net = []' > src/TfReview.Scanners/conftest-capabilities.json
 
-# Copy the Infracost token into each onboarded repo's Actions secrets, and it and the GitHub App's key into Key Vault; yours to run, never an agent's
-[confirm('Copy the Infracost token into the Actions secrets of tf-review and tf-review-demo, and it and the GitHub App key into Key Vault?')]
+# Copy the Infracost token and the GitHub App's key from pass into Key Vault, for the service; yours to run, never an agent's
+[confirm('Copy the Infracost token and the GitHub App key into Key Vault?')]
 [group('bootstrap')]
 secrets-sync:
     #!/usr/bin/env bash
     set -euo pipefail
     token="$(pass show tf-review/infracost/cli-token)"
     key="$(pass show tf-review/github-app/private-key)"
-    for repo in gergodrazsdik/tf-review gergodrazsdik/tf-review-demo; do
-      gh secret set INFRACOST_CLI_AUTHENTICATION_TOKEN -R "$repo" <<<"$token"
-      echo "$repo: set"
-    done
     # From stdin so values stay out of the process list, and no output because az prints the value it set. Not
     # with <<<, which adds a newline: az stores it, and a token with one can't be sent as a header.
     printf '%s' "$token" | az keyvault secret set --vault-name kv-tf-review-prod --name infracost-cli-token --file /dev/stdin --output none

@@ -13,32 +13,48 @@ locals {
   foundry_account_name = "ais-tf-review-prod"
   foundry_deployment   = "gpt-5.4-mini"
 
+  # What calls the model directly: only tf-review's evals and smoke test, because the service reviews
+  # everything else (D38).
+  llm_callers = toset([local.foundry_repo])
+
   # Secret name => value, per repo. These IDs aren't credentials, but Actions logs on public repos
   # are public, and only secrets get masked there, including inside tofu's resource IDs (D30).
-  repo_secrets = merge([
+  repo_secrets = merge(concat([
     for repo in keys(var.repos) : {
       for name, value in {
-        AZURE_CLIENT_ID_PLAN   = azurerm_user_assigned_identity.plan[repo].client_id
-        AZURE_CLIENT_ID_APPLY  = azurerm_user_assigned_identity.apply[repo].client_id
-        AZURE_CLIENT_ID_REVIEW = azurerm_user_assigned_identity.review[repo].client_id
-        AZURE_TENANT_ID        = data.azurerm_client_config.current.tenant_id
-        AZURE_SUBSCRIPTION_ID  = var.subscription_id
+        AZURE_CLIENT_ID_PLAN  = azurerm_user_assigned_identity.plan[repo].client_id
+        AZURE_CLIENT_ID_APPLY = azurerm_user_assigned_identity.apply[repo].client_id
+        AZURE_TENANT_ID       = data.azurerm_client_config.current.tenant_id
+        AZURE_SUBSCRIPTION_ID = var.subscription_id
       } : "${repo}/${name}" => { repo = repo, name = name, value = value }
     }
-  ]...)
+    ], [
+    for repo in local.llm_callers : {
+      "${repo}/AZURE_CLIENT_ID_REVIEW" = {
+        repo  = repo
+        name  = "AZURE_CLIENT_ID_REVIEW"
+        value = azurerm_user_assigned_identity.review[repo].client_id
+      }
+    }
+  ])...)
 
   # Variable name => value, per repo.
-  repo_variables = merge([
+  repo_variables = merge(concat([
     for repo in keys(var.repos) : {
       for name, value in {
-        TF_STATE_RESOURCE_GROUP     = azurerm_resource_group.state.name
-        TF_STATE_STORAGE_ACCOUNT    = azurerm_storage_account.state.name
-        TF_STATE_CONTAINER          = azurerm_storage_container.repo[repo].name
+        TF_STATE_RESOURCE_GROUP  = azurerm_resource_group.state.name
+        TF_STATE_STORAGE_ACCOUNT = azurerm_storage_account.state.name
+        TF_STATE_CONTAINER       = azurerm_storage_container.repo[repo].name
+      } : "${repo}/${name}" => { repo = repo, name = name, value = value }
+    }
+    ], [
+    for repo in local.llm_callers : {
+      for name, value in {
         TF_REVIEW_OPENAI_ENDPOINT   = "https://${local.foundry_account_name}.openai.azure.com/openai/v1/"
         TF_REVIEW_OPENAI_DEPLOYMENT = local.foundry_deployment
       } : "${repo}/${name}" => { repo = repo, name = name, value = value }
     }
-  ]...)
+  ])...)
 }
 
 resource "azurerm_resource_group" "target" {
@@ -79,10 +95,11 @@ resource "azurerm_user_assigned_identity" "apply" {
   tags                = local.common_tags
 }
 
-# Calls the LLM from the review job, which runs no PR code. It gets no state or target access,
-# so the plan job's PR code can't reach the LLM through its own identity (D21).
+# Calls the LLM from tf-review's evals and smoke test, in the review environment. It gets no state or
+# target access, so a plan job's PR code can't reach the LLM through its own identity (D21). Repos are
+# reviewed through the service, so this isn't one per repo any more (D38).
 resource "azurerm_user_assigned_identity" "review" {
-  for_each = var.repos
+  for_each = local.llm_callers
 
   name                = "id-${each.key}-review-prod"
   resource_group_name = azurerm_resource_group.state.name
@@ -111,7 +128,7 @@ resource "azurerm_federated_identity_credential" "apply" {
 }
 
 resource "azurerm_federated_identity_credential" "review" {
-  for_each = var.repos
+  for_each = local.llm_callers
 
   name                      = "github-environment-review"
   user_assigned_identity_id = azurerm_user_assigned_identity.review[each.key].id
@@ -154,7 +171,7 @@ resource "azurerm_role_assignment" "apply_state" {
 
 # Here and not in infra/, because the apply identity's Contributor can't assign roles (D24).
 resource "azurerm_role_assignment" "review_llm" {
-  for_each = var.repos
+  for_each = local.llm_callers
 
   scope                = azurerm_resource_group.target[local.foundry_repo].id
   role_definition_name = "Cognitive Services OpenAI User"
@@ -212,8 +229,9 @@ resource "github_repository_environment" "prod" {
   }
 }
 
-# No reviewers or branch policy: it runs on PRs, and it exists to scope the review identity's
-# federated credential. Anyone who can edit a workflow can still use it (D21).
+# No reviewers or branch policy: it runs on PRs. The API accepts only this environment's tokens, which
+# the plan job doesn't have (D45), and it scopes the eval identity's federated credential in tf-review.
+# Anyone who can edit a workflow can still use it, but D45's other checks refuse such a job.
 resource "github_repository_environment" "review" {
   for_each = var.repos
 
