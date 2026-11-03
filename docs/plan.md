@@ -668,8 +668,9 @@ Work runs in this order, so the unknowns surface before anything depends on them
 
 - [x] Retrieval evals (`just eval-retrieval`, results in `docs/evals/retrieval.md`), with the docs each case should find, comparing vector, hybrid and metadata-only retrieval (D5): hybrid gives 13 of 15 agents something relevant, against 9 for filtering alone, but finds only 27% of the labelled docs. Hybrid is what reviews use. Agent evals alone can't show this, because reference docs can't create findings
 - [x] Re-ranking (D49): a model picks from 15 candidates of each kind, which took hybrid to 34–36% of the labelled docs over two runs
-- [ ] Agent evals with reference material in the prompt: the baseline in `docs/evals/baseline.md` has to hold, with new held-out cases on whether suggestions get better rather than noisier
-- [ ] Gate: a demo PR reviewed through the service, asynchronously, with the App's comment and check run; `not reviewed` shown during a forced outage; retrieval compared with the metadata baseline, and the result recorded whichever way it comes out
+- [x] Agent evals with reference material in the prompt: the baseline in `docs/evals/baseline.md` has to hold. It did, 84 of 85 against 83 of 85 without on 2026-11-03, with suggestions read side by side: slightly more specific, never noisier. The demo turned references on (demo #37)
+- [ ] Held-out cases that score suggestions rather than findings, to show whether references make them better. Not written yet: the side-by-side reading above is the only evidence so far
+- [x] Gate: a demo PR reviewed through the service, asynchronously, with the App's comment and check run (demo #38); `not reviewed` shown during a forced outage (demo #39, an unresolvable `api-url`); retrieval compared with the metadata baseline, and the result recorded whichever way it comes out (`docs/evals/`), all on 2026-11-03
 
 **M4 · Hardening**
 

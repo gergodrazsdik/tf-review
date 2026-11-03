@@ -19,6 +19,29 @@ Model gpt-5.4-mini at low reasoning effort. Prompts conventions v4, security v4,
 
 `just service-eval` runs the seeded demo PRs through the real workflow, API, job, scanners, model and App, with nothing replayed. All 8 passed: C1, C2, C3, C5, C6, C8, C9 and C10. It's one run per case, so it proves the path works, and `e2e-live`'s five runs per case remain the measure of the agents. Eight pushes at once all got reviewed, one at a time as the job picked them up, after C8 was re-run because its plan lost a race on the state lock.
 
+## With reference material: 2026-11-03
+
+Prompts conventions, security and cost v5, reranker v1, corpus version `9e64e77a8010f482`. Two `e2e-live` runs, one each way, of the same code (v0.0.11):
+
+| Measure | Without references | With references |
+| --- | --- | --- |
+| Runs passing | 83 of 85 | 84 of 85 |
+| Failures | C13 twice: private SSH reported again | C14 once: the cost agent flagged a $20, 20% increase, which is under both of ADR-003's rules |
+| Input tokens (cached) | 217K (71K) | 829K (513K) |
+| Estimated cost of a full run | About $0.22 | About $0.56, so about $0.0066 a review |
+
+The baseline holds. One run each way can't separate 83 from 84, and C13's and C14's misses are both near misses that already flip now and then, so neither result counts as a gain or a regression.
+
+**Suggestions,** read side by side for every case: the same findings in each run, and the suggestions slightly more specific with references, never off topic. C3 names narrower roles (Reader, Contributor), C7 adds `prevent_destroy` before the replacement, and C12 quotes the source range. The rest read the same. That's one reading of existing cases. The plan asked for new held-out cases scoring suggestions, which aren't written yet.
+
+The demo turned references on afterwards (demo #37).
+
+## The part 6 gate: 2026-11-03
+
+- Demo #38, an app subnet with an NSG allowing only HTTPS from the internet, was reviewed through the service with references on: the App posted a success check run and a "No findings" comment, which credits the reference sources and lists the NSG and rule to look at first. That's the right answer.
+- Demo #39, a draft PR pointing `api-url` at a `.invalid` host, stood in for an outage: the submit failed after its retries, and the workflow posted "Not reviewed" for that commit with its own token (D39). It took 5 minutes, all of it retries.
+- Retrieval against the metadata baseline is in `retrieval.md`: hybrid with re-ranking finds 34–36% of the labelled docs and gives 13 of 15 agents something relevant, against 9 for filtering alone.
+
 ## How the held-out cases went
 
 These are the honest part of the suite, because C1–C10 were used to tune the prompts, or are things a policy finds anyway. Held-out cases had their expected results fixed before any model saw them, and were measured once.
