@@ -74,6 +74,14 @@ corpus-search text types version="5.12.0" ranking="hybrid":
       TF_REVIEW_OPENAI_ENDPOINT=https://ais-tf-review-prod.openai.azure.com/openai/v1/ \
       dotnet run --project src/TfReview.Corpus -- search "{{ text }}" "{{ types }}" "{{ version }}" "{{ ranking }}"
 
+# Measure what each seeded case's agent gets as references, for each ranking, against hand-picked docs; read-only
+[group('dev')]
+eval-retrieval report="":
+    TF_STANDARDS_DIR="{{ justfile_directory() }}/../tf-standards" \
+      TF_REVIEW_COSMOS_ENDPOINT=https://cosmos-tf-review-prod.documents.azure.com:443/ \
+      TF_REVIEW_OPENAI_ENDPOINT=https://ais-tf-review-prod.openai.azure.com/openai/v1/ \
+      dotnet run --project tests/TfReview.Eval -- retrieval tests/fixtures/retrieval/cases.yml {{ if report != "" { "--report " + report } else { "" } }}
+
 # Compare what the real service posted on the demo's seed PRs with what's expected; pass --rerun to review them again, which costs cents
 [group('dev')]
 service-eval *args:

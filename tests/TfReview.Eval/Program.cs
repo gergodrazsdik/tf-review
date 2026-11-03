@@ -39,12 +39,14 @@ return args switch
     ["record-scans", .. var names] => await RecordScans(names),
     ["live", "--runs", var runs] => await Live(int.Parse(runs, CultureInfo.InvariantCulture), null),
     ["live", "--runs", var runs, "--record", var directory] => await Live(int.Parse(runs, CultureInfo.InvariantCulture), directory),
+    ["retrieval", var labels] => await TfReview.Eval.RetrievalEval.RunAsync(labels, CasesDirectory, standardsDirectory, null),
+    ["retrieval", var labels, "--report", var report] => await TfReview.Eval.RetrievalEval.RunAsync(labels, CasesDirectory, standardsDirectory, report),
     _ => Usage(),
 };
 
 static int Usage()
 {
-    Console.Error.WriteLine("usage: eval replay\n       eval record-scans [case...]\n       eval live --runs <n> [--record <dir>]");
+    Console.Error.WriteLine("usage: eval replay\n       eval record-scans [case...]\n       eval live --runs <n> [--record <dir>]\n       eval retrieval <labels.yml> [--report <file.md>]");
     return 2;
 }
 

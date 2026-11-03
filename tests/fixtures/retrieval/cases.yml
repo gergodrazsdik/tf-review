@@ -1,0 +1,92 @@
+---
+# What a good search should find for each seeded case's agent, picked by hand from the imported docs (part 6, D5).
+# Paths are inside each source repo, so they survive index rebuilds. A doc counts as found when any chunk of it is in
+# the agent's references; a heading narrows that to one section. Picked before any retrieval was measured, from titles
+# and paths only, so the lists can be argued with but weren't tuned to a ranking.
+cases:
+  - case: c1-open-ssh
+    agent: security
+    relevant: &open-ports
+      - built-in-policies/policyDefinitions/Security Center/ASC_OpenManagementPortsOnVirtualMachines_Audit.json
+      - built-in-policies/policyDefinitions/Security Center/ASC_UnprotectedEndpoints_Audit.json
+      - built-in-policies/policyDefinitions/Security Center/ASC_JITNetworkAccess_Audit.json
+      # yamllint disable-line rule:line-length
+      - built-in-policies/policyDefinitions/Security Center/ASC_NetworkSecurityGroupsOnInternetFacingVirtualMachines_Audit.json
+      - docs/ready/azure-best-practices/plan-for-virtual-machine-remote-access.md
+      - path: website/docs/r/network_security_rule.html.markdown
+        heading: Arguments Reference
+  - case: c12-wide-source
+    agent: security
+    relevant: *open-ports
+  - case: c13-network-near-miss
+    agent: security
+    relevant: *open-ports
+  - case: c17-admin-near-miss
+    agent: security
+    relevant:
+      - built-in-policies/policyDefinitions/Security Center/ASC_OpenManagementPortsOnVirtualMachines_Audit.json
+      - built-in-policies/policyDefinitions/Security Center/ASC_UnprotectedEndpoints_Audit.json
+      - built-in-policies/policyDefinitions/Security Center/ASC_DesignateLessThanXOwners_Audit.json
+      - docs/ready/azure-setup-guide/manage-access.md
+      - path: website/docs/r/network_security_rule.html.markdown
+        heading: Arguments Reference
+      - website/docs/r/role_assignment.html.markdown
+  - case: c3-owner-role
+    agent: security
+    relevant:
+      - built-in-policies/policyDefinitions/Security Center/ASC_DesignateLessThanXOwners_Audit.json
+      - docs/ready/azure-setup-guide/manage-access.md
+      - docs/ready/landing-zone/design-area/identity-access-landing-zones.md
+      - website/docs/r/role_assignment.html.markdown
+  - case: c2-public-storage
+    agent: security
+    relevant:
+      - built-in-policies/policyDefinitions/Storage/ASC_Storage_DisallowPublicBlobAccess_Audit.json
+      - built-in-policies/policyDefinitions/Storage/StorageAccountDisablePublicBlobAccess_Modify.json
+      - built-in-policies/policyDefinitions/Storage/StorageAccountMinimumTLSVersion_Audit.json
+      - built-in-policies/policyDefinitions/Storage/Storage_AuditForHTTPSEnabled_Audit.json
+      - built-in-policies/policyDefinitions/Storage/StorageAccountAllowSharedKeyAccess_Audit.json
+      - path: website/docs/r/storage_account.html.markdown
+        heading: Arguments Reference
+  - case: c10-subnet
+    agent: security
+    relevant:
+      - built-in-policies/policyDefinitions/Security Center/ASC_NetworkSecurityGroupsOnSubnets_Audit.json
+      - built-in-policies/policyDefinitions/Network/PrivateSubnetOnly_Audit.json
+      - docs/ready/azure-best-practices/plan-for-landing-zone-network-segmentation.md
+      - path: website/docs/r/subnet.html.markdown
+        heading: Arguments Reference
+  - case: c4-sku-jump
+    agent: cost
+    relevant: &vm-cost
+      - built-in-policies/policyDefinitions/Compute/VMSkusAllowed_Deny.json
+      - docs/ready/azure-setup-guide/manage-costs.md
+      - docs/ready/azure-best-practices/track-costs.md
+      - path: website/docs/r/linux_virtual_machine.html.markdown
+        heading: Arguments Reference
+  - case: c14-cost-near-miss
+    agent: cost
+    relevant: *vm-cost
+  - case: c15-cost-percentage
+    agent: cost
+    relevant: *vm-cost
+  - case: c5-missing-tags
+    agent: conventions
+    relevant: &tags
+      - built-in-policies/policyDefinitions/Tags/RequireTag_Deny.json
+      - built-in-policies/policyDefinitions/Tags/RequireTagAndValue_Deny.json
+      - docs/ready/azure-best-practices/resource-tagging.md
+  - case: c8-tag-value
+    agent: conventions
+    relevant: *tags
+  - case: c9-bad-environment
+    agent: conventions
+    relevant: *tags
+  - case: c16-tag-injection
+    agent: conventions
+    relevant: *tags
+  - case: c6-bad-name
+    agent: conventions
+    relevant:
+      - docs/ready/azure-best-practices/resource-naming.md
+      - docs/ready/azure-best-practices/resource-abbreviations.md

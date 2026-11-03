@@ -44,26 +44,30 @@ public sealed partial class CosmosReferenceRetriever(Container container, IQuery
             return ReferenceRetrieval.None;
         }
 
-        var vector = await embedder.EmbedAsync(query.Text, cancellationToken);
+        var metadataOnly = query.Ranking == ReferenceRanking.Metadata;
+        float[] vector = metadataOnly ? [] : await embedder.EmbedAsync(query.Text, cancellationToken);
         var terms = SearchTerms(query.Text);
 
         var provider = query.ProviderVersion is { } providerVersion && query.ResourceTypes.Count > 0
             ? await this.SearchAsync(
                 version,
-                "c.provider_version = @providerVersion AND ARRAY_CONTAINS(@types, c.applies_to[0])",
+                // A resource's outputs, which a review of its inputs never needs, and which crowd out what it does.
+                "c.provider_version = @providerVersion AND ARRAY_CONTAINS(@types, c.applies_to[0]) AND c.heading != 'Attributes Reference'",
                 vector,
                 terms,
                 query.Ranking,
                 new Dictionary<string, object> { ["@providerVersion"] = providerVersion, ["@types"] = query.ResourceTypes.ToArray() },
                 cancellationToken)
             : [];
-        var general = await this.SearchAsync(
-            version, "ARRAY_LENGTH(c.applies_to) = 0", vector, terms, query.Ranking, [], cancellationToken);
+        IReadOnlyList<ReferenceDoc> general = metadataOnly
+            ? []
+            : await this.SearchAsync(version, "ARRAY_LENGTH(c.applies_to) = 0", vector, terms, query.Ranking, [], cancellationToken);
 
-        // Alternating keeps either kind from taking the whole budget, and the best of each goes first.
+        // Alternating keeps either kind from taking the whole budget. Policies and framework pages go first, because they
+        // say what's expected of a resource, where provider docs mostly say how to write it.
         var chosen = new List<ReferenceDoc>();
         var remaining = query.TokenBudget;
-        foreach (var doc in Interleave(provider, general).DistinctBy(doc => doc.Id))
+        foreach (var doc in Interleave(general, provider).DistinctBy(doc => doc.Id))
         {
             var tokens = TokenEstimate.Of(doc.Text);
             if (tokens <= remaining)
@@ -135,11 +139,19 @@ public sealed partial class CosmosReferenceRetriever(Container container, IQuery
         CancellationToken cancellationToken)
     {
         // FullTextScore takes its terms as arguments, so each is a parameter, never text spliced into the query.
-        var order = ranking == ReferenceRanking.Hybrid && terms.Count > 0
-            ? $"ORDER BY RANK RRF(VectorDistance(c.embedding, @vector), FullTextScore(c.text, {string.Join(", ", terms.Select((_, index) => $"@term{index}"))}))"
-            : "ORDER BY VectorDistance(c.embedding, @vector)";
+        var order = ranking switch
+        {
+            ReferenceRanking.Metadata => "ORDER BY c.id",
+            ReferenceRanking.Hybrid when terms.Count > 0 =>
+                $"ORDER BY RANK RRF(VectorDistance(c.embedding, @vector), FullTextScore(c.text, {string.Join(", ", terms.Select((_, index) => $"@term{index}"))}))",
+            _ => "ORDER BY VectorDistance(c.embedding, @vector)",
+        };
 
-        var query = new QueryDefinition($"SELECT TOP {Candidates} {Fields} FROM c WHERE {filter} {order}").WithParameter("@vector", vector);
+        var query = new QueryDefinition($"SELECT TOP {Candidates} {Fields} FROM c WHERE {filter} {order}");
+        if (ranking != ReferenceRanking.Metadata)
+        {
+            query = query.WithParameter("@vector", vector);
+        }
         foreach (var (name, value) in parameters)
         {
             query = query.WithParameter(name, value);

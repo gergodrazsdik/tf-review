@@ -6,5 +6,6 @@
   <ItemGroup>
     <ProjectReference Include="../../src/TfReview.Agents/TfReview.Agents.csproj" />
     <ProjectReference Include="../../src/TfReview.GitHub/TfReview.GitHub.csproj" />
+    <ProjectReference Include="../../src/TfReview.Service/TfReview.Service.csproj" />
   </ItemGroup>
 </Project>
