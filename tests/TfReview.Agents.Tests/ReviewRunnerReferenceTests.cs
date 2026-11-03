@@ -10,6 +10,9 @@ public class ReviewRunnerReferenceTests
     private const string Commit = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private const string Vnet = "azurerm_virtual_network.main";
     private const string Empty = """{"findings":[]}""";
+
+    // The re-ranker's answer, which comes before the agent's when there are references to choose from.
+    private const string Picked = """{"ids":["REF-0123456789abcdef0123456789abcdef"]}""";
     private const string NoViolations = """[{"namespace":"adr002","successes":1}]""";
 
     private const string Config = """
@@ -47,14 +50,15 @@ public class ReviewRunnerReferenceTests
     [Test]
     public async Task A_config_that_asks_gets_references_in_their_own_fence()
     {
-        var chat = new FakeChat(FakeChat.Answer(Empty));
+        var chat = new FakeChat(FakeChat.Answer(Picked), FakeChat.Answer(Empty));
         var retriever = new FakeRetriever(new ReferenceRetrieval([Doc], "0123456789abcdef", false));
 
         var result = await Run(chat, retriever, Config + "\nreferences: true\n");
 
-        var user = chat.Requests.Single().User;
+        var user = chat.Requests.Last().User;
         await Assert.That(user).Contains("<reference_material>").And.Contains("CANARY text about address_space");
         await Assert.That(user.IndexOf("</reference_material>", StringComparison.Ordinal)).IsLessThan(user.IndexOf("<plan_data>", StringComparison.Ordinal));
+        await Assert.That(chat.Requests.Count).IsEqualTo(2);
         await Assert.That(result.References!.CorpusVersion).IsEqualTo("0123456789abcdef");
         await Assert.That(result.References.Attributions.Single()).IsEqualTo("HashiCorp, MPL-2.0");
     }
@@ -71,7 +75,7 @@ public class ReviewRunnerReferenceTests
         await Assert.That(query.ProviderVersion).IsEqualTo("5.12.0");
         await Assert.That(query.Text).Contains("address_space");
         await Assert.That(query.Text).DoesNotContain("10.0.0.0");
-        await Assert.That(query.TokenBudget).IsEqualTo(ReviewRunner.ReferenceTokenBudget);
+        await Assert.That(query.Candidates).IsEqualTo(ReferenceSelector.Pool);
     }
 
     [Test]
@@ -108,7 +112,7 @@ public class ReviewRunnerReferenceTests
         var answer = $$"""
             {"findings":[{"resource_address":"{{Vnet}}","doc_id":"{{Doc.Id}}","attribute":"address_space","title":"Too wide.","suggestion":null,"breaks_standard":true}]}
             """;
-        var chat = new FakeChat(FakeChat.Answer(answer));
+        var chat = new FakeChat(FakeChat.Answer(Picked), FakeChat.Answer(answer));
 
         var result = await Run(chat, new FakeRetriever(new ReferenceRetrieval([Doc], "0123456789abcdef", false)), Config + "\nreferences: true\n");
 

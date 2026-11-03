@@ -19,6 +19,28 @@ What each seeded case's agent gets as reference material, compared with docs pic
 
 **Hybrid is what reviews use.** It gives 13 of 15 agents something relevant, against 9 for filtering alone, which is the improvement vectors were meant to show. It still misses most labelled docs, because about four chunks fit the budget and some cases list six docs.
 
+## Re-ranking: 2026-11-03 (D49)
+
+| Ranking | Run 1 | Run 2 |
+| --- | --- | --- |
+| Hybrid | 27% | 27% |
+| Vector, re-ranked | 38% | 36% |
+| **Hybrid, re-ranked** | **36%** | **34%** |
+
+A model picks up to 6 of 15 candidates of each kind, by title, heading and opening, and code fills the budget in that order. Both re-ranked rows give 13 of 15 agents something relevant. Reviews re-rank hybrid's candidates, because if the model fails, hybrid's own order is the better fallback.
+
+### How it got there
+
+The labelled docs were mostly in the top 50, which says the search finds them but doesn't rank them into the few slots the budget allows. These were tried first, each measured against the same labels:
+
+| Tried | Result | Why not |
+| --- | --- | --- |
+| Identifiers written as words, with or without short values, or only set attributes | 30–31% | The query states facts, but not what they mean for a review |
+| A model-written query, as a list and as guidance text | 25–27% | Better text, same docs found |
+| Policies indexed without their rule JSON, offline and vector only | 11% | The JSON's identifiers were what today's query matched |
+| Hand-written queries | 59% | Written already knowing the labels, so not a fair test |
+
+
 ### What changed on the way
 
 The first run had hybrid and vector both at 22%. Each change below was measured alone, against the same labels:
@@ -38,6 +60,8 @@ The first run had hybrid and vector both at 22%. Each change below was measured 
 - **Other queries.** Every case is one small change, and real PRs mix many.
 
 ## Ideas not tried yet
+
+- A model-written query against an index without rule JSON, which reached 30–34% offline, and no more than re-ranking with it
 
 - Fold near-identical policies together, such as the 429 "Enable logging" ones, so one family can't fill the results.
 - Give each kind of doc its own share of the budget instead of alternating.

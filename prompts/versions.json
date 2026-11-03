@@ -26,5 +26,8 @@
   "arbiter": {
     "1": "a5c6f45a9dbf4cfa64bd541abdd74d53afe3aa1edacb986dda904ce399800f9d",
     "2": "8871f16299b6a430753c66c897a8ca5b3b326f40a9a19d174fc3dc65d011b9c6"
+  },
+  "reranker": {
+    "1": "50ef8aed6146af3a7ec799954ba04b3734e424996231a98df17c89a1da98970a"
   }
 }

@@ -266,9 +266,9 @@ public sealed class ReviewRunner(
         var slice = plan.OnlyTypes(type => retrieval.Docs.Any(doc => doc.AppliesToType(type)));
 
         // Only when an agent has standards to judge by, because without them it isn't called at all.
-        var referenceDocs = retrieval.Docs.Count > 0 && referenceContext is not null
+        var (referenceDocs, referenceCalls) = retrieval.Docs.Count > 0 && referenceContext is not null
             ? await this.RetrieveReferencesAsync(profile, slice, referenceContext, cancellationToken)
-            : null;
+            : (null, []);
 
         var outcome = await new ReviewAgent(model.Chat, profile).ReviewAsync(
             slice, retrieval.Docs, policyFindings, costs, cancellationToken, referenceDocs?.Docs);
@@ -279,7 +279,7 @@ public sealed class ReviewRunner(
             retrieval.Docs,
             retrieval.OmittedDocIds,
             outcome is AgentFailed failed ? [new NotReviewed(profile.Scope, failed.Reason)] : [],
-            outcome.Calls)
+            [.. referenceCalls, .. outcome.Calls])
         {
             Plan = slice,
             Retracted = outcome is AgentReviewed { Retracted: var count } ? count : 0,
@@ -306,19 +306,22 @@ public sealed class ReviewRunner(
             ranking);
     }
 
-    // A failed search costs the agent its references, not its review: they can't create a finding anyway.
-    private async Task<ReferenceRetrieval> RetrieveReferencesAsync(
+    // A failed search costs the agent its references, not its review: they can't create a finding anyway. With a model,
+    // it re-ranks the search's candidates (D49).
+    private async Task<(ReferenceRetrieval Retrieval, IReadOnlyList<AgentCall> Calls)> RetrieveReferencesAsync(
         AgentProfile profile, CondensedPlan slice, ReferenceContext context, CancellationToken cancellationToken)
     {
-        var query = ReferenceQueryFor(profile, slice, context.ProviderVersion);
         try
         {
-            return await references!.RetrieveAsync(query, cancellationToken);
+            var selection = await new ReferenceSelector(references!, model?.Chat)
+                .SelectAsync(ReferenceQueryFor(profile, slice, context.ProviderVersion), profile.Topics, slice, cancellationToken);
+            Log(ReferenceSelector.Name, selection.PromptVersion, selection.Calls);
+            return (selection.Retrieval, selection.Calls);
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
             log?.Invoke($"{profile.Name}: references unavailable, {e.GetType().Name}.");
-            return ReferenceRetrieval.None;
+            return (ReferenceRetrieval.None, []);
         }
     }
 

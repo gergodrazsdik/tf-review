@@ -170,7 +170,7 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
         {
             var material = new JsonArray(
             [
-                .. references.Select(doc => (JsonNode)new JsonObject
+                .. references.OrderBy(doc => doc.Id, StringComparer.Ordinal).Select(doc => (JsonNode)new JsonObject
                 {
                     ["source"] = doc.Source,
                     ["title"] = doc.Title,
