@@ -95,3 +95,19 @@ resource "github_actions_secret" "index_client_id" {
   secret_name = "AZURE_CLIENT_ID_INDEX"
   value       = azurerm_user_assigned_identity.index.client_id
 }
+
+# The indexing identity's right to write Cosmos. Here and not in infra/, because the plan identity can't read the state
+# resource group, which holds the identity. These names come from infra/service.tf. Scoped to the database, which holds
+# only the references and the reviews' status, and Cosmos has no narrower built-in role that can write.
+locals {
+  cosmos_account_name = "cosmos-tf-review-prod"
+  cosmos_account_id   = "/subscriptions/${var.subscription_id}/resourceGroups/${azurerm_resource_group.target[local.foundry_repo].name}/providers/Microsoft.DocumentDB/databaseAccounts/${local.cosmos_account_name}"
+}
+
+resource "azurerm_cosmosdb_sql_role_assignment" "index" {
+  resource_group_name = azurerm_resource_group.target[local.foundry_repo].name
+  account_name        = local.cosmos_account_name
+  role_definition_id  = "${local.cosmos_account_id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
+  principal_id        = azurerm_user_assigned_identity.index.principal_id
+  scope               = "${local.cosmos_account_id}/dbs/tfreview"
+}
