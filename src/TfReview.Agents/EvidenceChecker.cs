@@ -21,6 +21,7 @@ public static class EvidenceChecker
     public const string NoCostIncrease = "no_cost_increase";
     public const string NoDocument = "no_document";
     public const string DocumentNotRetrieved = "document_not_retrieved";
+    public const string ReferenceCited = "reference_cited";
     public const string DocumentNotApplicable = "document_not_applicable";
 
     /// <param name="findings">Findings to check, from scanners and agents.</param>
@@ -93,6 +94,13 @@ public static class EvidenceChecker
         var resourceType = plan.TypeOf(finding.ResourceAddress);
         foreach (var document in documents)
         {
+            // Imported text informs a finding, but only a team's own decision can be broken (D42). Whether it was in
+            // the prompt doesn't matter: a model being told to obey it by the text itself is the case to stop.
+            if (ReferenceDocs.IsReference(document.DocId))
+            {
+                return ReferenceCited;
+            }
+
             var doc = retrieved.FirstOrDefault(candidate => candidate.Id == document.DocId);
             if (doc is null)
             {

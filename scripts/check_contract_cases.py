@@ -13,6 +13,7 @@ from pathlib import Path
 root = Path(__file__).resolve().parent.parent / "docs/contracts"
 finding = json.loads((root / "examples/finding.json").read_text())
 result = json.loads((root / "examples/review-result.json").read_text())
+chunk = json.loads((root / "examples/reference-chunk.json").read_text())
 
 
 def changed(base, **fields):
@@ -32,6 +33,15 @@ scanner_finding = changed(
 cases = [
     # name, schema, document, should it pass
     ("example finding", "finding", finding, True),
+    ("example reference chunk", "reference-chunk", chunk, True),
+    ("reference with no provider version", "reference-chunk", {k: v for k, v in chunk.items() if k != "provider_version"}, True),
+    ("reference with an unknown licence", "reference-chunk", changed(chunk, license="CC-BY-NC-4.0"), False),
+    ("reference with no licence", "reference-chunk", {k: v for k, v in chunk.items() if k != "license"}, False),
+    ("reference with no attribution", "reference-chunk", changed(chunk, attribution=""), False),
+    ("reference at a branch, not a commit", "reference-chunk", changed(chunk, source_commit="main"), False),
+    ("reference URL not at a commit", "reference-chunk", changed(chunk, source_url="https://github.com/a/b/blob/main/c.md"), False),
+    ("reference with a standards doc's ID", "reference-chunk", changed(chunk, id="ADR-001"), False),
+    ("reference with a short embedding", "reference-chunk", changed(chunk, embedding=[0.1]), False),
     ("scanner finding with only a pointer", "finding", scanner_finding, True),
     (
         "LLM finding with only a pointer",

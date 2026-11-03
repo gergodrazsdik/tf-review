@@ -130,6 +130,8 @@ contracts:
       docs/contracts/examples/corpus-frontmatter.yml
     {{ check_jsonschema }} --schemafile docs/contracts/review-result.schema.json \
       docs/contracts/examples/review-result.json
+    {{ check_jsonschema }} --schemafile docs/contracts/reference-chunk.schema.json \
+      docs/contracts/examples/reference-chunk.json
     uv run --quiet scripts/check_contract_cases.py
 
 # Validate the infra project without touching its backend

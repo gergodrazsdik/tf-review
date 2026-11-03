@@ -178,6 +178,15 @@ public class EvidenceCheckerTests
         await Assert.That(check.Drops[EvidenceChecker.NoPlanPointer]).IsEqualTo(1);
     }
 
+    // D42: imported text can inform a finding, but breaking it can't be one.
+    [Test]
+    public async Task Drops_a_model_finding_that_cites_a_reference_chunk()
+    {
+        await AssertDropped(
+            ModelFinding("azurerm_virtual_network.main", "REF-0123456789abcdef0123456789abcdef", "/resource_changes/azurerm_virtual_network.main/change/after/name"),
+            EvidenceChecker.ReferenceCited);
+    }
+
     private static EvidenceCheck Check(params Finding[] findings) => EvidenceChecker.Check(findings, Plan, [Naming, Tagging]);
 
     private static async Task AssertDropped(Finding finding, string reason)
