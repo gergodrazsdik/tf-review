@@ -111,3 +111,13 @@ resource "azurerm_cosmosdb_sql_role_assignment" "index" {
   principal_id        = azurerm_user_assigned_identity.index.principal_id
   scope               = "${local.cosmos_account_id}/dbs/tfreview"
 }
+
+# Read-only, for whoever runs bootstrap: trying retrieval and running the retrieval evals from a laptop. Writes stay
+# with the service and the indexing job.
+resource "azurerm_cosmosdb_sql_role_assignment" "deployer_reader" {
+  resource_group_name = azurerm_resource_group.target[local.foundry_repo].name
+  account_name        = local.cosmos_account_name
+  role_definition_id  = "${local.cosmos_account_id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000001"
+  principal_id        = data.azurerm_client_config.current.object_id
+  scope               = "${local.cosmos_account_id}/dbs/tfreview"
+}
