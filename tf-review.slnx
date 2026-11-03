@@ -4,6 +4,7 @@
     <Project Path="src/TfReview.Api/TfReview.Api.csproj" />
     <Project Path="src/TfReview.Cli/TfReview.Cli.csproj" />
     <Project Path="src/TfReview.Core/TfReview.Core.csproj" />
+    <Project Path="src/TfReview.Corpus/TfReview.Corpus.csproj" />
     <Project Path="src/TfReview.GitHub/TfReview.GitHub.csproj" />
     <Project Path="src/TfReview.Rag/TfReview.Rag.csproj" />
     <Project Path="src/TfReview.Scanners/TfReview.Scanners.csproj" />
@@ -14,6 +15,7 @@
     <Project Path="tests/TfReview.Agents.Tests/TfReview.Agents.Tests.csproj" />
     <Project Path="tests/TfReview.Api.Tests/TfReview.Api.Tests.csproj" />
     <Project Path="tests/TfReview.Core.Tests/TfReview.Core.Tests.csproj" />
+    <Project Path="tests/TfReview.Corpus.Tests/TfReview.Corpus.Tests.csproj" />
     <Project Path="tests/TfReview.Eval/TfReview.Eval.csproj" />
     <Project Path="tests/TfReview.GitHub.Tests/TfReview.GitHub.Tests.csproj" />
     <Project Path="tests/TfReview.Rag.Tests/TfReview.Rag.Tests.csproj" />

@@ -39,6 +39,7 @@ test:
     dotnet run --project tests/TfReview.Agents.Tests --no-build
     dotnet run --project tests/TfReview.Api.Tests --no-build
     dotnet run --project tests/TfReview.Core.Tests --no-build
+    dotnet run --project tests/TfReview.Corpus.Tests --no-build
     dotnet run --project tests/TfReview.GitHub.Tests --no-build
     TF_STANDARDS_DIR="{{ justfile_directory() }}/../tf-standards" dotnet run --project tests/TfReview.Rag.Tests --no-build
     TF_STANDARDS_DIR="{{ justfile_directory() }}/../tf-standards" dotnet run --project tests/TfReview.Scanners.Tests --no-build
@@ -60,6 +61,11 @@ e2e-live runs="3":
 [group('dev')]
 fixtures *cases:
     scripts/fixtures.sh {{ cases }}
+
+# Import the sources in corpus/sources.yml and report what they come to; needs no credentials and writes nothing to Azure
+[group('dev')]
+corpus-import output="artifacts/chunks.jsonl":
+    dotnet run --project src/TfReview.Corpus -- import corpus/sources.yml "{{ output }}"
 
 # Compare what the real service posted on the demo's seed PRs with what's expected; pass --rerun to review them again, which costs cents
 [group('dev')]
