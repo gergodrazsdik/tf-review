@@ -119,6 +119,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--rerun", action="store_true", help="review every seed again first")
     parser.add_argument("--timeout", type=int, default=900, help="seconds to wait for reviews")
+    parser.add_argument("--version", help="fail any seed PR that isn't pinned to this reviewer version")
     options = parser.parse_args()
 
     pulls = sorted(seeds(), key=lambda pull: pull["head"]["ref"])
@@ -129,6 +130,13 @@ def main():
     if options.rerun:
         since = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         rerun(pulls)
+
+    if options.version:
+        for pull in pulls:
+            pinned = gh("api", f"repos/{DEMO}/contents/.github/workflows/plan.yml?ref={pull['head']['sha']}",
+                        "-H", "Accept: application/vnd.github.raw+json")
+            if f"# {options.version}" not in pinned:
+                sys.exit(f"{pull['head']['ref']} isn't pinned to {options.version}, so this wouldn't test it.")
 
     late = wait_for_checks(pulls, options.timeout, since)
     failures = 0

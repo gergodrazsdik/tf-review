@@ -315,7 +315,7 @@ gh repo edit gergodrazsdik/tf-standards --template
 | `just fixtures` | `tf-review` | Takes the redacted plan each seeded branch's review already made, replaces every GUID with zeros, and writes it to `tests/fixtures/cases/`, so no raw plan reaches a laptop and no Azure login is needed |
 | `just record-scans` | `tf-review` | Saves what real Checkov and Infracost say about each eval case, so `just e2e` and CI need neither; reads the token from pass, so you run it |
 | `just bootstrap-plan` / `bootstrap-apply` / `bootstrap-migrate` | `tf-review` | The bootstrap project with your `az login`; apply and migrate ask first |
-| `just secrets-sync` | `tf-review` | Copies the Infracost token from pass into each onboarded repo's Actions secrets, and into Key Vault from M3; you run it, never an agent |
+| `just secrets-sync` | `tf-review` | Copies the Infracost token and the App's key from pass into Key Vault; you run it, never an agent |
 | `just policy-test` | `tf-standards` | `opa fmt --fail`, `conftest verify`, frontmatter schema check |
 
 The `claude` recipe in `tf-review` (the other repos list their own two siblings):
@@ -346,7 +346,7 @@ claude *args:
 
 | pass entry | Used locally by | Reaches CI or Azure via |
 | --- | --- | --- |
-| `tf-review/infracost/cli-token` | `just cost` runs, exported as `INFRACOST_CLI_AUTHENTICATION_TOKEN` | M2: `just secrets-sync` → Actions secret per onboarded repo; M3: Key Vault, repo secrets removed |
+| `tf-review/infracost/cli-token` | `just cost` runs, exported as `INFRACOST_CLI_AUTHENTICATION_TOKEN` | M2: `just secrets-sync` → Actions secret per onboarded repo, until M3 moved it to Key Vault; M3: Key Vault, repo secrets removed |
 | `tf-review/github/bootstrap-token` | `just bootstrap-*` (github provider: Actions secrets and variables, environments; the fine-grained token needs Secrets read and write on every onboarded repo) | Never leaves the machine |
 | `tf-review/github-app/private-key` (M3) | Local runs of the review service | `just secrets-sync` → Key Vault |
 
@@ -369,7 +369,7 @@ One storage account holds every repo's state, created once by a bootstrap projec
 | --- | --- | --- |
 | Plan | `repo:<owner>@<owner-id>/<repo>@<repo-id>:pull_request` | Reader on the target scope, Blob Data Contributor on its own state container |
 | Apply | `repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:prod` | Write on the target scope, gated by environment approval |
-| Review (M1–M2) | `repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:review` | Cognitive Services OpenAI User on the Foundry resource group; nothing else (D21, D24) |
+| Evals (`tf-review` only, from M3) | `repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:review` | Cognitive Services OpenAI User on the Foundry resource group; nothing else (D21, D24). Until M3 each repo had one for its review job |
 | Reviewer submit (M3) | No Azure identity: the API checks the GitHub OIDC token itself (D45) | Call the review API only |
 | Service (M3) | None: a managed identity on the service's container apps | LLM, queue, blobs, reading secrets and, from `infra/`, Cosmos, all in `tf-review`'s resource group |
 
@@ -642,7 +642,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 - [x] `tfreview submit`, retrying through the API's cold start for up to 5 minutes with a new token each time. A refusal isn't retried, because it won't change
 - [x] Reusable workflow: the review job runs `tfreview submit` and no agents. On any failure it posts "not reviewed" with its own token (D39), with no App needed
 - [x] OpenTelemetry to App Insights: tokens, cached tokens, latency and cost per agent call, findings per agent, evidence-check drops, and what wasn't reviewed, as metrics with names and counts only. The job flushes them as it exits. Proved by `tf-review-demo` PR #34, where the metrics and logs agreed on each call
-- [ ] Remove what the service replaced from each repo: the review identity, and the Infracost token, which moves to Key Vault (D38)
+- [x] Remove what the service replaced from each repo: the demo's review identity and LLM variables, and the Infracost token from both repos' Actions secrets, which now lives only in Key Vault and `pass` (D38). `tf-review` keeps one review identity, because `e2e-live` and `llm-smoke` call the model directly
 - [x] The real service as well as the eval harness, before the corpus changes: `just service-eval` compares what it posted on the demo's 8 seed PRs with their expected findings. Nothing is replayed, and `e2e-live` stays as the cheaper check on every PR. All 8 passed on 2026-11-03 once C8 was re-run, after 8 pushes at once showed plans racing on the state lock (D48)
 
 *4. Corpus*
