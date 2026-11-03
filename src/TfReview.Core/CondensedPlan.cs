@@ -135,6 +135,21 @@ public sealed class CondensedPlan
             .Order(StringComparer.Ordinal),
     ];
 
+    /// <summary>
+    /// The names of the attributes that change, without their values, which say what a slice is about to a search.
+    /// Name and tags are always kept, so they only count when they changed.
+    /// </summary>
+    public IReadOnlyList<string> ChangedAttributeNames() =>
+    [
+        .. root[ResourceChanges]!.AsObject()
+            .SelectMany(resource => resource.Value?[Change]?[After] is JsonObject after ? after.Select(attribute => (resource.Key, attribute.Key)) : [])
+            .Where(item => !AlwaysKept.Contains(item.Item2, StringComparer.Ordinal)
+                || !this.PointsAtUnchangedAttribute(PointerTo(item.Item1, Change, After, item.Item2)))
+            .Select(item => item.Item2)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal),
+    ];
+
     public string ToCanonicalJson() => CanonicalJson.Write(root);
 
     private static bool IsNoOp(JsonObject change) =>

@@ -154,6 +154,7 @@ resource "azapi_resource" "review_job" {
               TF_REVIEW_GITHUB_APP_CLIENT_ID = "Iv23lilG16KleMoC5ReP"
               TF_REVIEW_OPENAI_ENDPOINT      = "https://${azurerm_cognitive_account.foundry.custom_subdomain_name}.openai.azure.com/openai/v1/"
               TF_REVIEW_OPENAI_DEPLOYMENT    = azurerm_cognitive_deployment.gpt_5_4_mini.name
+              TF_REVIEW_EMBEDDING_DEPLOYMENT = azurerm_cognitive_deployment.text_embedding_3_small.name
             }) : { name = name, value = value }],
             [
               local.service_client_id,

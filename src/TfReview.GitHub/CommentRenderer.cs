@@ -54,6 +54,20 @@ public static partial class CommentRenderer
             comment.AppendLine().AppendLine($"Not checked, too large for the prompt: {string.Join(", ", omitted.Select(Code))}.");
         }
 
+        // Suggestions can draw on licensed text, and CC-BY asks for credit wherever that happens (D41).
+        if (result.References is { } references)
+        {
+            if (references.Attributions.Count > 0)
+            {
+                comment.AppendLine().AppendLine($"Reference material: {string.Join("; ", references.Attributions)}.");
+            }
+
+            if (references.ProviderDocsMissing)
+            {
+                comment.AppendLine().AppendLine("No azurerm docs were used: the project's lock file names no azurerm version, or one that isn't indexed.");
+            }
+        }
+
         return comment
             .AppendLine()
             .AppendLine("This review is advisory, and finding nothing doesn't mean a change is approved.")

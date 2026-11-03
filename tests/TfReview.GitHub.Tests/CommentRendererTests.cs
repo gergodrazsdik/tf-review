@@ -199,6 +199,29 @@ public class CommentRendererTests
         await Assert.That(CommentRenderer.Render(result, Counts)).Contains("| `See [this](https://evil.example)` |");
     }
 
+    // D41: CC-BY asks for credit wherever its text, or a suggestion drawn from it, is shown.
+    [Test]
+    public async Task Credits_the_reference_material_and_says_when_provider_docs_were_missing()
+    {
+        var result = Linked("adr/x.md") with
+        {
+            References = new ReferenceUse("0123456789abcdef", true, ["HashiCorp, MPL-2.0", "Microsoft, CC-BY-4.0"]),
+        };
+
+        var comment = CommentRenderer.Render(result, Counts);
+
+        await Assert.That(comment).Contains("Reference material: HashiCorp, MPL-2.0; Microsoft, CC-BY-4.0.");
+        await Assert.That(comment).Contains("No azurerm docs were used");
+    }
+
+    [Test]
+    public async Task Says_nothing_about_references_when_none_were_asked_for()
+    {
+        var comment = CommentRenderer.Render(Linked("adr/x.md"), Counts);
+
+        await Assert.That(comment).DoesNotContain("Reference material").And.DoesNotContain("azurerm docs");
+    }
+
     [Test]
     public async Task Says_which_docs_didnt_fit()
     {

@@ -3,6 +3,15 @@ using System.Text.Json.Serialization;
 
 namespace TfReview.Core;
 
+/// <summary>
+/// The reference material a review used: which index, whether provider docs were missing, and whom to credit, because
+/// a suggestion can draw on licensed text (D41).
+/// </summary>
+public sealed record ReferenceUse(
+    [property: JsonPropertyName("corpus_version")] string? CorpusVersion,
+    [property: JsonPropertyName("provider_docs_missing")] bool ProviderDocsMissing,
+    [property: JsonPropertyName("attributions")] IReadOnlyList<string> Attributions);
+
 [JsonConverter(typeof(JsonStringEnumConverter<Verdict>))]
 public enum Verdict
 {
@@ -212,6 +221,10 @@ public sealed record ReviewResult(
     [JsonPropertyName("usage")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public TokenUsage? Usage { get; init; }
+
+    [JsonPropertyName("references")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ReferenceUse? References { get; init; }
 
     private static readonly JsonSerializerOptions StrictOptions = new()
     {

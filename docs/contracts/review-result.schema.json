@@ -114,6 +114,29 @@
         }
       }
     },
+    "references": {
+      "description": "The reference material agents were given, when the config asked for it (D42).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["corpus_version", "provider_docs_missing", "attributions"],
+      "properties": {
+        "corpus_version": {
+          "description": "The index version used, or null when none was in use.",
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{16}$"
+        },
+        "provider_docs_missing": {
+          "description": "True when the lock file named no azurerm version, or one that isn't indexed, so no provider docs were used.",
+          "type": "boolean"
+        },
+        "attributions": {
+          "description": "Whom to credit for the material shown to agents.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    },
     "usage": {
       "description": "Totals across the review's LLM calls, for the cost metrics.",
       "type": "object",

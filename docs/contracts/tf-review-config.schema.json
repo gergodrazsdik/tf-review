@@ -33,6 +33,11 @@
       "items": { "enum": ["conventions", "cost", "security"] },
       "default": ["conventions"]
     },
+    "references": {
+      "description": "Give agents imported reference material, from Azure Policy, the Cloud Adoption Framework and the azurerm docs, beside the team's standards. It informs findings and can't create one (D42).",
+      "type": "boolean",
+      "default": false
+    },
     "thresholds": {
       "type": "object",
       "additionalProperties": false,

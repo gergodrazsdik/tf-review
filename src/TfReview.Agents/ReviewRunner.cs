@@ -20,6 +20,7 @@ public sealed record ReviewModel(IChatClient Chat, string Deployment);
 /// <param name="log">Receives one line per model call, holding no prompt or answer text.</param>
 /// <param name="infracost">Prices the plan, or null when there's no token, which is reported as not reviewed.</param>
 /// <param name="checkov">Checks the plan, or null when it isn't available, which is reported as not reviewed.</param>
+/// <param name="references">Imported reference material, for a config that asks for it, or null when there's none (D42).</param>
 public sealed class ReviewRunner(
     IStandardsSource standards,
     ConftestRunner conftest,
@@ -27,15 +28,27 @@ public sealed class ReviewRunner(
     IArbiter? arbiter = null,
     Action<string>? log = null,
     InfracostRunner? infracost = null,
-    CheckovRunner? checkov = null)
+    CheckovRunner? checkov = null,
+    IReferenceRetriever? references = null)
 {
+    /// <summary>
+    /// Each agent's share for references, apart from its standards' cap, so they can't push a rule out (D42). About
+    /// three chunks, which keeps a review's cost within about double what it was without them.
+    /// </summary>
+    public const int ReferenceTokenBudget = 2_000;
+
     /// <summary>The evidence_drops key for resources a model listed while saying they don't break a standard.</summary>
     public const string ModelRetracted = "model_retracted";
 
     private readonly IArbiter arbiter = arbiter ?? (model is null ? new RuleArbiter() : new LlmArbiter(model.Chat));
 
+    /// <param name="redactedPlan">The plan, which is redacted again here.</param>
+    /// <param name="configYaml">The config at the base commit.</param>
+    /// <param name="commit">The commit reviewed.</param>
+    /// <param name="cancellationToken">Stops the review.</param>
+    /// <param name="lockFile">The project's lock file at the base commit, which says which provider docs apply.</param>
     public async Task<ReviewResult> RunAsync(
-        string redactedPlan, string? configYaml, string commit, CancellationToken cancellationToken = default)
+        string redactedPlan, string? configYaml, string commit, CancellationToken cancellationToken = default, string? lockFile = null)
     {
         if (new PlanRedactor().Redact(redactedPlan) is not Redacted redacted)
         {
@@ -82,16 +95,18 @@ public sealed class ReviewRunner(
                 ? Task.FromResult(new RiskRanking(RiskOrchestrator.ByRules(plan), [], null))
                 : new RiskOrchestrator(model.Chat).RankAsync(plan, cancellationToken);
 
+            var referenceQuery = config.References && references is not null ? new ReferenceContext(LockFile.AzurermVersion(lockFile)) : null;
+
             // A failed scan already says that scope wasn't reviewed, and a cost agent without figures has nothing to judge.
             var passes = await Task.WhenAll(
                 Enabled(config, AgentProfile.Conventions)
-                    ? RunAgentAsync(AgentProfile.Conventions, plan, policyFindings, corpus, null, cancellationToken)
+                    ? RunAgentAsync(AgentProfile.Conventions, plan, policyFindings, corpus, null, referenceQuery, cancellationToken)
                     : Task.FromResult(AgentPass.Skipped),
                 Enabled(config, AgentProfile.Security)
-                    ? RunAgentAsync(AgentProfile.Security, plan, policyFindings, corpus, null, cancellationToken)
+                    ? RunAgentAsync(AgentProfile.Security, plan, policyFindings, corpus, null, referenceQuery, cancellationToken)
                     : Task.FromResult(AgentPass.Skipped),
                 cost is { } && cost.Resources.Any(resource => resource.Priced && resource.AfterUsd > resource.BeforeUsd)
-                    ? RunAgentAsync(AgentProfile.Cost, plan, [], corpus, cost.Resources, cancellationToken)
+                    ? RunAgentAsync(AgentProfile.Cost, plan, [], corpus, cost.Resources, referenceQuery, cancellationToken)
                     : Task.FromResult(AgentPass.Skipped));
 
             // Each agent's findings are checked against the documents in its own prompt, not everyone's.
@@ -129,6 +144,7 @@ public sealed class ReviewRunner(
                 DocPaths = DocPaths(arbitration.Findings, corpus),
                 OmittedDocs = omitted.Count == 0 ? null : omitted,
                 Usage = Usage([.. passes.SelectMany(pass => pass.Calls), .. risk.Calls, .. arbitration.Calls]),
+                References = referenceQuery is null ? null : ReferenceUseOf(passes),
             };
         }
         catch (StandardsFetchException)
@@ -228,6 +244,7 @@ public sealed class ReviewRunner(
         IReadOnlyList<Finding> policyFindings,
         StandardsCorpus? corpus,
         IReadOnlyList<ResourceCostChange>? costs,
+        ReferenceContext? referenceContext,
         CancellationToken cancellationToken)
     {
         if (corpus is null)
@@ -246,7 +263,13 @@ public sealed class ReviewRunner(
         // Code routes (D35): an agent sees the resources its standards cover, so coverage can't depend on a model.
         var slice = plan.OnlyTypes(type => retrieval.Docs.Any(doc => doc.AppliesToType(type)));
 
-        var outcome = await new ReviewAgent(model.Chat, profile).ReviewAsync(slice, retrieval.Docs, policyFindings, costs, cancellationToken);
+        // Only when an agent has standards to judge by, because without them it isn't called at all.
+        var referenceDocs = retrieval.Docs.Count > 0 && referenceContext is not null
+            ? await this.RetrieveReferencesAsync(profile, slice, referenceContext, cancellationToken)
+            : null;
+
+        var outcome = await new ReviewAgent(model.Chat, profile).ReviewAsync(
+            slice, retrieval.Docs, policyFindings, costs, cancellationToken, referenceDocs?.Docs);
         Log(profile.Name, outcome.PromptVersion, outcome.Calls);
 
         return new AgentPass(
@@ -258,8 +281,41 @@ public sealed class ReviewRunner(
         {
             Plan = slice,
             Retracted = outcome is AgentReviewed { Retracted: var count } ? count : 0,
+            References = referenceDocs,
         };
     }
+
+    // A failed search costs the agent its references, not its review: they can't create a finding anyway.
+    private async Task<ReferenceRetrieval> RetrieveReferencesAsync(
+        AgentProfile profile, CondensedPlan slice, ReferenceContext context, CancellationToken cancellationToken)
+    {
+        var types = slice.ResourceTypes();
+        var query = new ReferenceQuery(
+            $"{string.Join(", ", profile.Topics)}. Resource types: {string.Join(", ", types)}. Changed attributes: {string.Join(", ", slice.ChangedAttributeNames())}.",
+            types,
+            context.ProviderVersion,
+            ReferenceTokenBudget);
+        try
+        {
+            return await references!.RetrieveAsync(query, cancellationToken);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            log?.Invoke($"{profile.Name}: references unavailable, {e.GetType().Name}.");
+            return ReferenceRetrieval.None;
+        }
+    }
+
+    private static ReferenceUse ReferenceUseOf(IEnumerable<AgentPass> passes)
+    {
+        var used = passes.Select(pass => pass.References).OfType<ReferenceRetrieval>().ToList();
+        return new ReferenceUse(
+            used.Select(retrieval => retrieval.CorpusVersion).OfType<string>().FirstOrDefault(),
+            used.Any(retrieval => retrieval.ProviderDocsMissing),
+            [.. used.SelectMany(retrieval => retrieval.Docs).Select(doc => doc.Attribution).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)]);
+    }
+
+    private sealed record ReferenceContext(string? ProviderVersion);
 
     private void Log(string name, int? promptVersion, IReadOnlyList<AgentCall> calls)
     {
@@ -296,6 +352,9 @@ public sealed class ReviewRunner(
 
         /// <summary>Resources it listed while saying they don't break the standard.</summary>
         public int Retracted { get; init; }
+
+        /// <summary>The reference material it was shown, if the config asked for any.</summary>
+        public ReferenceRetrieval? References { get; init; }
 
         public static readonly AgentPass Skipped = new([], [], [], [], []);
 
