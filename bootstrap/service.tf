@@ -121,3 +121,15 @@ resource "azurerm_cosmosdb_sql_role_assignment" "deployer_reader" {
   principal_id        = data.azurerm_client_config.current.object_id
   scope               = "${local.cosmos_account_id}/dbs/tfreview"
 }
+
+# Read-only, for tf-review's own evals: e2e-live with reference material in the prompt reads the index as the eval
+# identity (D49). Only tf-review has one, so this is a single assignment.
+resource "azurerm_cosmosdb_sql_role_assignment" "eval_reader" {
+  for_each = local.llm_callers
+
+  resource_group_name = azurerm_resource_group.target[local.foundry_repo].name
+  account_name        = local.cosmos_account_name
+  role_definition_id  = "${local.cosmos_account_id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000001"
+  principal_id        = azurerm_user_assigned_identity.review[each.key].principal_id
+  scope               = "${local.cosmos_account_id}/dbs/tfreview"
+}
