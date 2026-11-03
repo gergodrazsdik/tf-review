@@ -49,7 +49,7 @@ Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET S
 - [ ] By 2027-02-01, or at any Infracost update: review the `.grype.yaml` exception for `infracost-parser-terraform-plan`, and remove it once a plugin version ships go-jose 4.1.6 or later
 - [ ] After a CSharpier release that parses C# 15 (1.3.0 fails on `union`): add it back to the prerequisites and decide where it runs; until then `dotnet format` is the only C# formatter
 - [x] Infracost v2: create a personal access token, store it as `pass insert tf-review/infracost/cli-token`, clear any cached `infracost auth login` session
-- [ ] M3: create the GitHub App and store its private key as `pass insert -m tf-review/github-app/private-key`
+- [x] M3: create the GitHub App and store its private key as `pass insert -m tf-review/github-app/private-key`
 
 ## Decision log
 
@@ -612,7 +612,7 @@ Work runs in this order, so the deterministic findings exist before the agents t
 - [x] Eval suite in CI (`e2e-live`, 5 runs per case) with the baseline recorded in `docs/evals/baseline.md`, including held-out cases whose expected results were fixed before any model saw them. 5 of the first 6 passed; later samples found the security agent listing resources it had judged fine, and the arbiter dropping a correct finding, both fixed in code. Now 83 of 85 runs, and the cost agent's handling of ADR-003 is the known weak spot
 - [x] Gate: C1–C10 run in CI, baseline recorded. Passed 2026-11-02: `e2e-live` runs 17 cases, five times each, on any PR that changes the agents, prompts, fixtures or `TfReview.Core`, and `docs/evals/baseline.md` holds the results. The stronger models above stay open until quota allows
 
-**M3 · Central service**
+**M3 · Central service** (gate passed 2026-11-03)
 
 Work runs in this order, so the unknowns surface before anything depends on them, and a review works through the service before the corpus grows. Steps marked **you** can only be run by you.
 
