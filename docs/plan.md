@@ -53,7 +53,7 @@ Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET S
 
 ## Decision log
 
-All 48 decisions are settled as of 2026-11-02; D19–D29 came from the M1 design council, D31–D34 from M2's spike, D35–D36 from building its orchestrator and arbiter, D37–D45 from planning M3, D46 from applying its infrastructure, D47 from designing the worker, and D48 from the first load on the service. Changing one means editing its row and the sections it affects in the same commit.
+All 49 decisions are settled as of 2026-11-02; D19–D29 came from the M1 design council, D31–D34 from M2's spike, D35–D36 from building its orchestrator and arbiter, D37–D45 from planning M3, D46 from applying its infrastructure, D47 from designing the worker, D48 from the first load on the service, and D49 from the retrieval evals. Changing one means editing its row and the sections it affects in the same commit.
 
 | # | Decision | Choice | Why |
 | --- | --- | --- | --- |
@@ -105,6 +105,7 @@ All 48 decisions are settled as of 2026-11-02; D19–D29 came from the M1 design
 | D46 | azapi where azurerm reads secrets | The Cosmos account, its vector container, the Container App and the job use the azapi provider. Other resources stay in azurerm. azurerm lists keys or secrets on every read of these, even when there are none, so a Reader's plan fails with a 403, and it can't declare a vector policy. The alternative was giving the plan identity, which runs PR code, the right to list them. With azapi it stays a Reader, and no keys reach the state. A new resource type gets a real plan with state before relying on it, because the first plan of a resource can't show this |
 | D47 | Sealed scanners | Scanners get only the environment they need, and conftest runs without `http.send`, `net.lookup_ip_addr`, `opa.runtime` or its own file readers. A policy using one doesn't compile, which reports a failed scan. The App's key is read from Key Vault into the worker's memory when posting, never put in its environment | A config chooses the standards repo, and its Rego runs in the review. A test showed Rego reading an environment variable and calling out over the network. In the service that would reach the managed identity's endpoint, so one repo's config could get at Key Vault and every other repo's reviews |
 | D48 | Review plans take no lock | The reusable workflow's plan runs with `-lock=false`. A repo's apply still locks | PRs planning at once race on the state blob: one can see another's lease before its lock details are written, and the azurerm backend fails at once with `terraformlockid was empty`, whatever `-lock-timeout` says. A review plan writes nothing and is never applied. The cost is that a plan during an apply may read the state from before it, which is advisory, and the next push reviews it again. Queueing them instead isn't possible, because GitHub's concurrency groups keep only one waiting run |
+| D49 | Re-ranking references | Search returns 15 candidates of each kind, a model picks up to 6 by title, heading and opening, and code fills the budget in that order. Its input is the slice's types, actions, the attributes that are set and short values, never names, tags or free text. A failed call keeps the search's order | The retrieval evals found the relevant docs ranking just below the budget's cut, and re-ranking took hybrid from 27% to 34–36% of them on the real index. A code-built query in words, a model-written query and a cleaned index each did no better. A PR can at worst steer which background an agent sees, which can't create a finding (D42) |
 
 ## Architecture
 
@@ -666,6 +667,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 *6. Evaluation and gate*
 
 - [x] Retrieval evals (`just eval-retrieval`, results in `docs/evals/retrieval.md`), with the docs each case should find, comparing vector, hybrid and metadata-only retrieval (D5): hybrid gives 13 of 15 agents something relevant, against 9 for filtering alone, but finds only 27% of the labelled docs. Hybrid is what reviews use. Agent evals alone can't show this, because reference docs can't create findings
+- [x] Re-ranking (D49): a model picks from 15 candidates of each kind, which took hybrid to 34–36% of the labelled docs over two runs
 - [ ] Agent evals with reference material in the prompt: the baseline in `docs/evals/baseline.md` has to hold, with new held-out cases on whether suggestions get better rather than noisier
 - [ ] Gate: a demo PR reviewed through the service, asynchronously, with the App's comment and check run; `not reviewed` shown during a forced outage; retrieval compared with the metadata baseline, and the result recorded whichever way it comes out
 

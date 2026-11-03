@@ -24,9 +24,6 @@ public interface IQueryEmbedder
 /// </summary>
 public sealed partial class CosmosReferenceRetriever(Container container, IQueryEmbedder embedder) : IReferenceRetriever
 {
-    /// <summary>Candidates per kind before the budget cuts them, which is more than a budget ever holds.</summary>
-    private const int Candidates = 8;
-
     private const int MaxSearchTerms = 12;
 
     private const string Fields = "c.id, c.source, c.title, c.heading, c.text, c.source_url, c.license, c.attribution, c.applies_to";
@@ -56,12 +53,13 @@ public sealed partial class CosmosReferenceRetriever(Container container, IQuery
                 vector,
                 terms,
                 query.Ranking,
+                query.Candidates,
                 new Dictionary<string, object> { ["@providerVersion"] = providerVersion, ["@types"] = query.ResourceTypes.ToArray() },
                 cancellationToken)
             : [];
         IReadOnlyList<ReferenceDoc> general = metadataOnly
             ? []
-            : await this.SearchAsync(version, "ARRAY_LENGTH(c.applies_to) = 0", vector, terms, query.Ranking, [], cancellationToken);
+            : await this.SearchAsync(version, "ARRAY_LENGTH(c.applies_to) = 0", vector, terms, query.Ranking, query.Candidates, [], cancellationToken);
 
         // Alternating keeps either kind from taking the whole budget. Policies and framework pages go first, because they
         // say what's expected of a resource, where provider docs mostly say how to write it.
@@ -81,7 +79,7 @@ public sealed partial class CosmosReferenceRetriever(Container container, IQuery
         var providerMissing = query.ResourceTypes.Count > 0
             && (query.ProviderVersion is null
                 || (provider.Count == 0 && !await this.HasProviderVersionAsync(version, query.ProviderVersion, cancellationToken)));
-        return new ReferenceRetrieval([.. chosen.OrderBy(doc => doc.Id, StringComparer.Ordinal)], version, providerMissing);
+        return new ReferenceRetrieval(chosen, version, providerMissing);
     }
 
     /// <summary>The words worth a full-text match: identifiers and words, without the ones every chunk has.</summary>
@@ -135,6 +133,7 @@ public sealed partial class CosmosReferenceRetriever(Container container, IQuery
         float[] vector,
         IReadOnlyList<string> terms,
         ReferenceRanking ranking,
+        int candidates,
         Dictionary<string, object> parameters,
         CancellationToken cancellationToken)
     {
@@ -147,7 +146,7 @@ public sealed partial class CosmosReferenceRetriever(Container container, IQuery
             _ => "ORDER BY VectorDistance(c.embedding, @vector)",
         };
 
-        var query = new QueryDefinition($"SELECT TOP {Candidates} {Fields} FROM c WHERE {filter} {order}");
+        var query = new QueryDefinition($"SELECT TOP {Math.Clamp(candidates, 1, 50)} {Fields} FROM c WHERE {filter} {order}");
         if (ranking != ReferenceRanking.Metadata)
         {
             query = query.WithParameter("@vector", vector);

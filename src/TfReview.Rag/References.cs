@@ -26,12 +26,15 @@ public enum ReferenceRanking
 /// <param name="ResourceTypes">The slice's types, which provider docs are filtered on.</param>
 /// <param name="ProviderVersion">The azurerm version in the repo's lock file, or null when it isn't known.</param>
 /// <param name="TokenBudget">Separate from the team's rules, so references can't push a rule out (D42).</param>
+/// <param name="Ranking">How results are ordered.</param>
+/// <param name="Candidates">How many of each kind to consider, which a re-ranker wants more of than a budget holds.</param>
 public sealed record ReferenceQuery(
     string Text,
     IReadOnlyCollection<string> ResourceTypes,
     string? ProviderVersion,
     int TokenBudget,
-    ReferenceRanking Ranking = ReferenceRanking.Hybrid);
+    ReferenceRanking Ranking = ReferenceRanking.Hybrid,
+    int Candidates = 8);
 
 /// <summary>One reference chunk, with what a prompt shows and what attribution needs.</summary>
 public sealed record ReferenceDoc(
@@ -46,8 +49,8 @@ public sealed record ReferenceDoc(
     IReadOnlyList<string> AppliesTo);
 
 /// <summary>
-/// The chunks found, sorted by ID so the same query always gives the same prompt, and whether provider docs were
-/// available, because a version that isn't indexed gets none and the result has to say so.
+/// The chunks found, best first, and whether provider docs were available, because a version that isn't indexed gets
+/// none and the result has to say so. A prompt sorts them by ID, so the same chunks always give the same prompt.
 /// </summary>
 public sealed record ReferenceRetrieval(IReadOnlyList<ReferenceDoc> Docs, string? CorpusVersion, bool ProviderDocsMissing)
 {

@@ -22,7 +22,12 @@ internal static class RetrievalEval
 {
     private const string ProviderVersion = "5.12.0";
 
-    private static readonly ReferenceRanking[] Rankings = [ReferenceRanking.Metadata, ReferenceRanking.Vector, ReferenceRanking.Hybrid];
+    // The search's own order for each ranking, and the model's re-ranking for the two that search (D49).
+    private static readonly (ReferenceRanking Ranking, bool Reranked)[] Rankings =
+    [
+        (ReferenceRanking.Metadata, false), (ReferenceRanking.Vector, false), (ReferenceRanking.Hybrid, false),
+        (ReferenceRanking.Vector, true), (ReferenceRanking.Hybrid, true),
+    ];
 
     public static async Task<int> RunAsync(string labelsPath, string casesDirectory, string standardsDirectory, string? reportPath)
     {
@@ -37,24 +42,26 @@ internal static class RetrievalEval
         var retriever = new CosmosReferenceRetriever(
             container, AzureQueryEmbedder.Create(new Uri(Required("TF_REVIEW_OPENAI_ENDPOINT")), "text-embedding-3-small", credential));
 
+        var chat = LlmClient.Create(new Uri(Required("TF_REVIEW_OPENAI_ENDPOINT")), Required("TF_REVIEW_OPENAI_DEPLOYMENT"));
         var rows = new List<Row>();
         foreach (var label in labels.Cases)
         {
             var slice = await SliceAsync(label, casesDirectory, corpus);
-            foreach (var ranking in Rankings)
+            foreach (var (ranking, reranked) in Rankings)
             {
-                var query = ReviewRunner.ReferenceQueryFor(Profile(label.Agent), slice, ProviderVersion, ranking);
-                var result = await retriever.RetrieveAsync(query);
+                var profile = Profile(label.Agent);
+                var query = ReviewRunner.ReferenceQueryFor(profile, slice, ProviderVersion, ranking);
+                var result = (await new ReferenceSelector(retriever, reranked ? chat : null).SelectAsync(query, profile.Topics, slice)).Retrieval;
                 var found = label.Relevant.Count(relevant => result.Docs.Any(doc => relevant.Matches(doc)));
                 if (Environment.GetEnvironmentVariable("TF_REVIEW_EVAL_DEBUG") == label.Case)
                 {
-                    Console.WriteLine($"{label.Case} {ranking}: {query.Text}");
+                    Console.WriteLine($"{label.Case} {Name(ranking, reranked)}: {query.Text}");
                     foreach (var doc in result.Docs)
                     {
                         Console.WriteLine($"  {doc.SourceUrl[(doc.SourceUrl.IndexOf("/blob/", StringComparison.Ordinal) + 48)..]} | {doc.Heading}");
                     }
                 }
-                rows.Add(new Row(label.Case, ranking, found, label.Relevant.Count, result.Docs.Count, result.Docs.Sum(doc => TokenEstimate.Of(doc.Text))));
+                rows.Add(new Row(label.Case, Name(ranking, reranked), found, label.Relevant.Count, result.Docs.Count, result.Docs.Sum(doc => TokenEstimate.Of(doc.Text))));
             }
         }
 
@@ -85,17 +92,18 @@ internal static class RetrievalEval
         var text = new StringBuilder()
             .AppendLine("| Ranking | Cases with something relevant | Relevant docs found | Chunks per agent | Tokens per agent |")
             .AppendLine("| --- | --- | --- | --- | --- |");
-        foreach (var ranking in Rankings)
+        var names = Rankings.Select(ranking => Name(ranking.Ranking, ranking.Reranked)).ToList();
+        foreach (var name in names)
         {
-            var mine = rows.Where(row => row.Ranking == ranking).ToList();
+            var mine = rows.Where(row => row.Ranking == name).ToList();
             text.AppendLine(CultureInfo.InvariantCulture,
-                $"| {ranking} | {mine.Count(row => row.Found > 0)} of {mine.Count} | {mine.Sum(row => row.Found)} of {mine.Sum(row => row.Relevant)} ({100.0 * mine.Sum(row => row.Found) / mine.Sum(row => row.Relevant):0}%) | {mine.Average(row => row.Chunks):0.0} | {mine.Average(row => row.Tokens):0} |");
+                $"| {name} | {mine.Count(row => row.Found > 0)} of {mine.Count} | {mine.Sum(row => row.Found)} of {mine.Sum(row => row.Relevant)} ({100.0 * mine.Sum(row => row.Found) / mine.Sum(row => row.Relevant):0}%) | {mine.Average(row => row.Chunks):0.0} | {mine.Average(row => row.Tokens):0} |");
         }
 
-        text.AppendLine().AppendLine("| Case | " + string.Join(" | ", Rankings) + " |").AppendLine("| --- |" + string.Concat(Rankings.Select(_ => " --- |")));
+        text.AppendLine().AppendLine("| Case | " + string.Join(" | ", names) + " |").AppendLine("| --- |" + string.Concat(names.Select(_ => " --- |")));
         foreach (var group in rows.GroupBy(row => row.Case))
         {
-            text.AppendLine(CultureInfo.InvariantCulture, $"| {group.Key} | {string.Join(" | ", Rankings.Select(ranking => group.Single(row => row.Ranking == ranking)).Select(row => $"{row.Found} of {row.Relevant}"))} |");
+            text.AppendLine(CultureInfo.InvariantCulture, $"| {group.Key} | {string.Join(" | ", names.Select(name => group.Single(row => row.Ranking == name)).Select(row => $"{row.Found} of {row.Relevant}"))} |");
         }
 
         return text.ToString();
@@ -113,7 +121,9 @@ internal static class RetrievalEval
         ? value
         : throw new InvalidOperationException($"{name} isn't set.");
 
-    private sealed record Row(string Case, ReferenceRanking Ranking, int Found, int Relevant, int Chunks, int Tokens);
+    private static string Name(ReferenceRanking ranking, bool reranked) => reranked ? $"{ranking}, re-ranked" : ranking.ToString();
+
+    private sealed record Row(string Case, string Ranking, int Found, int Relevant, int Chunks, int Tokens);
 
     private sealed class LabelFile
     {
