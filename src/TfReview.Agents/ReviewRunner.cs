@@ -37,6 +37,8 @@ public sealed class ReviewRunner(
     /// </summary>
     public const int ReferenceTokenBudget = 2_000;
 
+    private static readonly string[] CommonAttributes = ["location", "resource_group_name"];
+
     /// <summary>The evidence_drops key for resources a model listed while saying they don't break a standard.</summary>
     public const string ModelRetracted = "model_retracted";
 
@@ -285,16 +287,30 @@ public sealed class ReviewRunner(
         };
     }
 
+    /// <summary>
+    /// What an agent searches for: its topics, its slice's types and the names of the attributes that change, never their
+    /// values. Public so the retrieval evals measure the same query reviews send.
+    /// </summary>
+    public static ReferenceQuery ReferenceQueryFor(
+        AgentProfile profile, CondensedPlan slice, string? providerVersion, ReferenceRanking ranking = ReferenceRanking.Hybrid)
+    {
+        var types = slice.ResourceTypes();
+
+        // Nearly every resource sets these, so they only blur what a change is about.
+        var attributes = slice.ChangedAttributeNames().Where(name => !CommonAttributes.Contains(name, StringComparer.Ordinal));
+        return new ReferenceQuery(
+            $"{string.Join(", ", profile.Topics)}. Resource types: {string.Join(", ", types)}. Changed attributes: {string.Join(", ", attributes)}.",
+            types,
+            providerVersion,
+            ReferenceTokenBudget,
+            ranking);
+    }
+
     // A failed search costs the agent its references, not its review: they can't create a finding anyway.
     private async Task<ReferenceRetrieval> RetrieveReferencesAsync(
         AgentProfile profile, CondensedPlan slice, ReferenceContext context, CancellationToken cancellationToken)
     {
-        var types = slice.ResourceTypes();
-        var query = new ReferenceQuery(
-            $"{string.Join(", ", profile.Topics)}. Resource types: {string.Join(", ", types)}. Changed attributes: {string.Join(", ", slice.ChangedAttributeNames())}.",
-            types,
-            context.ProviderVersion,
-            ReferenceTokenBudget);
+        var query = ReferenceQueryFor(profile, slice, context.ProviderVersion);
         try
         {
             return await references!.RetrieveAsync(query, cancellationToken);

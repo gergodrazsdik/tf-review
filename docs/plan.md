@@ -61,7 +61,7 @@ All 48 decisions are settled as of 2026-11-02; D19–D29 came from the M1 design
 | D2 | Agent runtime | C# 15 on .NET 11, Microsoft Agent Framework, `IChatClient` from Microsoft.Extensions.AI over the OpenAI SDK's `OpenAIClient` | Strongest stack; the provider stays swappable; unions and closed hierarchies fit findings and agent outcomes; support should end about when .NET 10's does (November 2028); Agent Framework dropped `Azure.AI.OpenAI` in 1.21 |
 | D3 | Where the review runs | One container image: the workflow runs it in M1–M2, Container Apps runs it from M3 | Identical binaries and tool versions locally, in CI and in Azure |
 | D4 | LLM | Azure OpenAI in Foundry, Data Zone Standard (EU): gpt-5.4-mini `2026-03-17` for every agent, at low reasoning effort because its default of none failed valid names on the evals; gpt-6.1-sol `2026-09-29` for security and arbiter from M2, and gpt-6-luna `2026-09-22` as a small-model candidate, both once quota is granted; text-embedding-3-small `1` from M3; versions pinned and models set per agent in config | gpt-5.4-mini is the only OpenAI chat model with quota (checked 2026-11-01); gpt-6.1-sol is reportedly cheaper than gpt-5.4 and gpt-5.5 and retires later; Luna must beat mini on the evals, not just on price; EU processing from day one |
-| D5 | Retrieval | Metadata filter plus whole docs in M1–M2; Cosmos DB free tier with vectors in M3 | The baseline shows whether vectors actually help |
+| D5 | Retrieval | Metadata filter plus whole docs in M1–M2; Cosmos DB free tier with vectors in M3. A team's rules stay filtered, and reference material is ranked by hybrid search, which gave 13 of 15 agents something relevant against 9 for filtering alone (`docs/evals/retrieval.md`) | The baseline shows whether vectors actually help |
 | D6 | Repo visibility | Public | Free Actions minutes and environment approvals; portfolio value |
 | D7 | Repos | `tf-review`, `tf-review-demo`, `tf-standards` (created 2026-11-01) | Standards have their own owner and lifecycle in production |
 | D8 | Azure region | Germany West Central for all resources | Has every service; model quota is pooled per subscription anyway |
@@ -665,7 +665,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 
 *6. Evaluation and gate*
 
-- [ ] Retrieval evals, with queries and the chunks they should find, comparing vector, hybrid and metadata-only retrieval (D5). Agent evals alone can't show this, because reference docs can't create findings
+- [x] Retrieval evals (`just eval-retrieval`, results in `docs/evals/retrieval.md`), with the docs each case should find, comparing vector, hybrid and metadata-only retrieval (D5): hybrid gives 13 of 15 agents something relevant, against 9 for filtering alone, but finds only 27% of the labelled docs. Hybrid is what reviews use. Agent evals alone can't show this, because reference docs can't create findings
 - [ ] Agent evals with reference material in the prompt: the baseline in `docs/evals/baseline.md` has to hold, with new held-out cases on whether suggestions get better rather than noisier
 - [ ] Gate: a demo PR reviewed through the service, asynchronously, with the App's comment and check run; `not reviewed` shown during a forced outage; retrieval compared with the metadata baseline, and the result recorded whichever way it comes out
 

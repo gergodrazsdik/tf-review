@@ -10,6 +10,12 @@ public enum ReferenceRanking
 
     /// <summary>Vector distance and full-text score, fused by reciprocal rank.</summary>
     Hybrid,
+
+    /// <summary>
+    /// No search: the provider docs for the slice's types, in a fixed order, and nothing else. The baseline vectors have
+    /// to beat (D5), because it's what filtering alone can do.
+    /// </summary>
+    Metadata,
 }
 
 /// <summary>
