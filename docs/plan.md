@@ -647,7 +647,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 
 *4. Corpus*
 
-- [ ] A contract for reference chunks in Cosmos, with `source`, `source_commit`, `license` and `corpus_version` (D42). `tf-standards` and its frontmatter don't change. Citing a reference chunk as a broken rule is dropped by the evidence check
+- [x] `reference-chunk.schema.json`: a contract for reference chunks in Cosmos, with `source`, `source_commit`, `license`, `attribution` and `corpus_version` (D42). `tf-standards` and its frontmatter don't change. Citing a reference chunk as a broken rule is dropped by the evidence check, as `reference_cited`
 - [ ] `corpus/sources.yml` and importers in `tf-review` (D43): Azure Policy built-ins, Cloud Adoption Framework, and azurerm docs for the listed provider versions (D41). Attribution per doc, and a check that nothing unlicensed got in
 
 *5. Retrieval*

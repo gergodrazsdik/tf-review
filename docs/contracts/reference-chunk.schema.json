@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/gergodrazsdik/tf-review/main/docs/contracts/reference-chunk.schema.json",
+  "title": "Reference chunk",
+  "description": "One piece of an imported document, as stored in Cosmos (D42, D43). It informs findings and can't create one, because it isn't a team's decision. A team's rules use corpus-frontmatter.schema.json instead.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "corpus_version",
+    "source",
+    "source_repository",
+    "source_commit",
+    "source_path",
+    "source_url",
+    "license",
+    "attribution",
+    "title",
+    "heading",
+    "applies_to",
+    "text",
+    "content_hash"
+  ],
+  "properties": {
+    "id": {
+      "description": "Stable for one place in one document, whatever its text. The prefix is how the evidence check knows a finding cited a reference.",
+      "type": "string",
+      "pattern": "^REF-[0-9a-f]{32}$"
+    },
+    "corpus_version": {
+      "description": "Which index this belongs to. Retrieval only reads the version marked complete, so a review never sees a half-built one (D44).",
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$"
+    },
+    "source": {
+      "description": "Which entry in corpus/sources.yml this came from.",
+      "enum": ["azure-policy", "cloud-adoption-framework", "azurerm-docs"]
+    },
+    "source_repository": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    },
+    "source_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "source_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_url": {
+      "description": "The document at that exact commit, for attribution and for checking what a suggestion drew on.",
+      "type": "string",
+      "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/blob/[0-9a-f]{40}/"
+    },
+    "license": {
+      "description": "Only licences that allow this use. Anything else can't be stored (D41).",
+      "enum": ["MIT", "CC-BY-4.0", "MPL-2.0"]
+    },
+    "attribution": {
+      "description": "What to show wherever this text is quoted or a suggestion draws on it.",
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "heading": {
+      "description": "The section within the document, empty for text before its first heading.",
+      "type": "string"
+    },
+    "provider_version": {
+      "description": "Only on provider docs. A review filters on the version in the repo's lock file, and a version that isn't indexed gets no provider docs.",
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "applies_to": {
+      "description": "Provider resource types this is about. Empty when it isn't about particular ones, which only vector search can find.",
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+      "uniqueItems": true
+    },
+    "text": {
+      "description": "Upstream text, which is untrusted: it stays in its own fence in a prompt.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8000
+    },
+    "content_hash": {
+      "description": "Of the text, embedding model and chunker version, so only what changed gets embedded again (D44).",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "embedding": {
+      "description": "Added by indexing. text-embedding-3-small returns 1536 numbers.",
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 1536,
+      "maxItems": 1536
+    }
+  }
+}
