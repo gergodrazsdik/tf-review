@@ -372,6 +372,7 @@ One storage account holds every repo's state, created once by a bootstrap projec
 | Evals (`tf-review` only, from M3) | `repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:review` | Cognitive Services OpenAI User on the Foundry resource group; nothing else (D21, D24). Until M3 each repo had one for its review job |
 | Reviewer submit (M3) | No Azure identity: the API checks the GitHub OIDC token itself (D45) | Call the review API only |
 | Service (M3) | None: a managed identity on the service's container apps | LLM, queue, blobs, reading secrets and, from `infra/`, Cosmos, all in `tf-review`'s resource group |
+| Index (M3) | `repo:<owner>@<owner-id>/tf-review@<repo-id>:environment:corpus`, which only `main` can use, after your approval | Embeddings and, from `infra/`, writing the reference container (D44) |
 
 **Reviewer infrastructure** (`tf-review/infra`; Foundry from M1, the rest from M3)
 
@@ -653,7 +654,8 @@ Work runs in this order, so the unknowns surface before anything depends on them
 
 *5. Retrieval*
 
-- [ ] Indexing workflow, as described under "Refreshing the corpus": a dry run on PRs changing `corpus/sources.yml`, indexing on merge with a switch to the new version only once it's complete, and a by-hand rebuild. **You:** bootstrap for its identity, then approve its environment
+- [x] Bootstrap: the indexing identity and the `corpus` environment. **You:** `bootstrap-plan`, `bootstrap-apply`
+- [ ] Indexing workflow, as described under "Refreshing the corpus": a dry run on PRs changing `corpus/sources.yml`, indexing on merge with a switch to the new version only once it's complete, and a by-hand rebuild. **You:** approve its environment
 - [ ] The vector container, through azapi (D46), because azurerm 5.12 has no vector policy on a container, and a policy can't be changed later
 - [ ] `CosmosRetriever` behind `IRetriever`: a team's rules always come through filtering, as they do today, so coverage can't depend on a ranking. Reference chunks are ranked by vector or hybrid search within a separate token budget
 - [ ] Prompts: reference material in its own fence, marked as context rather than rules, which needs a new version of each agent's prompt
