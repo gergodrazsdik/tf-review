@@ -51,14 +51,15 @@ public static class WorkerHost
             Model(),
             log: Console.WriteLine,
             infracost: new InfracostRunner(new ProcessRunner(InfracostRunner.EnvironmentVariables)),
-            checkov: new CheckovRunner(new ProcessRunner()));
+            checkov: new CheckovRunner(new ProcessRunner()),
+            references: References());
 
         var worker = new ReviewWorker(
             stores.Queue,
             stores.Plans,
             stores.Statuses,
             (repository, cancellationToken) => app.OpenAsync(repository, GitHubApi, cancellationToken),
-            (plan, config, _, commit, cancellationToken) => runner.RunAsync(plan, config, commit, cancellationToken),
+            (plan, config, lockFile, commit, cancellationToken) => runner.RunAsync(plan, config, commit, cancellationToken, lockFile),
             Console.WriteLine);
 
         return await worker.RunOnceAsync(deadline.Token);
@@ -71,6 +72,25 @@ public static class WorkerHost
                 .AddAzureMonitorMetricExporter(options => options.ConnectionString = connectionString)
                 .Build()
             : null;
+
+    // Read-only use of the index the corpus workflow builds. Only configs asking for references get any (D42).
+    private static CosmosReferenceRetriever? References()
+    {
+        var endpoint = Environment.GetEnvironmentVariable("TF_REVIEW_OPENAI_ENDPOINT");
+        var deployment = Environment.GetEnvironmentVariable("TF_REVIEW_EMBEDDING_DEPLOYMENT");
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) || string.IsNullOrEmpty(deployment))
+        {
+            return null;
+        }
+
+        var credential = new DefaultAzureCredential();
+        var container = new Microsoft.Azure.Cosmos.CosmosClient(
+                Required("TF_REVIEW_COSMOS_ENDPOINT"),
+                credential,
+                new Microsoft.Azure.Cosmos.CosmosClientOptions { ApplicationName = "tf-review", ConnectionMode = Microsoft.Azure.Cosmos.ConnectionMode.Gateway })
+            .GetContainer("tfreview", "references");
+        return new CosmosReferenceRetriever(container, AzureQueryEmbedder.Create(uri, deployment, credential));
+    }
 
     // No model configured means the agents report "not reviewed", rather than the whole review failing.
     private static ReviewModel? Model()

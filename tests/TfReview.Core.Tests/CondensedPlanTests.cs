@@ -18,6 +18,17 @@ public class CondensedPlanTests
         await Assert.That(plan.ResourceTypes()).IsEquivalentTo(["x"]);
     }
 
+    // What a search is told about a slice: which attributes change, and nothing of their values.
+    [Test]
+    public async Task Names_the_attributes_that_change_but_not_tags_or_names_kept_as_they_were()
+    {
+        var plan = Condense(Plan(
+            Resource("a.one", "[\"update\"]", """{"name":"n","tags":{"a":"1"},"sku":"Basic"}""", """{"name":"n","tags":{"a":"1"},"sku":"Standard"}"""),
+            Resource("a.two", "[\"create\"]", "null", """{"name":"m","min_tls_version":"TLS1_2"}""")));
+
+        await Assert.That(plan.ChangedAttributeNames()).IsEquivalentTo(["min_tls_version", "name", "sku"]);
+    }
+
     [Test]
     public async Task Drops_no_ops()
     {

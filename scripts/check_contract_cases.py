@@ -34,6 +34,9 @@ cases = [
     # name, schema, document, should it pass
     ("example finding", "finding", finding, True),
     ("example reference chunk", "reference-chunk", chunk, True),
+    ("result with references", "review-result", changed(result, references={"corpus_version": "0123456789abcdef", "provider_docs_missing": False, "attributions": ["HashiCorp, MPL-2.0"]}), True),
+    ("result with references and no index", "review-result", changed(result, references={"corpus_version": None, "provider_docs_missing": True, "attributions": []}), True),
+    ("result with references missing a field", "review-result", changed(result, references={"corpus_version": None}), False),
     ("reference with no provider version", "reference-chunk", {k: v for k, v in chunk.items() if k != "provider_version"}, True),
     ("reference with an unknown licence", "reference-chunk", changed(chunk, license="CC-BY-NC-4.0"), False),
     ("reference with no licence", "reference-chunk", {k: v for k, v in chunk.items() if k != "license"}, False),

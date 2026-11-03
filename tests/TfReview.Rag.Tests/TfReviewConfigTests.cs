@@ -24,6 +24,16 @@ public class TfReviewConfigTests
     }
 
     [Test]
+    public async Task References_are_off_unless_a_config_asks()
+    {
+        var off = TfReviewConfig.Parse($"version: 1\nstandards:\n  repository: a/b\n  commit: {Sha}\n");
+        var on = TfReviewConfig.Parse($"version: 1\nstandards:\n  repository: a/b\n  commit: {Sha}\nreferences: true\n");
+
+        await Assert.That(off.References).IsFalse();
+        await Assert.That(on.References).IsTrue();
+    }
+
+    [Test]
     public async Task Cost_is_opt_in_because_it_needs_a_secret()
     {
         var config = TfReviewConfig.Parse($"version: 1\nstandards:\n  repository: a/b\n  commit: {Sha}\nagents: [conventions, cost]\n");

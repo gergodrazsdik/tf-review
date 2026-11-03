@@ -13,6 +13,9 @@ public sealed class ConfigException(string message) : Exception(message);
 /// </summary>
 public sealed partial record TfReviewConfig(string Repository, string Commit, IReadOnlyList<string> Agents, bool Blocking)
 {
+    /// <summary>Whether agents get imported reference material as well as the team's rules (D42). Off by default.</summary>
+    public bool References { get; init; }
+
     private static readonly string[] KnownAgents = ["conventions", "cost", "security"];
 
     // A repo opts in to the rest: cost needs a secret set up first, and security can add findings a repo's
@@ -65,7 +68,7 @@ public sealed partial record TfReviewConfig(string Repository, string Commit, IR
             _ => throw new ConfigException("gate.mode must be advisory or blocking."),
         };
 
-        return new TfReviewConfig(repository, commit, agents, blocking);
+        return new TfReviewConfig(repository, commit, agents, blocking) { References = file.References ?? false };
     }
 
     [GeneratedRegex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")]
@@ -83,6 +86,8 @@ public sealed partial record TfReviewConfig(string Repository, string Commit, IR
         public StandardsSection? Standards { get; set; }
 
         public List<string>? Agents { get; set; }
+
+        public bool? References { get; set; }
 
         public ThresholdsSection? Thresholds { get; set; }
 

@@ -1,4 +1,4 @@
 {
   "prompt_version": 2,
-  "text": "{\"groups\":[{\"finding_ids\":[\"F1\",\"F3\"]},{\"finding_ids\":[\"F4\"]}],\"order\":[\"F2\",\"F1\",\"F3\",\"F4\",\"F5\"]}"
+  "text": "{\"groups\":[{\"finding_ids\":[\"F1\",\"F3\"]},{\"finding_ids\":[\"F4\"]}],\"order\":[\"F1\",\"F3\",\"F2\",\"F4\",\"F5\"]}"
 }

@@ -71,7 +71,8 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
         IReadOnlyList<StandardsDoc> docs,
         IReadOnlyList<Finding> policyFindings,
         IReadOnlyList<ResourceCostChange>? costs = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyList<ReferenceDoc>? references = null)
     {
         var prompt = Prompts.Load(profile.Name);
         var calls = new List<AgentCall>();
@@ -82,7 +83,7 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
             return new AgentReviewed(prompt.Version, calls, []);
         }
 
-        var user = UserMessage(plan, docs, policyFindings, costs);
+        var user = UserMessage(plan, docs, policyFindings, costs, references);
         if (TokenEstimate.Of(user) > MaxUserMessageTokens)
         {
             return new AgentFailed(prompt.Version, calls, NotReviewedReason.PlanTooLarge);
@@ -120,7 +121,11 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
 
     /// <summary>Plan text and policy messages come from the PR. An agent only sees findings for the standards it can cite.</summary>
     private static string UserMessage(
-        CondensedPlan plan, IReadOnlyList<StandardsDoc> docs, IReadOnlyList<Finding> policyFindings, IReadOnlyList<ResourceCostChange>? costs)
+        CondensedPlan plan,
+        IReadOnlyList<StandardsDoc> docs,
+        IReadOnlyList<Finding> policyFindings,
+        IReadOnlyList<ResourceCostChange>? costs,
+        IReadOnlyList<ReferenceDoc>? references)
     {
         var policies = new JsonArray(
         [
@@ -157,6 +162,24 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
             ]);
 
             message.AppendLine("<cost_data>").AppendLine(StructuredCall.Escape(CanonicalJson.Write(figures))).AppendLine("</cost_data>").AppendLine();
+        }
+
+        // Upstream text, which is untrusted like the plan, so it's data in the user message and never part of the
+        // instructions. Escaped the same way, so nothing in it can close the fence.
+        if (references is { Count: > 0 })
+        {
+            var material = new JsonArray(
+            [
+                .. references.Select(doc => (JsonNode)new JsonObject
+                {
+                    ["source"] = doc.Source,
+                    ["title"] = doc.Title,
+                    ["heading"] = doc.Heading,
+                    ["text"] = doc.Text,
+                }),
+            ]);
+
+            message.AppendLine("<reference_material>").AppendLine(StructuredCall.Escape(CanonicalJson.Write(material))).AppendLine("</reference_material>").AppendLine();
         }
 
         return message.AppendLine("<plan_data>").AppendLine(StructuredCall.Escape(plan.ToCanonicalJson())).Append("</plan_data>").ToString();
