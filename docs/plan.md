@@ -642,7 +642,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 - [x] Reusable workflow: the review job runs `tfreview submit` and no agents. On any failure it posts "not reviewed" with its own token (D39), with no App needed
 - [x] OpenTelemetry to App Insights: tokens, cached tokens, latency and cost per agent call, findings per agent, evidence-check drops, and what wasn't reviewed, as metrics with names and counts only. The job flushes them as it exits. Proved by `tf-review-demo` PR #34, where the metrics and logs agreed on each call
 - [ ] Remove what the service replaced from each repo: the review identity, and the Infracost token, which moves to Key Vault (D38)
-- [ ] `e2e-live` against the real service as well as the eval harness, and a real demo PR, before the corpus changes
+- [x] The real service as well as the eval harness, before the corpus changes: `just service-eval` compares what it posted on the demo's 8 seed PRs with their expected findings. Nothing is replayed, and `e2e-live` stays as the cheaper check on every PR. All 8 passed on 2026-11-03 once C8 was re-run, after 8 pushes at once showed plans racing on the state lock (D48)
 
 *4. Corpus*
 
@@ -674,6 +674,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 
 **Backlog after v1**
 
+- A shared dashboard of the reviewer's metrics and resource usage, as an Azure Workbook in `infra/`: cost and tokens per agent, findings, what wasn't reviewed, job runs and Cosmos and storage use
 - Terraform Cloud / HCP-hosted plans as an input
 - AWS and Google pricing (add their Infracost plugins to the image)
 - Fix suggestions as GitHub suggested changes

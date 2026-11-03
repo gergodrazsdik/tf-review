@@ -1,0 +1,153 @@
+#!/usr/bin/env python3
+"""Compares what the real service posted on the demo's seed PRs with each case's expected findings.
+
+Nothing is replayed here: real plans, scanners, model and App. So a miss can be the model on a bad day (see
+docs/evals/baseline.md), and a single one needs reading rather than reverting. Run it outside the Claude sandbox.
+"""
+
+import argparse
+import json
+import re
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+DEMO = "gergodrazsdik/tf-review-demo"
+APP = "tf-review-gergodrazsdik"
+MARKER = "<!-- tf-review -->"
+CASES = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "cases"
+SEVERITIES = ("high", "medium", "low")
+POLL_SECONDS = 15
+
+
+def gh(*arguments):
+    """Runs gh, retrying because GitHub's API times out from here now and then."""
+    error = ""
+    for attempt in range(5):
+        done = subprocess.run(["gh", *arguments], capture_output=True, text=True, check=False)
+        if done.returncode == 0:
+            return done.stdout
+        error = done.stderr
+        if attempt < 4:
+            time.sleep(5)
+    sys.exit(f"gh {arguments[0]} failed: {error.strip()[:200]}")
+
+
+def api(path):
+    return json.loads(gh("api", f"repos/{DEMO}/{path}"))
+
+
+def seeds():
+    pulls = api("pulls?state=open&per_page=100")
+    return [pull for pull in pulls if pull["head"]["ref"].startswith("seed/")]
+
+
+def check_run(sha):
+    """The App's check on this commit, or None until there is one."""
+    runs = api(f"commits/{sha}/check-runs?check_name=tf-review")["check_runs"]
+    return next((run for run in runs if run["app"]["slug"] == APP), None)
+
+
+def comment(pull):
+    """The sticky comment, which either identity may have written."""
+    comments = api(f"issues/{pull['number']}/comments?per_page=100")
+    return next((item["body"] for item in comments if item["body"].startswith(MARKER)), None)
+
+
+def parse_findings(body):
+    """The (resource, rule) each row stands for. A row the arbiter merged names its other rules after "also"."""
+    findings = set()
+    for line in body.splitlines():
+        cells = [cell.strip() for cell in line.split("|")]
+        if len(cells) < 4 or cells[1] not in SEVERITIES:
+            continue
+        resource = cells[2].strip("`")
+        main, _, also = cells[3].partition(", also ")
+        rule = re.match(r"\[?`?([A-Za-z0-9_-]+)", main)
+        findings.add((resource, rule.group(1) if rule else main))
+        findings.update((resource, other) for other in re.findall(r"`([A-Za-z0-9_-]+)`", also))
+    return findings
+
+
+def judge(pull, body):
+    """What's wrong with this PR's review, as lines to print."""
+    sha = pull["head"]["sha"]
+    case = pull["head"]["ref"].removeprefix("seed/")
+    if f"`{sha[:7]}`" not in body:
+        return [f"the comment isn't for commit {sha[:7]}"]
+
+    expected_path = CASES / case / "expected.json"
+    expected = json.loads(expected_path.read_text(encoding="utf-8"))
+    wanted = {(item["resource_address"], item["rule"]) for item in expected["findings"]}
+    posted = parse_findings(body)
+
+    problems = [f"missing: {resource} {rule}" for resource, rule in sorted(wanted - posted)]
+    problems += [f"unexpected: {resource} {rule}" for resource, rule in sorted(posted - wanted)]
+    gaps = re.search(r"^Not reviewed: .*$", body, re.MULTILINE)
+    if gaps:
+        problems.append(gaps.group(0))
+    return problems
+
+
+def rerun(pulls):
+    """Starts each seed's latest workflow again, for testing a service that changed without a push."""
+    for pull in pulls:
+        runs = json.loads(gh(
+            "run", "list", "-R", DEMO, "--workflow", "plan", "--branch", pull["head"]["ref"],
+            "--limit", "1", "--json", "databaseId"))
+        gh("run", "rerun", str(runs[0]["databaseId"]), "-R", DEMO)
+
+
+def wait_for_checks(pulls, timeout, since):
+    """Waits for each PR's check, newer than `since` if that's given. Returns those still without one."""
+    deadline = time.monotonic() + timeout
+    waiting = list(pulls)
+    while waiting and time.monotonic() < deadline:
+        ready = []
+        for pull in waiting:
+            run = check_run(pull["head"]["sha"])
+            if run and run["status"] == "completed" and (since is None or run["completed_at"] > since):
+                ready.append(pull)
+        waiting = [pull for pull in waiting if pull not in ready]
+        if waiting:
+            time.sleep(POLL_SECONDS)
+    return waiting
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--rerun", action="store_true", help="review every seed again first")
+    parser.add_argument("--timeout", type=int, default=900, help="seconds to wait for reviews")
+    options = parser.parse_args()
+
+    pulls = sorted(seeds(), key=lambda pull: pull["head"]["ref"])
+    if not pulls:
+        sys.exit("No open seed PRs.")
+
+    since = None
+    if options.rerun:
+        since = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        rerun(pulls)
+
+    late = wait_for_checks(pulls, options.timeout, since)
+    failures = 0
+    for pull in pulls:
+        name = pull["head"]["ref"].removeprefix("seed/")
+        if pull in late:
+            problems = [f"no review after {options.timeout} seconds"]
+        else:
+            body = comment(pull)
+            problems = judge(pull, body) if body else ["no comment"]
+
+        print(f"{'FAIL' if problems else 'PASS'}: {name} (#{pull['number']})")
+        for problem in problems:
+            print(f"  {problem}")
+        failures += bool(problems)
+
+    print(f"{len(pulls) - failures} of {len(pulls)} passed.")
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

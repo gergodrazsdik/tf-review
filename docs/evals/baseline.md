@@ -15,6 +15,10 @@ Model gpt-5.4-mini at low reasoning effort. Prompts conventions v4, security v4,
 
 **Read this as "about 99% on small, known cases", not as solved.** At 5 runs per case, `e2e-live` will still fail now and then with no change to blame, so it isn't a required check, and a single failure needs reading rather than reverting. The known weak spots are the cost agent on ADR-003's rules and the security agent on C13-style near misses. Nothing about them can block a merge, because model findings never do.
 
+## Through the real service: 2026-11-03
+
+`just service-eval` runs the seeded demo PRs through the real workflow, API, job, scanners, model and App, with nothing replayed. All 8 passed: C1, C2, C3, C5, C6, C8, C9 and C10. It's one run per case, so it proves the path works, and `e2e-live`'s five runs per case remain the measure of the agents. Eight pushes at once all got reviewed, one at a time as the job picked them up, after C8 was re-run because its plan lost a race on the state lock.
+
 ## How the held-out cases went
 
 These are the honest part of the suite, because C1–C10 were used to tune the prompts, or are things a policy finds anyway. Held-out cases had their expected results fixed before any model saw them, and were measured once.
