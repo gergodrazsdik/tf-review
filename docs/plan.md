@@ -372,7 +372,7 @@ One storage account holds every repo's state, created once by a bootstrap projec
 | Evals (`tf-review` only, from M3) | `repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:review` | Cognitive Services OpenAI User on the Foundry resource group; nothing else (D21, D24). Until M3 each repo had one for its review job |
 | Reviewer submit (M3) | No Azure identity: the API checks the GitHub OIDC token itself (D45) | Call the review API only |
 | Service (M3) | None: a managed identity on the service's container apps | LLM, queue, blobs, reading secrets and, from `infra/`, Cosmos, all in `tf-review`'s resource group |
-| Index (M3) | `repo:<owner>@<owner-id>/tf-review@<repo-id>:environment:corpus`, which only `main` can use, after your approval | Embeddings and, from `infra/`, writing the reference container (D44) |
+| Index (M3) | `repo:<owner>@<owner-id>/tf-review@<repo-id>:environment:corpus`, which only `main` can use, after your approval | Embeddings and writing the `tfreview` database, both from bootstrap, because `infra/`'s plan identity can't read the state resource group (D44) |
 
 **Reviewer infrastructure** (`tf-review/infra`; Foundry from M1, the rest from M3)
 
@@ -655,6 +655,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 *5. Retrieval*
 
 - [x] Bootstrap: the indexing identity and the `corpus` environment. **You:** `bootstrap-plan`, `bootstrap-apply`
+- [x] Bootstrap: the indexing identity's Cosmos data role, scoped to the database. **You:** `bootstrap-plan`, `bootstrap-apply`
 - [x] Indexing workflow, as described under "Refreshing the corpus": `corpus.yml` runs `tfreview-corpus dry-run` on PRs changing the sources or the importer, with no credentials, into the job summary, and `tfreview-corpus index` on merge in the `corpus` environment, and by hand with `rebuild`. Vectors are reused by content hash, which covers what's embedded (title, heading and text), the model and the chunker. Each batch is stored as it's embedded, so a failed run's work isn't paid for twice, and reviews switch to a version only once its count matches. **You:** approve the `corpus` environment
 - [x] The `references` container, through azapi (D46), because azurerm 5.12 has no vector policy on a container, and a policy can't be changed later: partitioned by `corpus_version`, 1536-dimension cosine vectors with a quantized flat index, and full-text search on the text for hybrid ranking, at 600 RU/s, which uses the rest of the free 1,000. **You:** approve `prod`
 - [ ] `CosmosRetriever` behind `IRetriever`: a team's rules always come through filtering, as they do today, so coverage can't depend on a ranking. Reference chunks are ranked by vector or hybrid search within a separate token budget
