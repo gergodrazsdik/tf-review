@@ -31,6 +31,7 @@ public class ReviewSubmitterTests
         await Assert.That(run.Handler.Bodies.Single()).Contains($"\"commit\":\"{Commit}\"");
         await Assert.That(run.Handler.Bodies.Single()).Contains("\"config_path\":\".tf-review.yml\"");
         await Assert.That(run.Handler.Bodies.Single()).Contains("\"plan\":\"the plan\"");
+        await Assert.That(run.Handler.Bodies.Single()).DoesNotContain("working_directory");
     }
 
     // The API is scaling up from nothing, which is what happens on most PRs.

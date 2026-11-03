@@ -191,13 +191,15 @@ jobs:
         env:
           TF_REVIEW_API_URL: ${{ inputs.api-url }}
           CONFIG_PATH: ${{ inputs.config-path }}
+          # So the service can read the project's lock file at the base commit, for its provider version.
+          PROJECT: ${{ inputs.working-directory }}
         run: |
           work="$RUNNER_TEMP/tf-review"
           mkdir -p "$work"
           docker run --rm --read-only --tmpfs /tmp --user "$(id -u):$(id -g)" -v "$work:/work" \
             -e HOME=/tmp -e TF_REVIEW_API_URL \
             -e ACTIONS_ID_TOKEN_REQUEST_URL -e ACTIONS_ID_TOKEN_REQUEST_TOKEN \
-            "$IMAGE" submit /work/redacted.json "$COMMIT" "$CONFIG_PATH"
+            "$IMAGE" submit /work/redacted.json "$COMMIT" "$CONFIG_PATH" "$PROJECT"
       # With its own token and no result, which says "not reviewed", so an older result can't stand for this
       # commit (D39). A re-run reviews it once the service is back.
       - name: Say not reviewed

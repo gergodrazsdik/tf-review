@@ -4,8 +4,11 @@ using TfReview.Service;
 
 namespace TfReview.Worker;
 
-/// <summary>Runs one review from a redacted plan and a config. Production's is <c>ReviewRunner</c>.</summary>
-public delegate Task<ReviewResult> ReviewEngine(string plan, string? config, string commit, CancellationToken cancellationToken);
+/// <summary>
+/// Runs one review from a redacted plan, a config and the project's lock file, all from the base commit except the plan.
+/// Production's is <c>ReviewRunner</c>.
+/// </summary>
+public delegate Task<ReviewResult> ReviewEngine(string plan, string? config, string? lockFile, string commit, CancellationToken cancellationToken);
 
 /// <summary>Opens a repo through the GitHub App, with a token for that repo alone.</summary>
 public delegate Task<RepositorySession> RepositoryOpener(string repository, CancellationToken cancellationToken);
@@ -110,10 +113,15 @@ public sealed class ReviewWorker(
 
         // At the base commit, so a PR can't weaken its own review.
         var config = await session.ReadFileAsync(job.ConfigPath, pullRequest.Base, cancellationToken);
+
+        // Also at the base commit: it says which provider docs apply, and a PR's own version isn't merged yet.
+        var lockFile = job.WorkingDirectory is { } directory
+            ? await session.ReadFileAsync($"{directory.TrimEnd('/')}/.terraform.lock.hcl", pullRequest.Base, cancellationToken)
+            : null;
         var plan = await plans.ReadAsync(job.ReviewId, cancellationToken);
         var result = plan is null
             ? ReviewResult.Failed(job.Commit, ReviewScope.Plan, NotReviewedReason.Unavailable)
-            : await engine(plan, config, job.Commit, cancellationToken);
+            : await engine(plan, config, lockFile, job.Commit, cancellationToken);
 
         if ((await session.ReadPullRequestAsync(job.PullRequest, cancellationToken)).Head != job.Commit)
         {

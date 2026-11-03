@@ -58,7 +58,7 @@ public static class WorkerHost
             stores.Plans,
             stores.Statuses,
             (repository, cancellationToken) => app.OpenAsync(repository, GitHubApi, cancellationToken),
-            (plan, config, commit, cancellationToken) => runner.RunAsync(plan, config, commit, cancellationToken),
+            (plan, config, _, commit, cancellationToken) => runner.RunAsync(plan, config, commit, cancellationToken),
             Console.WriteLine);
 
         return await worker.RunOnceAsync(deadline.Token);

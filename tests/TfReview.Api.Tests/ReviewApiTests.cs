@@ -211,6 +211,32 @@ public class ReviewApiTests
     }
 
     [Test]
+    public async Task The_working_directory_reaches_the_job()
+    {
+        await using var api = await Api.StartAsync();
+
+        using var response = await api.SendAsync(
+            Token(GoodClaims()), new { commit = Commit, config_path = ".tf-review.yml", plan = CleanPlan, working_directory = "infra" });
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
+        await Assert.That(api.Queue.Jobs.Single().WorkingDirectory).IsEqualTo("infra");
+    }
+
+    [Test]
+    [Arguments("../other")]
+    [Arguments("/etc")]
+    [Arguments("infra/../../x")]
+    public async Task A_working_directory_outside_the_repo_is_refused(string directory)
+    {
+        await using var api = await Api.StartAsync();
+
+        using var response = await api.SendAsync(
+            Token(GoodClaims()), new { commit = Commit, config_path = ".tf-review.yml", plan = CleanPlan, working_directory = directory });
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
     public async Task The_plan_is_redacted_again_before_it_is_stored()
     {
         await using var api = await Api.StartAsync();
