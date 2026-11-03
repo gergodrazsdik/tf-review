@@ -51,6 +51,7 @@ So 5 of the first 6 passed on their first measurement, which is the fair estimat
 | 2026-11-02 | `breaks_standard`, first in the schema | C13 passed 1 of 3, C11 2 of 3 from the arbiter's drop, everything else 3 of 3 |
 | 2026-11-02 | Field last, arbiter can't drop, 5 runs per case | 84 of 85: C14 failed once, flagging a 20% rise |
 | 2026-11-02 | Code supplies the percentage (cost v4) | 83 of 85: C4 and C15 failed once each, retracting real increases |
+| 2026-11-03 | v5 prompts, saying how to treat reference material, run without any | 85 of 85 |
 
 ## What this doesn't measure
 

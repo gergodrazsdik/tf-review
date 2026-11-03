@@ -1,4 +1,4 @@
 {
   "prompt_version": 1,
-  "text": "{\"resources\":[{\"resource_address\":\"azurerm_network_security_rule.seed\",\"reason\":\"This can expose network access if the rule is too permissive.\"},{\"resource_address\":\"azurerm_network_security_group.seed\",\"reason\":null}]}"
+  "text": "{\"resources\":[{\"resource_address\":\"azurerm_network_security_group.seed\",\"reason\":null},{\"resource_address\":\"azurerm_network_security_rule.seed\",\"reason\":\"This could change network exposure if the rule allows unexpected traffic.\"}]}"
 }

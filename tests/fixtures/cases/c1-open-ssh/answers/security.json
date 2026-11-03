@@ -1,4 +1,4 @@
 {
-  "prompt_version": 4,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_network_security_rule.seed\",\"doc_id\":\"POL-002\",\"attribute\":\"destination_port_range\",\"title\":\"azurerm_network_security_rule.seed allows SSH with destination_port_range \\\"22\\\" from the internet source \\\"0.0.0.0/0\\\", which opens an admin port to the internet.\",\"suggestion\":\"Restrict the source to a private range, VPN, or bastion host, or change the rule so SSH is not exposed publicly.\",\"breaks_standard\":true}]}"
+  "prompt_version": 5,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_network_security_rule.seed\",\"doc_id\":\"POL-002\",\"attribute\":\"source_address_prefix\",\"title\":\"azurerm_network_security_rule.seed allows SSH on port \\\"22\\\" from the internet because the source is \\\"0.0.0.0/0\\\", which exposes an admin port publicly.\",\"suggestion\":\"Restrict the source address to a private range, VPN, or bastion host instead of \\\"0.0.0.0/0\\\".\",\"breaks_standard\":true}]}"
 }
