@@ -37,8 +37,8 @@ return args switch
 {
     ["replay"] => await Replay(),
     ["record-scans", .. var names] => await RecordScans(names),
-    ["live", "--runs", var runs] => await Live(int.Parse(runs, CultureInfo.InvariantCulture), null),
-    ["live", "--runs", var runs, "--record", var directory] => await Live(int.Parse(runs, CultureInfo.InvariantCulture), directory),
+    ["live", "--runs", var runs, .. var options] => await Live(
+        int.Parse(runs, CultureInfo.InvariantCulture), Option(options, "--record"), options.Contains("--references"), Option(options, "--suggestions")),
     ["retrieval", var labels] => await TfReview.Eval.RetrievalEval.RunAsync(labels, CasesDirectory, standardsDirectory, null),
     ["retrieval", var labels, "--report", var report] => await TfReview.Eval.RetrievalEval.RunAsync(labels, CasesDirectory, standardsDirectory, report),
     _ => Usage(),
@@ -46,7 +46,7 @@ return args switch
 
 static int Usage()
 {
-    Console.Error.WriteLine("usage: eval replay\n       eval record-scans [case...]\n       eval live --runs <n> [--record <dir>]\n       eval retrieval <labels.yml> [--report <file.md>]");
+    Console.Error.WriteLine("usage: eval replay\n       eval record-scans [case...]\n       eval live --runs <n> [--record <dir>] [--references] [--suggestions <dir>]\n       eval retrieval <labels.yml> [--report <file.md>]");
     return 2;
 }
 
@@ -120,11 +120,25 @@ static string Describe(object outcome) => outcome switch
     _ => "unknown",
 };
 
-async Task<int> Live(int runs, string? recordDirectory)
+static string? Option(string[] options, string name) =>
+    Array.IndexOf(options, name) is var index and >= 0 && index + 1 < options.Length ? options[index + 1] : null;
+
+// With --references the config turns reference material on, and agents read the real index with the lock file below.
+// The baseline has to hold with it, and --suggestions saves what each run suggested, to read against a run without.
+async Task<int> Live(int runs, string? recordDirectory, bool withReferences, string? suggestionsDirectory)
 {
     var endpoint = new Uri(Required("TF_REVIEW_OPENAI_ENDPOINT"));
     var deployment = Required("TF_REVIEW_OPENAI_DEPLOYMENT");
     using var client = LlmClient.Create(endpoint, deployment);
+    var references = withReferences
+        ? new TfReview.Service.CosmosReferenceRetriever(
+            new Microsoft.Azure.Cosmos.CosmosClient(
+                    Required("TF_REVIEW_COSMOS_ENDPOINT"),
+                    new Azure.Identity.DefaultAzureCredential(),
+                    new Microsoft.Azure.Cosmos.CosmosClientOptions { ConnectionMode = Microsoft.Azure.Cosmos.ConnectionMode.Gateway })
+                .GetContainer("tfreview", "references"),
+            TfReview.Service.AzureQueryEmbedder.Create(endpoint, "text-embedding-3-small", new Azure.Identity.DefaultAzureCredential()))
+        : null;
 
     var failures = 0;
     var totalCost = 0m;
@@ -137,7 +151,21 @@ async Task<int> Live(int runs, string? recordDirectory)
         for (var run = 1; run <= runs; run++)
         {
             using var recording = new RecordingChat(client, profiles);
-            var result = await Review(directory, recording, deployment);
+            var result = await Review(directory, recording, deployment, references);
+            if (suggestionsDirectory is not null)
+            {
+                Directory.CreateDirectory(Path.Combine(suggestionsDirectory, name));
+                await File.WriteAllTextAsync(
+                    Path.Combine(suggestionsDirectory, name, $"run-{run}.json"),
+                    JsonSerializer.Serialize(
+                        new
+                        {
+                            findings = result.Findings.Select(finding => new { finding.ResourceAddress, finding.Rule, finding.Title, finding.Suggestion }),
+                            references = result.References,
+                        },
+                        fileOptions) + "\n");
+            }
+
             var problems = await Problems(directory, result);
             failures += Report(name, run, problems);
             totalCost += result.Usage is { } usage ? StepSummary.EstimateCost(usage) ?? 0 : 0;
@@ -153,7 +181,8 @@ async Task<int> Live(int runs, string? recordDirectory)
             if (problems.Count == 0)
             {
                 passes++;
-                if (recordDirectory is not null)
+                // Replay runs without references, so answers given with them would be the wrong fixtures.
+                if (recordDirectory is not null && !withReferences)
                 {
                     foreach (var (agent, text) in recording.Answers)
                     {
@@ -171,13 +200,14 @@ async Task<int> Live(int runs, string? recordDirectory)
     }
 
     var versions = string.Join(", ", profiles.Select(profile => $"{profile} v{Prompts.Load(profile).Version}"));
+    Console.WriteLine(withReferences ? $"With reference material, re-ranked by {ReferenceSelector.Name} v{Prompts.Load(ReferenceSelector.Name).Version}." : "Without reference material.");
     Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"Prompts {versions}, model {deployment}, estimated cost ~${totalCost:0.0000}."));
     Console.WriteLine($"Input tokens: {inputTokens}, of which cached: {cachedTokens}.");
     Console.WriteLine(failures == 0 ? $"PASS: {cases.Length} case(s), {runs} run(s) each." : $"FAIL: {failures} failed run(s).");
     return failures == 0 ? 0 : 1;
 }
 
-async Task<ReviewResult> Review(string directory, IChatClient chat, string deployment = "replay")
+async Task<ReviewResult> Review(string directory, IChatClient chat, string deployment = "replay", IReferenceRetriever? references = null)
 {
     var scans = new RecordedScans(directory);
     var runner = new ReviewRunner(
@@ -185,9 +215,16 @@ async Task<ReviewResult> Review(string directory, IChatClient chat, string deplo
         new ConftestRunner(new ProcessRunner()),
         new ReviewModel(chat, deployment),
         infracost: new InfracostRunner(scans),
-        checkov: new CheckovRunner(scans));
+        checkov: new CheckovRunner(scans),
+        references: references);
 
-    return await runner.RunAsync(await File.ReadAllTextAsync(Path.Combine(directory, "plan.json")), Config, Commit);
+    // The demo's provider version, which is what the index holds docs for.
+    const string LockFile = "provider \"registry.opentofu.org/hashicorp/azurerm\" {\n  version = \"5.12.0\"\n}\n";
+    return await runner.RunAsync(
+        await File.ReadAllTextAsync(Path.Combine(directory, "plan.json")),
+        references is null ? Config : Config + "\nreferences: true\n",
+        Commit,
+        lockFile: references is null ? null : LockFile);
 }
 
 // The whole set has to match: an extra finding is a false positive, and it fails the case like a missed one.

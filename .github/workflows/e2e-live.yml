@@ -18,6 +18,10 @@ on:
         description: Runs per case.
         type: number
         default: 5
+      references:
+        description: Give agents reference material from the index, which the baseline has to hold with.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -64,9 +68,21 @@ jobs:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           TF_REVIEW_OPENAI_ENDPOINT: ${{ vars.TF_REVIEW_OPENAI_ENDPOINT }}
           TF_REVIEW_OPENAI_DEPLOYMENT: ${{ vars.TF_REVIEW_OPENAI_DEPLOYMENT }}
+          TF_REVIEW_COSMOS_ENDPOINT: https://cosmos-tf-review-prod.documents.azure.com:443/
+          REFERENCES: ${{ inputs.references && '--references' || '' }}
         run: |
           export AZURE_FEDERATED_TOKEN_FILE="$RUNNER_TEMP/federated-token"
-          dotnet run --project tests/TfReview.Eval --no-build -- live --runs "$RUNS" --record "$RUNNER_TEMP/answers"
+          # shellcheck disable=SC2086  # REFERENCES is empty or one flag.
+          dotnet run --project tests/TfReview.Eval --no-build -- live --runs "$RUNS" --record "$RUNNER_TEMP/answers" \
+            --suggestions "$RUNNER_TEMP/suggestions" $REFERENCES
+      # What each run found and suggested, to read a run with references against one without.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: suggestions
+          path: ${{ runner.temp }}/suggestions
+          retention-days: 14
+          if-no-files-found: warn
       # Passing answers, to commit as the replay fixtures after a prompt change.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
