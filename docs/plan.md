@@ -656,7 +656,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 
 - [x] Bootstrap: the indexing identity and the `corpus` environment. **You:** `bootstrap-plan`, `bootstrap-apply`
 - [ ] Indexing workflow, as described under "Refreshing the corpus": a dry run on PRs changing `corpus/sources.yml`, indexing on merge with a switch to the new version only once it's complete, and a by-hand rebuild. **You:** approve its environment
-- [ ] The vector container, through azapi (D46), because azurerm 5.12 has no vector policy on a container, and a policy can't be changed later
+- [x] The `references` container, through azapi (D46), because azurerm 5.12 has no vector policy on a container, and a policy can't be changed later: partitioned by `corpus_version`, 1536-dimension cosine vectors with a quantized flat index, and full-text search on the text for hybrid ranking, at 600 RU/s, which uses the rest of the free 1,000. **You:** approve `prod`
 - [ ] `CosmosRetriever` behind `IRetriever`: a team's rules always come through filtering, as they do today, so coverage can't depend on a ranking. Reference chunks are ranked by vector or hybrid search within a separate token budget
 - [ ] Prompts: reference material in its own fence, marked as context rather than rules, which needs a new version of each agent's prompt
 
