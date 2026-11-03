@@ -131,6 +131,12 @@ def main():
         since = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         rerun(pulls)
 
+    # GitHub runs no pull_request workflow for a PR that conflicts with its base, and says nothing about it.
+    for pull in pulls:
+        state = api(f"pulls/{pull['number']}").get("mergeable")
+        if state is False:
+            sys.exit(f"{pull['head']['ref']} conflicts with main, so GitHub won't review it. Merge main into it first.")
+
     if options.version:
         for pull in pulls:
             pinned = gh("api", f"repos/{DEMO}/contents/.github/workflows/plan.yml?ref={pull['head']['sha']}",
