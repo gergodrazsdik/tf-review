@@ -648,7 +648,8 @@ Work runs in this order, so the unknowns surface before anything depends on them
 *4. Corpus*
 
 - [x] `reference-chunk.schema.json`: a contract for reference chunks in Cosmos, with `source`, `source_commit`, `license`, `attribution` and `corpus_version` (D42). `tf-standards` and its frontmatter don't change. Citing a reference chunk as a broken rule is dropped by the evidence check, as `reference_cited`
-- [ ] `corpus/sources.yml` and importers in `tf-review` (D43): Azure Policy built-ins, Cloud Adoption Framework, and azurerm docs for the listed provider versions (D41). Attribution per doc, and a check that nothing unlicensed got in
+- [x] `corpus/sources.yml` and importers in `tf-review` (D43), as `src/TfReview.Corpus`, which isn't in the review image: Azure Policy built-ins, Cloud Adoption Framework, and azurerm docs for the listed provider versions (D41). Attribution per chunk, and two checks that nothing unlicensed gets in: `sources.yml` only allows the three licences, and each source's own licence file has to agree at its pinned commit
+- [x] Measure it, replacing part 1's estimate: 7,627 chunks from 1,929 policies, 119 framework pages and 1,107 azurerm resources, at most 3.3M tokens, about 7 cents to embed from nothing, and about 160 MB with vectors against the free 25 GB. Azure Policy's Regulatory Compliance and Azure Government folders are excluded, because they made up 58% of its chunks and neither can inform a review. 429 "Enable logging" policies are near-copies of each other, and stay until the retrieval evals show whether they crowd out better results
 
 *5. Retrieval*
 

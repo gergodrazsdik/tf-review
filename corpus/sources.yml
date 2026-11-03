@@ -1,0 +1,41 @@
+---
+# What reviews can draw on besides a team's own rules (D41, D43). The text itself lives only in Cosmos, and this file
+# is what it's rebuilt from: changing a pin here is the only way the index changes (D44). Upstream text is untrusted,
+# and a review of a pin change reads the dry run's report, because that text isn't in the diff.
+version: 1
+embedding_model: text-embedding-3-small
+sources:
+  - id: azure-policy
+    repository: Azure/azure-policy
+    commit: f096d8de10fb25e71dd7f82b78ded110ec711d73
+    license: MIT
+    attribution: Microsoft, Azure Policy built-in definitions, MIT
+    include:
+      - built-in-policies/policyDefinitions
+    # Over half the definitions, and neither can inform a review. Regulatory Compliance is mostly Microsoft's own
+    # process controls, and none of it looks at a resource a plan could change. Azure Government is for a cloud we
+    # don't deploy to.
+    exclude:
+      - built-in-policies/policyDefinitions/Regulatory Compliance
+      - built-in-policies/policyDefinitions/Azure Government
+  - id: cloud-adoption-framework
+    repository: MicrosoftDocs/cloud-adoption-framework
+    commit: 6535103c6b3b54175cf4b10bf8985f433ae9a514
+    license: CC-BY-4.0
+    attribution: Microsoft, Cloud Adoption Framework for Azure, CC-BY-4.0
+    # The parts about how to run Azure. The rest is about strategy and migration, which plans say nothing about.
+    include:
+      - docs/ready
+      - docs/secure
+      - docs/manage
+      - docs/govern
+  - id: azurerm-docs
+    repository: hashicorp/terraform-provider-azurerm
+    license: MPL-2.0
+    attribution: HashiCorp, Terraform AzureRM provider documentation, MPL-2.0
+    # Resources only: a plan's changes are to resources. Each version's tag, as a commit, because tags can move.
+    versions:
+      - version: 5.12.0
+        commit: e4304e154034d27313432fa98dee2184fb6d8519
+    include:
+      - website/docs/r
