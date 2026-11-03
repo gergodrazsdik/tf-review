@@ -146,8 +146,8 @@ resource "azapi_resource" "cosmos" {
       enableFreeTier           = true
       disableLocalAuth         = true
       minimalTlsVersion        = "Tls12"
-      # Full-text search is for hybrid ranking, which part 6 compares with vectors alone (D5).
-      capabilities      = [{ name = "EnableNoSQLVectorSearch" }, { name = "EnableNoSQLFullTextSearch" }]
+      # Full-text search, for hybrid ranking, needs no capability: the reference container's policy is enough.
+      capabilities      = [{ name = "EnableNoSQLVectorSearch" }]
       consistencyPolicy = { defaultConsistencyLevel = "Session" }
       locations = [{
         locationName     = "Germany West Central"
