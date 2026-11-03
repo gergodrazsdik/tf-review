@@ -61,6 +61,11 @@ e2e-live runs="3":
 fixtures *cases:
     scripts/fixtures.sh {{ cases }}
 
+# Compare what the real service posted on the demo's seed PRs with what's expected; pass --rerun to review them again, which costs cents
+[group('dev')]
+service-eval *args:
+    python3 scripts/service_eval.py {{ args }}
+
 # Save what real Checkov and Infracost say about the named eval cases, or all; needs the token from pass, so it's yours to run
 [group('dev')]
 record-scans *cases:
