@@ -13,7 +13,7 @@ const string Usage = """
     usage: tfreview redact <plan.json> <redacted.json>
            tfreview review <redacted.json> <config.yml> <result.json> <commit>
            tfreview publish <result.json> <redacted.json> <commit>
-           tfreview submit <redacted.json> <commit> <config-path>
+           tfreview submit <redacted.json> <commit> <config-path> [working-directory]
            tfreview serve
            tfreview work
     """;
@@ -27,7 +27,9 @@ switch (args)
     case ["publish", var result, var redacted, var commit] when IsCommit(commit):
         return await Publish(result, redacted, commit);
     case ["submit", var redacted, var commit, var configPath] when IsCommit(commit):
-        return await Submit(redacted, commit, configPath);
+        return await Submit(redacted, commit, configPath, null);
+    case ["submit", var redacted, var commit, var configPath, var workingDirectory] when IsCommit(commit):
+        return await Submit(redacted, commit, configPath, workingDirectory);
     case ["serve"]:
         await ReviewApi.RunAsync();
         return 0;
@@ -148,7 +150,7 @@ static async Task<int> Publish(string resultPath, string redactedPath, string co
 }
 
 // A failure exits non-zero, and the workflow then says "not reviewed" with its own token (D39).
-static async Task<int> Submit(string redactedPath, string commit, string configPath)
+static async Task<int> Submit(string redactedPath, string commit, string configPath, string? workingDirectory)
 {
     if (await ReadOrNull(redactedPath) is not { } plan)
     {
@@ -166,7 +168,7 @@ static async Task<int> Submit(string redactedPath, string commit, string configP
         cancellationToken => ActionsIdToken.GetAsync(github, tokenUrl, tokenSecret, ReviewSubmitter.Audience, cancellationToken),
         Task.Delay,
         Console.WriteLine);
-    return await submitter.SubmitAsync(plan, commit, configPath) ? 0 : 1;
+    return await submitter.SubmitAsync(plan, commit, configPath, workingDirectory) ? 0 : 1;
 }
 
 // No model configured means the agent reports "not reviewed", rather than the whole review failing.

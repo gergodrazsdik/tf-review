@@ -47,11 +47,12 @@ public sealed class ReviewSubmitter(
     ];
 
     /// <summary>Whether the API accepted the review. Why it didn't is logged, with nothing from the plan.</summary>
-    public async Task<bool> SubmitAsync(string plan, string commit, string configPath, CancellationToken cancellationToken = default)
+    public async Task<bool> SubmitAsync(
+        string plan, string commit, string configPath, string? workingDirectory = null, CancellationToken cancellationToken = default)
     {
         for (var attempt = 0; ; attempt++)
         {
-            var outcome = await this.TryAsync(plan, commit, configPath, cancellationToken);
+            var outcome = await this.TryAsync(new SubmitBody(commit, configPath, plan, workingDirectory), cancellationToken);
             if (outcome is Outcome.Accepted or Outcome.Refused)
             {
                 return outcome == Outcome.Accepted;
@@ -67,14 +68,14 @@ public sealed class ReviewSubmitter(
         }
     }
 
-    private async Task<Outcome> TryAsync(string plan, string commit, string configPath, CancellationToken cancellationToken)
+    private async Task<Outcome> TryAsync(SubmitBody submission, CancellationToken cancellationToken)
     {
         try
         {
             // New each time, because these only last minutes, and a cold start's retries can outlast one.
             using var request = new HttpRequestMessage(HttpMethod.Post, "reviews")
             {
-                Content = JsonContent.Create(new SubmitBody(commit, configPath, plan)),
+                Content = JsonContent.Create(submission),
             };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await token(cancellationToken));
 
@@ -120,5 +121,6 @@ public sealed class ReviewSubmitter(
     private sealed record SubmitBody(
         [property: JsonPropertyName("commit")] string Commit,
         [property: JsonPropertyName("config_path")] string ConfigPath,
-        [property: JsonPropertyName("plan")] string Plan);
+        [property: JsonPropertyName("plan")] string Plan,
+        [property: JsonPropertyName("working_directory"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? WorkingDirectory);
 }

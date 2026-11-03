@@ -87,6 +87,29 @@ public class ReviewWorkerTests
     }
 
     [Test]
+    public async Task The_lock_file_comes_from_the_working_directory_at_the_base_commit()
+    {
+        var world = new World { Queued = Job with { WorkingDirectory = "infra" } };
+
+        await world.RunAsync();
+
+        await Assert.That(world.GitHub.Requests).Contains($"GET /repos/owner/repo/contents/infra/.terraform.lock.hcl?ref={Base}");
+        await Assert.That(world.Engine.LockFile).IsEqualTo(Config);
+    }
+
+    // Callers pinned to a workflow from before the working directory was sent.
+    [Test]
+    public async Task A_job_without_a_working_directory_reads_no_lock_file()
+    {
+        var world = new World();
+
+        await world.RunAsync();
+
+        await Assert.That(world.GitHub.Requests.Any(request => request.Contains(".terraform.lock.hcl", StringComparison.Ordinal))).IsFalse();
+        await Assert.That(world.Engine.LockFile).IsNull();
+    }
+
+    [Test]
     public async Task A_missing_config_reaches_the_review_as_none()
     {
         var world = new World();
@@ -401,14 +424,17 @@ public class ReviewWorkerTests
 
         public string? Config { get; private set; }
 
+        public string? LockFile { get; private set; }
+
         public Exception? Throws { get; set; }
 
         public ReviewResult Result { get; set; } = new(1, Head, Verdict.NoFindings, [], [], new Dictionary<string, int>());
 
-        public Task<ReviewResult> RunAsync(string plan, string? config, string commit, CancellationToken cancellationToken)
+        public Task<ReviewResult> RunAsync(string plan, string? config, string? lockFile, string commit, CancellationToken cancellationToken)
         {
             this.Calls++;
             this.Config = config;
+            this.LockFile = lockFile;
             return this.Throws is { } failure ? throw failure : Task.FromResult(this.Result);
         }
     }

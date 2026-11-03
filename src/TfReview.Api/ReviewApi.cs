@@ -182,7 +182,12 @@ public static partial class ReviewApi
         try
         {
             var request = JsonSerializer.Deserialize<SubmitRequest>(body, RequestOptions);
-            return request is not null && CommitFormat().IsMatch(request.Commit) && IsConfigPath(request.ConfigPath) ? request : null;
+            return request is not null
+                && CommitFormat().IsMatch(request.Commit)
+                && IsConfigPath(request.ConfigPath)
+                && (request.WorkingDirectory is null || IsConfigPath(request.WorkingDirectory))
+                ? request
+                : null;
         }
         catch (JsonException)
         {
@@ -206,7 +211,7 @@ public static partial class ReviewApi
             {
                 await stores.Plans.SaveAsync(id, RedactAgain(request.Plan, logger), cancellationToken);
                 await stores.Queue.EnqueueAsync(
-                    new ReviewJob(id, caller.RepositoryId, caller.Repository, caller.PullRequest, request.Commit, request.ConfigPath),
+                    new ReviewJob(id, caller.RepositoryId, caller.Repository, caller.PullRequest, request.Commit, request.ConfigPath, request.WorkingDirectory),
                     cancellationToken);
 
                 status = new ReviewStatus(
@@ -254,7 +259,10 @@ public static partial class ReviewApi
     private sealed record SubmitRequest(
         [property: JsonPropertyName("commit")] string Commit,
         [property: JsonPropertyName("config_path")] string ConfigPath,
-        [property: JsonPropertyName("plan")] string Plan);
+        [property: JsonPropertyName("plan")] string Plan,
+
+        // Where the project is, to read its lock file at the base commit. Callers from before it was sent leave it out.
+        [property: JsonPropertyName("working_directory")] string? WorkingDirectory = null);
 
     private sealed record ReviewResponse(
         [property: JsonPropertyName("id")] string Id,

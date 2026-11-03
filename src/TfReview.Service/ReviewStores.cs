@@ -7,7 +7,8 @@ public sealed record ReviewJob(
     string Repository,
     int PullRequest,
     string Commit,
-    string ConfigPath);
+    string ConfigPath,
+    string? WorkingDirectory = null);
 
 public enum ReviewState
 {
