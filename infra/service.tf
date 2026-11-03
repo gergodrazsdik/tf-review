@@ -146,8 +146,9 @@ resource "azapi_resource" "cosmos" {
       enableFreeTier           = true
       disableLocalAuth         = true
       minimalTlsVersion        = "Tls12"
-      capabilities             = [{ name = "EnableNoSQLVectorSearch" }]
-      consistencyPolicy        = { defaultConsistencyLevel = "Session" }
+      # Full-text search is for hybrid ranking, which part 6 compares with vectors alone (D5).
+      capabilities      = [{ name = "EnableNoSQLVectorSearch" }, { name = "EnableNoSQLFullTextSearch" }]
+      consistencyPolicy = { defaultConsistencyLevel = "Session" }
       locations = [{
         locationName     = "Germany West Central"
         failoverPriority = 0
@@ -170,8 +171,7 @@ resource "azurerm_cosmosdb_sql_database" "service" {
   }
 }
 
-# Review status and history. The vector container arrives with retrieval and takes the remaining 600 RU/s, through
-# azapi, because azurerm 5.12 has no vector policy on a container (D46).
+# Review status and history. The reference container below takes the rest of the free 1,000 RU/s.
 resource "azurerm_cosmosdb_sql_container" "reviews" {
   name                = "reviews"
   resource_group_name = data.azurerm_resource_group.target.name
@@ -202,5 +202,48 @@ resource "azurerm_cognitive_deployment" "text_embedding_3_small" {
   sku {
     name     = "DataZoneStandard"
     capacity = 120
+  }
+}
+
+# Reference chunks with their vectors (D43), one partition per corpus version, so a new index is built beside the one in
+# use and an old one is deleted by partition (D44). Through azapi, because azurerm 5.12 has no vector or full-text policy
+# on a container (D46), and neither policy can be changed once the container exists, so getting them wrong means a new
+# container.
+resource "azapi_resource" "references" {
+  type      = "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2025-10-15"
+  name      = "references"
+  parent_id = azurerm_cosmosdb_sql_database.service.id
+
+  body = {
+    properties = {
+      options = { throughput = 600 }
+      resource = {
+        id           = "references"
+        partitionKey = { paths = ["/corpus_version"], kind = "Hash", version = 2 }
+
+        # text-embedding-3-small's 1536 numbers, compared by cosine as OpenAI recommends for its embeddings.
+        vectorEmbeddingPolicy = {
+          vectorEmbeddings = [{ path = "/embedding", dataType = "float32", dimensions = 1536, distanceFunction = "cosine" }]
+        }
+        fullTextPolicy = {
+          defaultLanguage = "en-US"
+          fullTextPaths   = [{ path = "/text", language = "en-US" }]
+        }
+
+        # The vector is searched through its own index, and indexing its numbers as values would only cost writes.
+        indexingPolicy = {
+          indexingMode    = "consistent"
+          automatic       = true
+          includedPaths   = [{ path = "/*" }]
+          excludedPaths   = [{ path = "/embedding/*" }, { path = "/\"_etag\"/?" }]
+          vectorIndexes   = [{ path = "/embedding", type = "quantizedFlat" }]
+          fullTextIndexes = [{ path = "/text" }]
+        }
+      }
+    }
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
