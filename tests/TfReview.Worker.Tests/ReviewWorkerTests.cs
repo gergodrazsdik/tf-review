@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.Metrics;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -45,6 +46,32 @@ public class ReviewWorkerTests
         await Assert.That(world.Completed).IsTrue();
         await Assert.That(world.Statuses.Last.State).IsEqualTo(ReviewState.Done);
         await Assert.That(world.Statuses.Last.Verdict).IsEqualTo("no_findings");
+    }
+
+    [Test]
+    public async Task A_review_reports_its_outcome()
+    {
+        var reported = new ConcurrentBag<string?>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meters) =>
+        {
+            if (instrument.Name == "tfreview.reviews")
+            {
+                meters.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((_, _, tags, _) =>
+        {
+            foreach (var tag in tags)
+            {
+                reported.Add(tag.Value?.ToString());
+            }
+        });
+        listener.Start();
+
+        await new World().RunAsync();
+
+        await Assert.That(reported).Contains("owner/repo");
     }
 
     [Test]

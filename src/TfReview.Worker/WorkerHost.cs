@@ -1,5 +1,8 @@
 using Azure.Identity;
+using Azure.Monitor.OpenTelemetry.Exporter;
 using Azure.Security.KeyVault.Secrets;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
 using TfReview.Agents;
 using TfReview.Core;
 using TfReview.GitHub;
@@ -20,6 +23,10 @@ public static class WorkerHost
 
     public static async Task<int> RunAsync()
     {
+        // Nothing is exported by a job that has exited, so this flushes when it's disposed, and an export that fails
+        // can't change the review's outcome. Scanners don't get the connection string (D47).
+        using var metrics = MetricsProvider();
+
         // The job's own limit is lower than the message's visibility, and this stops it cleanly before that.
         using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(14));
 
@@ -56,6 +63,14 @@ public static class WorkerHost
 
         return await worker.RunOnceAsync(deadline.Token);
     }
+
+    private static MeterProvider? MetricsProvider() =>
+        Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING") is { Length: > 0 } connectionString
+            ? Sdk.CreateMeterProviderBuilder()
+                .AddMeter(ReviewMetrics.MeterName)
+                .AddAzureMonitorMetricExporter(options => options.ConnectionString = connectionString)
+                .Build()
+            : null;
 
     // No model configured means the agents report "not reviewed", rather than the whole review failing.
     private static ReviewModel? Model()
