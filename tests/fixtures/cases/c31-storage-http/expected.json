@@ -1,0 +1,17 @@
+{
+  "held_out": true,
+  "findings": [
+    {
+      "resource_address": "azurerm_storage_account.uploads",
+      "rule": "POL-001",
+      "agent": "security",
+      "deterministic": true
+    },
+    {
+      "resource_address": "azurerm_storage_account.uploads",
+      "rule": "CKV_AZURE_59",
+      "agent": "scanner",
+      "deterministic": true
+    }
+  ]
+}

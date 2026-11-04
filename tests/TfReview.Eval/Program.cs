@@ -43,7 +43,8 @@ return args switch
     ["record-scans", .. var names] => await RecordScans(names),
     ["live", "--runs", var runs, .. var options] => await Live(
         int.Parse(runs, CultureInfo.InvariantCulture), Option(options, "--record"), options.Contains("--references"), Option(options, "--suggestions"),
-        Option(options, "--cases")?.Split(',')),
+        Option(options, "--cases")?.Split(','),
+        Option(options, "--placement") is "finding" ? ReferencePlacement.Finding : ReferencePlacement.Agent),
     ["retrieval", var labels] => await TfReview.Eval.RetrievalEval.RunAsync(labels, CasesDirectory, standardsDirectory, null),
     ["retrieval", var labels, "--report", var report] => await TfReview.Eval.RetrievalEval.RunAsync(labels, CasesDirectory, standardsDirectory, report),
     _ => Usage(),
@@ -51,7 +52,7 @@ return args switch
 
 static int Usage()
 {
-    Console.Error.WriteLine("usage: eval replay\n       eval record-scans [case...]\n       eval live --runs <n> [--record <dir>] [--references] [--suggestions <dir>] [--cases <name,...>]\n       eval retrieval <labels.yml> [--report <file.md>]");
+    Console.Error.WriteLine("usage: eval replay\n       eval record-scans [case...]\n       eval live --runs <n> [--record <dir>] [--references] [--suggestions <dir>] [--cases <name,...>] [--placement agent|finding]\n       eval retrieval <labels.yml> [--report <file.md>]");
     return 2;
 }
 
@@ -131,7 +132,7 @@ static string? Option(string[] options, string name) =>
 // With --references the config turns reference material on, and agents read the real index with the lock file below.
 // The baseline has to hold with it, and --suggestions saves what each run suggested, to read against a run without.
 // Cases with a suggestions.json also score their suggestions, which is reported and never fails a run.
-async Task<int> Live(int runs, string? recordDirectory, bool withReferences, string? suggestionsDirectory, string[]? only)
+async Task<int> Live(int runs, string? recordDirectory, bool withReferences, string? suggestionsDirectory, string[]? only, ReferencePlacement placement)
 {
     var selected = only is null ? cases : cases.Where(directory => only.Contains(Path.GetFileName(directory), StringComparer.Ordinal)).ToArray();
     if (only is not null && selected.Length != only.Length)
@@ -169,7 +170,7 @@ async Task<int> Live(int runs, string? recordDirectory, bool withReferences, str
         for (var run = 1; run <= runs; run++)
         {
             using var recording = new RecordingChat(client, profiles);
-            var result = await Review(directory, recording, deployment, references);
+            var result = await Review(directory, recording, deployment, references, placement);
             if (suggestionsDirectory is not null)
             {
                 Directory.CreateDirectory(Path.Combine(suggestionsDirectory, name));
@@ -230,7 +231,11 @@ async Task<int> Live(int runs, string? recordDirectory, bool withReferences, str
     }
 
     var versions = string.Join(", ", profiles.Select(profile => $"{profile} v{Prompts.Load(profile).Version}"));
-    Console.WriteLine(withReferences ? $"With reference material, re-ranked by {ReferenceSelector.Name} v{Prompts.Load(ReferenceSelector.Name).Version}." : "Without reference material.");
+    Console.WriteLine(!withReferences
+        ? "Without reference material."
+        : placement == ReferencePlacement.Finding
+            ? $"With reference material per finding, added by {ReferenceSuggester.Name} v{Prompts.Load(ReferenceSuggester.Name).Version}."
+            : $"With reference material, re-ranked by {ReferenceSelector.Name} v{Prompts.Load(ReferenceSelector.Name).Version}.");
     Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"Prompts {versions}, model {deployment}, estimated cost ~${totalCost:0.0000}."));
     Console.WriteLine($"Input tokens: {inputTokens}, of which cached: {cachedTokens}.");
     if (conceptsAsked > 0)
@@ -242,7 +247,8 @@ async Task<int> Live(int runs, string? recordDirectory, bool withReferences, str
     return failures == 0 ? 0 : 1;
 }
 
-async Task<ReviewResult> Review(string directory, IChatClient chat, string deployment = "replay", IReferenceRetriever? references = null)
+async Task<ReviewResult> Review(
+    string directory, IChatClient chat, string deployment = "replay", IReferenceRetriever? references = null, ReferencePlacement placement = ReferencePlacement.Agent)
 {
     var scans = new RecordedScans(directory);
     var runner = new ReviewRunner(
@@ -251,7 +257,8 @@ async Task<ReviewResult> Review(string directory, IChatClient chat, string deplo
         new ReviewModel(chat, deployment),
         infracost: new InfracostRunner(scans),
         checkov: new CheckovRunner(scans),
-        references: references);
+        references: references,
+        placement: placement);
 
     // The demo's provider version, which is what the index holds docs for.
     const string LockFile = "provider \"registry.opentofu.org/hashicorp/azurerm\" {\n  version = \"5.12.0\"\n}\n";

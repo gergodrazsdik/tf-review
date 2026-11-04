@@ -1,0 +1,12 @@
+{
+  "held_out": true,
+  "findings": [
+    {
+      "resource_address": "azurerm_postgresql_flexible_server.orders",
+      "rule": "POL-004",
+      "agent": "security",
+      "deterministic": true
+    }
+  ],
+  "risk_first": "azurerm_postgresql_flexible_server.orders"
+}

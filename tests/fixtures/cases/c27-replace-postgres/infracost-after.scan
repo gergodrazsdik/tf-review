@@ -1,0 +1,166 @@
+{
+  "currency": "USD",
+  "summary": {
+    "projects": 1,
+    "resources": 1,
+    "costed_resources": 1,
+    "free_resources": 0,
+    "total_monthly_cost": "137.3",
+    "finops_policies": 3,
+    "failing_finops_policies": 2,
+    "distinct_failing_finops_resources": 1,
+    "tagging_policies": 1,
+    "failing_tagging_policies": 1,
+    "distinct_failing_tagging_resources": 1
+  },
+  "projects": [
+    {
+      "project_name": "after.json",
+      "path": "after.json",
+      "finops_results": [
+        {
+          "policy_id": "00000000-0000-0000-0000-000000000000",
+          "policy_name": "Database - consider removing geo-redundant backups in non-production projects",
+          "policy_slug": "azure-disable-geo-redundant-db-backups-outside-prod",
+          "policy_message": "Consider removing geo-redundant backups from non-production databases to reduce costs. By eliminating unnecessary data replication, you can cut costs by up to half.",
+          "failing_resources": [
+            {
+              "name": "azurerm_postgresql_flexible_server.orders",
+              "issues": [
+                {
+                  "description": "Set `geo_redundant_backup_enabled` to `false`",
+                  "yearly_savings": "0",
+                  "monthly_carbon_savings_grams_co2e": "0",
+                  "monthly_water_savings_liters": "0",
+                  "address": "azurerm_postgresql_flexible_server.orders",
+                  "attribute": "geo_redundant_backup_enabled"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "policy_id": "00000000-0000-0000-0000-000000000000",
+          "policy_name": "PostgreSQL - consider enabling autogrow on non-production projects",
+          "policy_slug": "azure-enable-postgres-autogrow-nonprod",
+          "policy_message": "Consider enabling autogrow on non-production projects to limit overprovisioning databases as per your organization's policies.",
+          "failing_resources": [
+            {
+              "name": "azurerm_postgresql_flexible_server.orders",
+              "issues": [
+                {
+                  "description": "Set `auto_grow_enabled` to true",
+                  "yearly_savings": "0",
+                  "monthly_carbon_savings_grams_co2e": "0",
+                  "monthly_water_savings_liters": "0",
+                  "address": "azurerm_postgresql_flexible_server.orders",
+                  "attribute": "auto_grow_enabled"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "policy_id": "00000000-0000-0000-0000-000000000000",
+          "policy_name": "PostgreSQL - consider using backup retention in non-production projects",
+          "policy_slug": "azure-use-postgres-backup-retention-nonprod",
+          "policy_message": "Consider limiting the count of retention days for backups in non-production projects as per your organization's policies.",
+          "failing_resources": []
+        }
+      ],
+      "tagging_results": [
+        {
+          "policy_id": "00000000-0000-0000-0000-000000000000",
+          "policy_name": "FinOps tags",
+          "message": "This example Tagging policy shows how you can enforce required FinOps tag keys/values in pull requests. This example checks for the tags 'Service' (can have any value) and 'Environment' (must be Dev/Stage/Prod) on all taggable resources being changed in the pull request. You can adjust it from https://dashboard.infracost.io \u003e Governance \u003e Tagging policies. You have a 14 day trial of this feature as it's part of Infracost Cloud.",
+          "tag_schema": [
+            {
+              "key": "Environment",
+              "valid_values": [
+                "Dev",
+                "Prod",
+                "Stage"
+              ],
+              "mandatory": true
+            },
+            {
+              "key": "Service",
+              "mandatory": true
+            }
+          ],
+          "failing_resources": [
+            {
+              "address": "azurerm_postgresql_flexible_server.orders",
+              "resource_type": "azurerm_postgresql_flexible_server",
+              "invalid_tags": [
+                {
+                  "key": "Environment",
+                  "value": ""
+                }
+              ],
+              "path": "",
+              "line": 0,
+              "missing_mandatory_tags": [
+                "Service"
+              ],
+              "propagation_problems": []
+            }
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "name": "azurerm_postgresql_flexible_server.orders",
+          "type": "azurerm_postgresql_flexible_server",
+          "is_supported": true,
+          "is_free": false,
+          "cost_components": [
+            {
+              "name": "Compute (GP_Standard_D2ds_v5)",
+              "unit": "hours",
+              "price": "0.178",
+              "quantity": "730",
+              "base_monthly_cost": "129.94",
+              "usage_monthly_cost": "0",
+              "total_monthly_cost": "129.94",
+              "monthly_carbon_savings_grams_co2e": "0",
+              "monthly_water_savings_liters": "0"
+            },
+            {
+              "name": "Storage",
+              "unit": "GB",
+              "price": "0.115",
+              "quantity": "64",
+              "base_monthly_cost": "7.36",
+              "usage_monthly_cost": "0",
+              "total_monthly_cost": "7.36",
+              "monthly_carbon_savings_grams_co2e": "69.03103616",
+              "monthly_water_savings_liters": "0.16597888"
+            },
+            {
+              "name": "Additional backup storage",
+              "unit": "GB",
+              "price": "0.095",
+              "quantity": "0",
+              "base_monthly_cost": "0",
+              "usage_monthly_cost": "0",
+              "total_monthly_cost": "0",
+              "monthly_carbon_savings_grams_co2e": "0",
+              "monthly_water_savings_liters": "0",
+              "usage_based": true
+            }
+          ],
+          "tags": {
+            "environment": "prod",
+            "owner": "gergodrazsdik",
+            "project": "tf-review-demo"
+          },
+          "supports_tags": true,
+          "metadata": {
+            "deep_checksum": "9759f487e3a08402"
+          }
+        }
+      ]
+    }
+  ]
+}

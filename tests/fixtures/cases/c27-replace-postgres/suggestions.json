@@ -1,0 +1,13 @@
+{
+  "findings": [
+    {
+      "resource_address": "azurerm_postgresql_flexible_server.orders",
+      "rule": "POL-004",
+      "concepts": {
+        "backup": "back(ed)? ?up|pg_dump|dump|export|point-in-time|restore|migrat",
+        "in_place": "geo_redundant_backup_enabled|keep the (original|existing|current)|in place|revert|unchanged|separate|new server",
+        "replica": "read replica|replica|geo-restore|geo restore|zone[- ]redundant|high[_ ]availability"
+      }
+    }
+  ]
+}

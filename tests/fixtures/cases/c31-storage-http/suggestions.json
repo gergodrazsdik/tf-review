@@ -1,0 +1,13 @@
+{
+  "findings": [
+    {
+      "resource_address": "azurerm_storage_account.uploads",
+      "rule": "POL-001",
+      "concepts": {
+        "attribute": "https_traffic_only_enabled",
+        "clients": "client|application|SDK|connection string|endpoint|caller",
+        "secure_transfer": "secure transfer|TLS|min_tls_version|private endpoint"
+      }
+    }
+  ]
+}

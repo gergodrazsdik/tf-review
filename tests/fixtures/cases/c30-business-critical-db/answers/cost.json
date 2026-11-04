@@ -1,0 +1,4 @@
+{
+  "prompt_version": 5,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_mssql_database.ledger\",\"doc_id\":\"ADR-003\",\"attribute\":\"sku_name\",\"title\":\"azurerm_mssql_database.ledger increases from $0.00/month to $1785.9004/month.\",\"suggestion\":\"Confirm the planned SQL database SKU is intended, since this new resource adds a large monthly cost.\",\"breaks_standard\":true}]}"
+}

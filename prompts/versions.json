@@ -29,5 +29,8 @@
   },
   "reranker": {
     "1": "50ef8aed6146af3a7ec799954ba04b3734e424996231a98df17c89a1da98970a"
+  },
+  "suggester": {
+    "1": "039d572a16f28d5d4689e5d42692e6c66a7548e11dd8ba48b9b5c7268552fb55"
   }
 }

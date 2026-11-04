@@ -1,0 +1,4 @@
+{
+  "prompt_version": 5,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_network_security_rule.legacy\",\"doc_id\":\"POL-002\",\"attribute\":\"destination_port_range\",\"title\":\"azurerm_network_security_rule.legacy allows inbound TCP ports \\\"20-25\\\" from \\\"0.0.0.0/0\\\", which includes SSH on port 22 from the internet.\",\"suggestion\":\"Restrict the source to a private network or bastion, or change the destination port range so it does not include admin ports like 22.\",\"breaks_standard\":true}]}"
+}
