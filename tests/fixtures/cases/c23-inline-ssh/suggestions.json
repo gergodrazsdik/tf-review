@@ -1,0 +1,13 @@
+{
+  "findings": [
+    {
+      "resource_address": "azurerm_network_security_group.jump",
+      "rule": "POL-002",
+      "concepts": {
+        "private_path": "bastion|VPN|private (network|range|address)|ExpressRoute",
+        "just_in_time": "just-in-time|\\bJIT\\b",
+        "attribute": "source_address_prefix"
+      }
+    }
+  ]
+}

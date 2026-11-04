@@ -1,0 +1,13 @@
+{
+  "findings": [
+    {
+      "resource_address": "azurerm_role_assignment.operations",
+      "rule": "POL-003",
+      "concepts": {
+        "scope": "subscription|resource group",
+        "role": "Contributor|Reader|custom role",
+        "privileged_access": "PIM|Privileged Identity Management|eligible|time-bound|just-in-time"
+      }
+    }
+  ]
+}

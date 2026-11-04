@@ -1,0 +1,11 @@
+{
+  "held_out": true,
+  "findings": [
+    {
+      "resource_address": "azurerm_role_assignment.operations",
+      "rule": "POL-003",
+      "agent": "security",
+      "deterministic": true
+    }
+  ]
+}

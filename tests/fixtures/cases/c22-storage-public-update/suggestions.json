@@ -1,0 +1,13 @@
+{
+  "findings": [
+    {
+      "resource_address": "azurerm_storage_account.reports",
+      "rule": "POL-001",
+      "concepts": {
+        "attribute": "allow_nested_items_to_be_public",
+        "alternative_access": "SAS|shared access signature|user delegation|Entra|RBAC|role-based|Storage Blob Data Reader|managed identit|private endpoint",
+        "container": "container_access_type"
+      }
+    }
+  ]
+}

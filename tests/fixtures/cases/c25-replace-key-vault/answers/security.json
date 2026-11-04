@@ -1,0 +1,4 @@
+{
+  "prompt_version": 5,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_key_vault.app\",\"doc_id\":\"POL-004\",\"attribute\":\"name\",\"title\":\"azurerm_key_vault.app replaces the key vault by changing name from \\\"kv-app-tf-review-prod\\\" to \\\"kv-apps-tf-review-prod\\\", which can destroy stored data.\",\"suggestion\":\"Keep the existing key vault name so the resource updates in place, or confirm the vault is backed up or disposable before applying the replacement.\",\"breaks_standard\":true}]}"
+}

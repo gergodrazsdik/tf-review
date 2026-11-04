@@ -53,6 +53,25 @@ One pattern was wrong and fixed after the runs: C20's backup concept, `back ?up`
 
 The earlier side-by-side reading of C1–C17 found suggestions slightly more specific with references. This measure, which was fixed in advance, doesn't confirm that.
 
+## A prompt that asks for more: 2026-11-04, not shipped
+
+The idea: v5 asks for "one plain sentence" with the standard's fix, which leaves references nothing to add. A trial security and cost v6 allowed two sentences, the standard's fix first and then "a safer or more complete way to fix this resource" from the reference material, by name, "never advice of your own". It was measured on five new held-out cases, C22–C26, written before the prompt was run on them: public blobs turned on by an update (POL-001), SSH open in an NSG's inline rule (POL-002), `Owner` on a management group (POL-003), a key vault replaced by a rename (POL-004), and a 4x VM resize (ADR-003). Five runs each, all four combinations:
+
+| C22–C26, 75 concepts | Without references | With references |
+| --- | --- | --- |
+| v5 | 31 | 32 |
+| v6 | 37 | 37 |
+
+On C18–C21, seen before and so only a check: v5 32 and 31, v6 30 and 36. Findings held: v6 passed 129 of 130 runs without references (C13 once) and 130 of 130 with them.
+
+**What the score doesn't show,** from reading every second sentence v6 wrote on C22–C26:
+
+- Without references, every added sentence was on topic (Bastion, SAS or private endpoints, PIM, a smaller size), but came from the model's own knowledge, which the prompt forbade. The rule doesn't hold.
+- With references, about 8 of 19 were redundant or beside the point: `allowBlobPublicAccess`, which is the ARM name of the attribute the finding already fixes (3), a key vault firewall for a vault being replaced (1), and the "Allowed virtual machine size SKUs" policy for a resize (3). The good ones were good: savings plans and reservations for the VM, conditions with PIM for `Owner`.
+- Suggestions grew from about 100 to 164 characters on average with references.
+
+**Not shipped:** the demo runs with references, so v6 there would add some coverage and a lot of noise to PR comments. The cause looks like retrieval more than the prompt: references are chosen per agent, for everything it reviews, so a finding gets material about its resource rather than its problem, and the model uses what it's given. The next try is references chosen per finding, from its rule and attribute, with a prompt rule that the added sentence must address the same problem, measured on new held-out cases, because C22–C26 have now been read.
+
 ## The part 6 gate: 2026-11-03
 
 - Demo #38, an app subnet with an NSG allowing only HTTPS from the internet, was reviewed through the service with references on: the App posted a success check run and a "No findings" comment, which credits the reference sources and lists the NSG and rule to look at first. That's the right answer.

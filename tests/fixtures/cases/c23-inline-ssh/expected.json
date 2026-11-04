@@ -1,0 +1,17 @@
+{
+  "held_out": true,
+  "findings": [
+    {
+      "resource_address": "azurerm_network_security_group.jump",
+      "rule": "POL-002",
+      "agent": "security",
+      "deterministic": true
+    },
+    {
+      "resource_address": "azurerm_network_security_group.jump",
+      "rule": "CKV_AZURE_10",
+      "agent": "scanner",
+      "deterministic": true
+    }
+  ]
+}

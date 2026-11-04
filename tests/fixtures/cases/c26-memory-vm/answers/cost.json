@@ -1,0 +1,4 @@
+{
+  "prompt_version": 5,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_linux_virtual_machine.main\",\"doc_id\":\"ADR-003\",\"attribute\":\"size\",\"title\":\"azurerm_linux_virtual_machine.main increases from $71.62/month to $369.46/month, a $297.84/month rise.\",\"suggestion\":\"Confirm the larger VM size is intended and necessary for the workload.\",\"breaks_standard\":true}]}"
+}
