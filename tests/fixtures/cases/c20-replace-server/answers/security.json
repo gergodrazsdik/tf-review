@@ -1,0 +1,4 @@
+{
+  "prompt_version": 5,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_mssql_server.orders\",\"doc_id\":\"POL-004\",\"attribute\":\"administrator_login\",\"title\":\"azurerm_mssql_server.orders will be replaced because \\\"administrator_login\\\" changes to \\\"ordersadmin\\\", and replacing a SQL Server can destroy data it holds unless it is backed up or disposable.\",\"suggestion\":\"Confirm the server and its databases are backed up or intentionally disposable before applying, or change the plan to avoid the replacement.\",\"breaks_standard\":true}]}"
+}

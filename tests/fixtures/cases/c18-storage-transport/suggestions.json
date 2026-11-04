@@ -1,0 +1,13 @@
+{
+  "findings": [
+    {
+      "resource_address": "azurerm_storage_account.exports",
+      "rule": "POL-001",
+      "concepts": {
+        "tls": "TLS ?1[._]?2|min_tls_version",
+        "https": "https_traffic_only_enabled|HTTPS[- ]only|require HTTPS|secure transfer",
+        "network": "network_rules|default_action|private endpoint|public_network_access|firewall|selected networks|trusted (Microsoft )?services"
+      }
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "currency": "USD",
+  "summary": {
+    "projects": 1,
+    "resources": 1,
+    "costed_resources": 0,
+    "free_resources": 1,
+    "total_monthly_cost": "0",
+    "tagging_policies": 1,
+    "failing_tagging_policies": 1,
+    "distinct_failing_tagging_resources": 1
+  },
+  "projects": [
+    {
+      "project_name": "before.json",
+      "path": "before.json",
+      "finops_results": [],
+      "tagging_results": [
+        {
+          "policy_id": "00000000-0000-0000-0000-000000000000",
+          "policy_name": "FinOps tags",
+          "message": "This example Tagging policy shows how you can enforce required FinOps tag keys/values in pull requests. This example checks for the tags 'Service' (can have any value) and 'Environment' (must be Dev/Stage/Prod) on all taggable resources being changed in the pull request. You can adjust it from https://dashboard.infracost.io \u003e Governance \u003e Tagging policies. You have a 14 day trial of this feature as it's part of Infracost Cloud.",
+          "tag_schema": [
+            {
+              "key": "Environment",
+              "valid_values": [
+                "Dev",
+                "Prod",
+                "Stage"
+              ],
+              "mandatory": true
+            },
+            {
+              "key": "Service",
+              "mandatory": true
+            }
+          ],
+          "failing_resources": [
+            {
+              "address": "azurerm_mssql_server.orders",
+              "resource_type": "azurerm_mssql_server",
+              "invalid_tags": [
+                {
+                  "key": "Environment",
+                  "value": ""
+                }
+              ],
+              "path": "",
+              "line": 0,
+              "missing_mandatory_tags": [
+                "Service"
+              ],
+              "propagation_problems": []
+            }
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "name": "azurerm_mssql_server.orders",
+          "type": "azurerm_mssql_server",
+          "is_supported": true,
+          "is_free": true,
+          "tags": {
+            "environment": "prod",
+            "owner": "gergodrazsdik",
+            "project": "tf-review-demo"
+          },
+          "supports_tags": true,
+          "metadata": {
+            "deep_checksum": "be6b16e9740535af"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "held_out": true,
+  "risk_first": "azurerm_mssql_server.orders",
+  "findings": [
+    { "resource_address": "azurerm_mssql_server.orders", "rule": "POL-004", "agent": "security", "deterministic": true }
+  ]
+}
