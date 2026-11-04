@@ -44,6 +44,18 @@ internal static class StructuredCall
         var maxOutputTokens = MaxOutputTokens;
         var last = NotReviewedReason.InvalidOutput;
 
+        // An answer that no longer parses, say after a wire change, is a miss, and the new one replaces it.
+        var cache = chat.GetService<AnswerCache>();
+        var key = cache?.KeyFor(name, system, user, schema);
+        if (cache is not null)
+        {
+            var lookup = Stopwatch.StartNew();
+            if (await cache.ReadAsync(key!, cancellationToken) is { } stored && parse(stored) is { } hit)
+            {
+                return new StructuredResult<T>(hit, null, [AnswerCache.Hit(lookup.Elapsed)]);
+            }
+        }
+
         for (var attempt = 1; attempt <= MaxAttempts; attempt++)
         {
             var capture = new ResponseCapture(chat);
@@ -90,6 +102,11 @@ internal static class StructuredCall
 
             if (response is not null && parse(response.Text) is { } value)
             {
+                if (cache is not null)
+                {
+                    await cache.WriteAsync(key!, name, response.Text, cancellationToken);
+                }
+
                 return new StructuredResult<T>(value, null, calls);
             }
 

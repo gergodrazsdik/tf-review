@@ -86,6 +86,17 @@ public class ReviewWorkerTests
         await Assert.That(world.GitHub.Requests.Any(request => request.Contains($"ref={Head}", StringComparison.Ordinal))).IsFalse();
     }
 
+    // The result cache's scope (D53): another repo's answers must never come back.
+    [Test]
+    public async Task The_review_is_scoped_to_the_jobs_repo()
+    {
+        var world = new World();
+
+        await world.RunAsync();
+
+        await Assert.That(world.Engine.RepositoryId).IsEqualTo(Job.RepositoryId);
+    }
+
     [Test]
     public async Task The_lock_file_comes_from_the_working_directory_at_the_base_commit()
     {
@@ -426,13 +437,17 @@ public class ReviewWorkerTests
 
         public string? LockFile { get; private set; }
 
+        public string? RepositoryId { get; private set; }
+
         public Exception? Throws { get; set; }
 
         public ReviewResult Result { get; set; } = new(1, Head, Verdict.NoFindings, [], [], new Dictionary<string, int>());
 
-        public Task<ReviewResult> RunAsync(string plan, string? config, string? lockFile, string commit, CancellationToken cancellationToken)
+        public Task<ReviewResult> RunAsync(
+            string plan, string? config, string? lockFile, string commit, string repositoryId, CancellationToken cancellationToken)
         {
             this.Calls++;
+            this.RepositoryId = repositoryId;
             this.Config = config;
             this.LockFile = lockFile;
             return this.Throws is { } failure ? throw failure : Task.FromResult(this.Result);

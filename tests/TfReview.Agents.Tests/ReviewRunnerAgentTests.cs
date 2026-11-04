@@ -213,8 +213,45 @@ public class ReviewRunnerAgentTests
         await Assert.That(parsed.Usage!.Model).IsEqualTo("test-model");
     }
 
+    // D53: the same review again, say a re-push that changed nothing the model sees, costs no model call.
+    [Test]
+    public async Task A_repeated_review_of_the_same_repo_reuses_the_answers()
+    {
+        var chat = new FakeChat(FakeChat.Answer(Answer(Vnet), 100, 10));
+        var answers = new MemoryAnswers();
+
+        var first = await Run(VnetPlan, chat, NoViolations, answers: answers, repositoryId: "1");
+        var sent = chat.Requests.Count;
+        var again = await Run(VnetPlan, chat, NoViolations, answers: answers, repositoryId: "1");
+
+        await Assert.That(chat.Requests.Count).IsEqualTo(sent);
+        await Assert.That(again.Findings).IsEquivalentTo(first.Findings);
+        await Assert.That(again.NotReviewed).IsEmpty();
+        await Assert.That(again.Usage!.InputTokens).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task Another_repo_never_gets_those_answers()
+    {
+        var chat = new FakeChat(FakeChat.Answer(Answer(Vnet)), FakeChat.Answer(Answer(Vnet)));
+        var answers = new MemoryAnswers();
+
+        await Run(VnetPlan, chat, NoViolations, answers: answers, repositoryId: "1");
+        var sent = chat.Requests.Count;
+        await Run(VnetPlan, chat, NoViolations, answers: answers, repositoryId: "2");
+
+        await Assert.That(chat.Requests.Count).IsGreaterThan(sent);
+    }
+
     private static async Task<ReviewResult> Run(
-        string plan, FakeChat chat, string conftestOutput, string docs = Tagging, string config = Config, Action<string>? log = null)
+        string plan,
+        FakeChat chat,
+        string conftestOutput,
+        string docs = Tagging,
+        string config = Config,
+        Action<string>? log = null,
+        IAnswerStore? answers = null,
+        string? repositoryId = null)
     {
         var directory = Directory.CreateTempSubdirectory("tfreview-source-");
         try
@@ -226,9 +263,10 @@ public class ReviewRunnerAgentTests
                 new LocalDirectorySource(directory.FullName),
                 new ConftestRunner(new FakeProcesses(conftestOutput)),
                 new ReviewModel(chat, "test-model"),
-                log: log);
+                log: log,
+                answers: answers);
 
-            return await runner.RunAsync(plan, config, Commit);
+            return await runner.RunAsync(plan, config, Commit, repositoryId: repositoryId);
         }
         finally
         {

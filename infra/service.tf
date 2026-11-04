@@ -171,7 +171,9 @@ resource "azurerm_cosmosdb_sql_database" "service" {
   }
 }
 
-# Review status and history. The reference container below takes the rest of the free 1,000 RU/s.
+# Review status and history, and the result cache's answers (D53), all partitioned by repo. The reference container
+# below takes the rest of the free 1,000 RU/s. A default TTL of -1 lets each answer expire on its own, while statuses,
+# which set none, never do.
 resource "azurerm_cosmosdb_sql_container" "reviews" {
   name                = "reviews"
   resource_group_name = data.azurerm_resource_group.target.name
@@ -179,6 +181,7 @@ resource "azurerm_cosmosdb_sql_container" "reviews" {
   database_name       = azurerm_cosmosdb_sql_database.service.name
   partition_key_paths = ["/repository"]
   throughput          = 400
+  default_ttl         = -1
 
   lifecycle {
     prevent_destroy = true

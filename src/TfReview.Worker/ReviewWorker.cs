@@ -8,7 +8,8 @@ namespace TfReview.Worker;
 /// Runs one review from a redacted plan, a config and the project's lock file, all from the base commit except the plan.
 /// Production's is <c>ReviewRunner</c>.
 /// </summary>
-public delegate Task<ReviewResult> ReviewEngine(string plan, string? config, string? lockFile, string commit, CancellationToken cancellationToken);
+public delegate Task<ReviewResult> ReviewEngine(
+    string plan, string? config, string? lockFile, string commit, string repositoryId, CancellationToken cancellationToken);
 
 /// <summary>Opens a repo through the GitHub App, with a token for that repo alone.</summary>
 public delegate Task<RepositorySession> RepositoryOpener(string repository, CancellationToken cancellationToken);
@@ -121,7 +122,7 @@ public sealed class ReviewWorker(
         var plan = await plans.ReadAsync(job.ReviewId, cancellationToken);
         var result = plan is null
             ? ReviewResult.Failed(job.Commit, ReviewScope.Plan, NotReviewedReason.Unavailable)
-            : await engine(plan, config, lockFile, job.Commit, cancellationToken);
+            : await engine(plan, config, lockFile, job.Commit, job.RepositoryId, cancellationToken);
 
         if ((await session.ReadPullRequestAsync(job.PullRequest, cancellationToken)).Head != job.Commit)
         {
