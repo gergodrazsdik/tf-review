@@ -1,4 +1,4 @@
 {
-  "prompt_version": 5,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_mssql_database.ledger\",\"doc_id\":\"ADR-003\",\"attribute\":\"sku_name\",\"title\":\"Creating azurerm_mssql_database.ledger sets sku_name to BC_Gen5_8 and increases monthly list cost from $0.00 to $1,785.90.\",\"suggestion\":\"Confirm the BC_Gen5_8 SKU is intended, since it adds a large monthly cost.\",\"breaks_standard\":true}]}"
+  "prompt_version": 6,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_mssql_database.ledger\",\"doc_id\":\"ADR-003\",\"attribute\":\"sku_name\",\"title\":\"Creates a new resource at $0.00 a month and $1785.9004 a month, which adds more than $50 a month.\",\"suggestion\":\"Confirm the chosen SKU is intended, since the new database is priced at a much higher monthly list cost.\",\"breaks_standard\":true}]}"
 }
