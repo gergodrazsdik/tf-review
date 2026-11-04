@@ -9,7 +9,7 @@ public class ReviewRunnerReferenceTests
 {
     private const string Commit = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private const string Vnet = "azurerm_virtual_network.main";
-    private const string Empty = """{"findings":[]}""";
+    private const string Empty = """{"policy_suggestions":[],"findings":[]}""";
 
     // The re-ranker's answer, which comes before the agent's when there are references to choose from.
     private const string Picked = """{"ids":["REF-0123456789abcdef0123456789abcdef"]}""";
@@ -110,7 +110,7 @@ public class ReviewRunnerReferenceTests
     public async Task A_finding_citing_a_reference_is_dropped()
     {
         var answer = $$"""
-            {"findings":[{"resource_address":"{{Vnet}}","doc_id":"{{Doc.Id}}","attribute":"address_space","title":"Too wide.","suggestion":null,"breaks_standard":true}]}
+            {"policy_suggestions":[],"findings":[{"resource_address":"{{Vnet}}","doc_id":"{{Doc.Id}}","attribute":"address_space","title":"Too wide.","suggestion":null,"breaks_standard":true}]}
             """;
         var chat = new FakeChat(FakeChat.Answer(Picked), FakeChat.Answer(answer));
 
@@ -119,7 +119,23 @@ public class ReviewRunnerReferenceTests
         await Assert.That(result.Findings).IsEmpty();
     }
 
-    private static async Task<ReviewResult> Run(FakeChat chat, IReferenceRetriever retriever, string config, Action<string>? log = null)
+    // D50: per finding, the agent's prompt holds no references, and nothing is searched when there's no finding.
+    [Test]
+    public async Task Per_finding_the_agent_sees_no_references()
+    {
+        var retriever = new FakeRetriever(new ReferenceRetrieval([Doc], "0123456789abcdef", false));
+        var chat = new FakeChat(FakeChat.Answer(Empty));
+
+        var result = await Run(chat, retriever, Config + "\nreferences: true\n", placement: ReferencePlacement.Finding);
+
+        await Assert.That(chat.Requests.Single().User).DoesNotContain("reference_material");
+        await Assert.That(retriever.Queries).IsEmpty();
+        await Assert.That(result.References).IsNotNull();
+    }
+
+    // Per agent unless a test says otherwise, because most of these are about what an agent's prompt holds.
+    private static async Task<ReviewResult> Run(
+        FakeChat chat, IReferenceRetriever retriever, string config, Action<string>? log = null, ReferencePlacement placement = ReferencePlacement.Agent)
     {
         var directory = Directory.CreateTempSubdirectory("tfreview-source-");
         try
@@ -134,7 +150,8 @@ public class ReviewRunnerReferenceTests
                 new ReviewModel(chat, "test-model"),
                 arbiter: new RuleArbiter(),
                 log: log,
-                references: retriever);
+                references: retriever,
+                placement: placement);
 
             return await runner.RunAsync(VnetPlan, config, Commit, lockFile: LockFile);
         }

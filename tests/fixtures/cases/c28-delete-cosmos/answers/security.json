@@ -1,0 +1,4 @@
+{
+  "prompt_version": 6,
+  "text": "{\"policy_suggestions\":[{\"id\":\"P1\",\"suggestion\":\"Confirm the Cosmos DB account data is backed up or disposable before allowing this deletion to proceed.\"}],\"findings\":[]}"
+}

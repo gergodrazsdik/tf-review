@@ -1,4 +1,4 @@
 {
-  "prompt_version": 5,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_virtual_network.main\",\"doc_id\":\"ADR-002\",\"attribute\":\"tags\",\"title\":\"The tags value includes environment = \\\"production\\\", but ADR-002 requires a non-empty environment tag of \\\"dev\\\", \\\"test\\\", or \\\"prod\\\".\",\"suggestion\":\"Change the environment tag to one of \\\"dev\\\", \\\"test\\\", or \\\"prod\\\", such as \\\"prod\\\".\",\"breaks_standard\":true}]}"
+  "prompt_version": 6,
+  "text": "{\"policy_suggestions\":[],\"findings\":[{\"resource_address\":\"azurerm_virtual_network.main\",\"doc_id\":\"ADR-002\",\"attribute\":\"tags\",\"title\":\"The resource has tag environment=\\\"production\\\", which is not one of the allowed values dev, test, or prod.\",\"suggestion\":\"Change the environment tag to dev, test, or prod.\",\"breaks_standard\":true}]}"
 }

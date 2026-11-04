@@ -1,4 +1,4 @@
 {
-  "prompt_version": 5,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_virtual_network.seed\",\"doc_id\":\"ADR-001\",\"attribute\":\"name\",\"title\":\"azurerm_virtual_network.seed has name \\\"MyBadNetwork\\\", which does not follow the required lowercase \\\"vnet-<workload>-<environment>\\\" pattern.\",\"suggestion\":\"Rename it to a lowercase value like \\\"vnet-<workload>-prod\\\" that matches the required format.\",\"breaks_standard\":true}]}"
+  "prompt_version": 6,
+  "text": "{\"policy_suggestions\":[{\"id\":\"P1\",\"suggestion\":\"Rename the virtual network to a lowercase value like \\\"vnet-<workload>-prod\\\" so it matches the required prefix and environment pattern.\"}],\"findings\":[]}"
 }

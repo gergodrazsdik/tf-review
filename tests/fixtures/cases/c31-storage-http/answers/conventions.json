@@ -1,4 +1,4 @@
 {
-  "prompt_version": 5,
-  "text": "{\"findings\":[]}"
+  "prompt_version": 6,
+  "text": "{\"policy_suggestions\":[],\"findings\":[]}"
 }

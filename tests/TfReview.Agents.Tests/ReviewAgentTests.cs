@@ -9,10 +9,10 @@ namespace TfReview.Agents.Tests;
 public class ReviewAgentTests
 {
     private const string Address = "azurerm_virtual_network.main";
-    private const string Empty = """{"findings":[]}""";
+    private const string Empty = """{"policy_suggestions":[],"findings":[]}""";
 
     private const string OneFinding = """
-        {"findings":[{"breaks_standard":true,"resource_address":"azurerm_virtual_network.main","doc_id":"ADR-002","attribute":"tags",
+        {"policy_suggestions":[],"findings":[{"breaks_standard":true,"resource_address":"azurerm_virtual_network.main","doc_id":"ADR-002","attribute":"tags",
         "title":"environment is production","suggestion":"Use prod."}]}
         """;
 
@@ -40,11 +40,11 @@ public class ReviewAgentTests
 
     // A model that tries to claim more gets treated like any other malformed answer.
     [Test]
-    [Arguments("""{"findings":[{"breaks_standard":true,"resource_address":"a.b","doc_id":"ADR-002","attribute":"tags","title":"t","suggestion":null,"deterministic":true}]}""")]
-    [Arguments("""{"findings":[{"breaks_standard":true,"resource_address":"a.b","doc_id":"ADR-002","attribute":"tags","title":"t","suggestion":null,"severity":"high"}]}""")]
-    [Arguments("""{"findings":[{"breaks_standard":true,"resource_address":"a.b","doc_id":"ADR-002","attribute":"tags","title":"t"}]}""")]
-    [Arguments("""{"findings":[{"breaks_standard":true,"resource_address":"a.b","doc_id":"ADR-002","attribute":"tags","title":"  ","suggestion":null}]}""")]
-    [Arguments("""{"findings":null}""")]
+    [Arguments("""{"policy_suggestions":[],"findings":[{"breaks_standard":true,"resource_address":"a.b","doc_id":"ADR-002","attribute":"tags","title":"t","suggestion":null,"deterministic":true}]}""")]
+    [Arguments("""{"policy_suggestions":[],"findings":[{"breaks_standard":true,"resource_address":"a.b","doc_id":"ADR-002","attribute":"tags","title":"t","suggestion":null,"severity":"high"}]}""")]
+    [Arguments("""{"policy_suggestions":[],"findings":[{"breaks_standard":true,"resource_address":"a.b","doc_id":"ADR-002","attribute":"tags","title":"t"}]}""")]
+    [Arguments("""{"policy_suggestions":[],"findings":[{"breaks_standard":true,"resource_address":"a.b","doc_id":"ADR-002","attribute":"tags","title":"  ","suggestion":null}]}""")]
+    [Arguments("""{"policy_suggestions":[],"findings":null}""")]
     [Arguments("""{}""")]
     [Arguments("not json")]
     [Arguments("")]
@@ -74,7 +74,7 @@ public class ReviewAgentTests
     public async Task Removes_what_the_model_says_doesnt_break_the_standard()
     {
         const string Answered = """
-            {"findings":[
+            {"policy_suggestions":[],"findings":[
             {"breaks_standard":false,"resource_address":"a.fine","doc_id":"ADR-002","attribute":"tags","title":"This does not violate the rule.","suggestion":null},
             {"breaks_standard":true,"resource_address":"a.bad","doc_id":"ADR-002","attribute":"tags","title":"This does.","suggestion":null}]}
             """;
@@ -94,7 +94,7 @@ public class ReviewAgentTests
     public async Task Points_at_the_top_level_attribute(string attribute)
     {
         var json = System.Text.Json.JsonSerializer.Serialize(attribute);
-        var answer = $$"""{"findings":[{"breaks_standard":true,"resource_address":"a.b","doc_id":"ADR-002","attribute":{{json}},"title":"t","suggestion":null}]}""";
+        var answer = $$"""{"policy_suggestions":[],"findings":[{"breaks_standard":true,"resource_address":"a.b","doc_id":"ADR-002","attribute":{{json}},"title":"t","suggestion":null}]}""";
 
         var outcome = await Review(new FakeChat(FakeChat.Answer(answer)));
 
@@ -105,7 +105,7 @@ public class ReviewAgentTests
     [Test]
     public async Task An_empty_attribute_leaves_nothing_for_the_evidence_check_to_accept()
     {
-        const string Answered = """{"findings":[{"breaks_standard":true,"resource_address":"azurerm_virtual_network.main","doc_id":"ADR-002","attribute":"","title":"t","suggestion":null}]}""";
+        const string Answered = """{"policy_suggestions":[],"findings":[{"breaks_standard":true,"resource_address":"azurerm_virtual_network.main","doc_id":"ADR-002","attribute":"","title":"t","suggestion":null}]}""";
 
         var outcome = (AgentReviewed)await Review(new FakeChat(FakeChat.Answer(Answered)));
         var check = EvidenceChecker.Check(outcome.Findings, Plan, [Tagging]);
@@ -117,7 +117,7 @@ public class ReviewAgentTests
     [Test]
     public async Task An_invented_doc_is_dropped_by_the_evidence_check()
     {
-        const string Answered = """{"findings":[{"breaks_standard":true,"resource_address":"azurerm_virtual_network.main","doc_id":"POL-999","attribute":"name","title":"t","suggestion":null}]}""";
+        const string Answered = """{"policy_suggestions":[],"findings":[{"breaks_standard":true,"resource_address":"azurerm_virtual_network.main","doc_id":"POL-999","attribute":"name","title":"t","suggestion":null}]}""";
 
         var outcome = (AgentReviewed)await Review(new FakeChat(FakeChat.Answer(Answered)));
         var check = EvidenceChecker.Check(outcome.Findings, Plan, [Tagging]);
@@ -150,6 +150,38 @@ public class ReviewAgentTests
 
         await Assert.That(chat.Requests.Single().User).Contains("Tags finding");
         await Assert.That(chat.Requests.Single().User).DoesNotContain("Network finding");
+    }
+
+    // C28 and C29: a policy finding gets its suggestion by ID, keeping code's title and evidence, so a deletion with
+    // nothing to point at gets one, and the model can't change what the policy found.
+    [Test]
+    public async Task A_policy_finding_gets_its_suggestion_by_id_and_keeps_everything_else()
+    {
+        Finding first = new(Address, "ADR-002", Severity.Low, Reporter.Scanner, true, "Tags finding", [new PlanEvidence("/resource_changes/a.b/change/after")]);
+        Finding second = new("a.c", "ADR-002", Severity.Low, Reporter.Scanner, true, "Other finding", [new PlanEvidence("/resource_changes/a.c/change/after")]);
+        var chat = new FakeChat(FakeChat.Answer(
+            """{"policy_suggestions":[{"id":"P2","suggestion":" Back it up first. "},{"id":"P9","suggestion":"Invented."},{"id":"P1","suggestion":null}],"findings":[]}"""));
+
+        var outcome = (AgentReviewed)await new ReviewAgent(chat, AgentProfile.Conventions).ReviewAsync(Plan, [Tagging], [first, second]);
+
+        var suggested = outcome.Findings.Single();
+        await Assert.That(suggested).IsEqualTo(second with { Agent = Reporter.Conventions, Suggestion = "Back it up first." });
+        await Assert.That(chat.Requests.Single().User).Contains("\"id\":\"P1\"");
+    }
+
+    // The cost agent never gets policy findings, so it isn't asked for suggestions on them (D51).
+    [Test]
+    public async Task Only_agents_given_policy_findings_are_asked_to_answer_them()
+    {
+        var cost = new FakeChat(FakeChat.Answer("""{"findings":[]}"""));
+        var security = new FakeChat(FakeChat.Answer(Empty));
+
+        await new ReviewAgent(cost, AgentProfile.Cost).ReviewAsync(Plan, [Tagging], [], []);
+        await new ReviewAgent(security, AgentProfile.Security).ReviewAsync(Plan, [Tagging], []);
+
+        static string Schema(FakeChat chat) => ((ChatResponseFormatJson)chat.Requests.Single().Options!.ResponseFormat!).Schema?.ToString() ?? string.Empty;
+        await Assert.That(Schema(cost)).DoesNotContain("policy_suggestions");
+        await Assert.That(Schema(security)).Contains("policy_suggestions");
     }
 
     [Test]
@@ -308,7 +340,7 @@ public class ReviewAgentTests
     [Test]
     public async Task A_truncated_answer_gets_one_retry_with_more_room()
     {
-        var chat = new FakeChat(FakeChat.Answer("""{"findings":[""", finish: ChatFinishReason.Length), FakeChat.Answer(Empty));
+        var chat = new FakeChat(FakeChat.Answer("""{"policy_suggestions":[],"findings":[""", finish: ChatFinishReason.Length), FakeChat.Answer(Empty));
 
         var outcome = await Review(chat);
 

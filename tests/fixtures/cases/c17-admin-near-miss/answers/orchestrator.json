@@ -1,4 +1,4 @@
 {
   "prompt_version": 1,
-  "text": "{\"resources\":[{\"resource_address\":\"azurerm_role_assignment.owner\",\"reason\":\"This grants access and should be checked carefully for overbroad permissions.\"},{\"resource_address\":\"azurerm_network_security_rule.rdp\",\"reason\":\"This opens network access and should be verified for the intended source and scope.\"}]}"
+  "text": "{\"resources\":[{\"resource_address\":\"azurerm_role_assignment.owner\",\"reason\":\"This grants ownership-level access and should be checked carefully.\"},{\"resource_address\":\"azurerm_network_security_rule.rdp\",\"reason\":\"This opens network access for RDP and could expose a host if misconfigured.\"}]}"
 }

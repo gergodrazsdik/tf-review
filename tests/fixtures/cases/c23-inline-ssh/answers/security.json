@@ -1,4 +1,4 @@
 {
-  "prompt_version": 5,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_network_security_group.jump\",\"doc_id\":\"POL-002\",\"attribute\":\"security_rule\",\"title\":\"azurerm_network_security_group.jump allows inbound SSH on port \\\"22\\\" from source \\\"*\\\", which exposes an admin port to the internet.\",\"suggestion\":\"Change the rule to use a private source range, a bastion host, or remove the SSH allow rule entirely.\",\"breaks_standard\":true}]}"
+  "prompt_version": 6,
+  "text": "{\"policy_suggestions\":[{\"id\":\"P1\",\"suggestion\":\"Change the inbound SSH rule to use a private source such as a bastion subnet or VPN range instead of \\\"*\\\".\"}],\"findings\":[]}"
 }

@@ -1,4 +1,4 @@
 {
   "prompt_version": 5,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_linux_virtual_machine.main\",\"doc_id\":\"ADR-003\",\"attribute\":\"size\",\"title\":\"The virtual machine size changes from Standard_B2s to Standard_D4s_v5, increasing monthly cost from $31.904 to $141.696.\",\"suggestion\":\"Confirm the larger size is intended and needed for the workload.\",\"breaks_standard\":true}]}"
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_linux_virtual_machine.main\",\"doc_id\":\"ADR-003\",\"attribute\":\"size\",\"title\":\"azurerm_linux_virtual_machine.main exceeds the large increase threshold, rising from $31.904 to $141.696 per month.\",\"suggestion\":\"Confirm that the switch to Standard_D4s_v5 is intended for this virtual machine.\",\"breaks_standard\":true}]}"
 }

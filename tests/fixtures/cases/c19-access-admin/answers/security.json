@@ -1,4 +1,4 @@
 {
-  "prompt_version": 5,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_role_assignment.pipeline\",\"doc_id\":\"POL-003\",\"attribute\":\"role_definition_name\",\"title\":\"azurerm_role_assignment.pipeline grants \\\"User Access Administrator\\\" at subscription scope \\\"/subscriptions/[redacted:2]\\\", which can delegate access across the whole subscription.\",\"suggestion\":\"Assign a narrower role or change the scope to a resource group or specific resource instead of the subscription.\",\"breaks_standard\":true}]}"
+  "prompt_version": 6,
+  "text": "{\"policy_suggestions\":[{\"id\":\"P1\",\"suggestion\":\"Change the assignment to a narrower scope such as a resource group or resource, or use a less privileged role than User Access Administrator.\"}],\"findings\":[]}"
 }

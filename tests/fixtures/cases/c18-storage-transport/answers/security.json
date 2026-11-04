@@ -1,4 +1,4 @@
 {
-  "prompt_version": 5,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_storage_account.exports\",\"doc_id\":\"POL-001\",\"attribute\":\"https_traffic_only_enabled\",\"title\":\"azurerm_storage_account.exports sets \\\"https_traffic_only_enabled\\\" to false and \\\"min_tls_version\\\" to \\\"TLS1_0\\\", which breaks the storage account hardening requirement for encrypted transport and TLS 1.2.\",\"suggestion\":\"Set https_traffic_only_enabled to true and min_tls_version to TLS1_2.\",\"breaks_standard\":true}]}"
+  "prompt_version": 6,
+  "text": "{\"policy_suggestions\":[{\"id\":\"P1\",\"suggestion\":\"Set `https_traffic_only_enabled` to `true` and `min_tls_version` to `TLS1_2` on the storage account.\"}],\"findings\":[{\"resource_address\":\"azurerm_storage_account.exports\",\"doc_id\":\"POL-001\",\"attribute\":\"https_traffic_only_enabled\",\"title\":\"The storage account sets `https_traffic_only_enabled` to `false` and `min_tls_version` to `TLS1_0`, which allows unencrypted traffic and deprecated TLS versions.\",\"suggestion\":\"Set `https_traffic_only_enabled` to `true` and `min_tls_version` to `TLS1_2`.\",\"breaks_standard\":true}]}"
 }

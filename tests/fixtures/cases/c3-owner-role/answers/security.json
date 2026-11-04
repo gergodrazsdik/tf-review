@@ -1,4 +1,4 @@
 {
-  "prompt_version": 5,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_role_assignment.seed\",\"doc_id\":\"POL-003\",\"attribute\":\"role_definition_name\",\"title\":\"azurerm_role_assignment.seed grants \\\"Owner\\\" at subscription scope, which can let that principal control access across the entire subscription.\",\"suggestion\":\"Change the role to a narrower permission set or assign it at a resource group or resource scope instead of the subscription.\",\"breaks_standard\":true}]}"
+  "prompt_version": 6,
+  "text": "{\"policy_suggestions\":[{\"id\":\"P1\",\"suggestion\":\"Assign a narrower role or move the assignment to a resource group or specific resource instead of the subscription scope.\"}],\"findings\":[]}"
 }

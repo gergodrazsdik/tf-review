@@ -1,4 +1,4 @@
 {
-  "prompt_version": 5,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_network_security_rule.seed\",\"doc_id\":\"POL-002\",\"attribute\":\"source_address_prefix\",\"title\":\"azurerm_network_security_rule.seed allows SSH on port \\\"22\\\" from the internet because the source is \\\"0.0.0.0/0\\\", which exposes an admin port publicly.\",\"suggestion\":\"Restrict the source address to a private range, VPN, or bastion host instead of \\\"0.0.0.0/0\\\".\",\"breaks_standard\":true}]}"
+  "prompt_version": 6,
+  "text": "{\"policy_suggestions\":[{\"id\":\"P1\",\"suggestion\":\"Change the rule to deny SSH from the internet or restrict the source to a private network or bastion host.\"}],\"findings\":[]}"
 }

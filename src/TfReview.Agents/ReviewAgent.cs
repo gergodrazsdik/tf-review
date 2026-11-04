@@ -42,6 +42,46 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
         {
           "type": "object",
           "properties": {
+            "policy_suggestions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string" },
+                  "suggestion": { "type": ["string", "null"] }
+                },
+                "required": ["id", "suggestion"],
+                "additionalProperties": false
+              }
+            },
+            "findings": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "resource_address": { "type": "string" },
+                  "doc_id": { "type": "string" },
+                  "attribute": { "type": "string" },
+                  "title": { "type": "string" },
+                  "suggestion": { "type": ["string", "null"] },
+                  "breaks_standard": { "type": "boolean" }
+                },
+                "required": ["resource_address", "doc_id", "attribute", "title", "suggestion", "breaks_standard"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["policy_suggestions", "findings"],
+          "additionalProperties": false
+        }
+        """;
+
+    // The cost agent gets no policy findings, so it keeps the shape it had before D51: a field it can only leave empty
+    // shouldn't be part of what it's asked.
+    private const string CostSchema = """
+        {
+          "type": "object",
+          "properties": {
             "findings": {
               "type": "array",
               "items": {
@@ -83,7 +123,9 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
             return new AgentReviewed(prompt.Version, calls, []);
         }
 
-        var user = UserMessage(plan, docs, policyFindings, costs, references);
+        // Only findings for the standards it can cite, each with an ID its suggestion answers to.
+        var policies = policyFindings.Where(finding => docs.Any(doc => doc.Id == finding.Rule)).ToList();
+        var user = UserMessage(plan, docs, policies, costs, references);
         if (TokenEstimate.Of(user) > MaxUserMessageTokens)
         {
             return new AgentFailed(prompt.Version, calls, NotReviewedReason.PlanTooLarge);
@@ -94,8 +136,8 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
             profile.Name,
             SystemMessage(prompt, docs),
             user,
-            Schema,
-            text => ParseFindings(text, docs, costs),
+            profile.Reporter == Reporter.Cost ? CostSchema : Schema,
+            text => ParseFindings(text, docs, costs, policies),
             timeout,
             cancellationToken);
 
@@ -130,9 +172,9 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
         var policies = new JsonArray(
         [
             .. policyFindings
-                .Where(finding => docs.Any(doc => doc.Id == finding.Rule))
-                .Select(finding => (JsonNode)new JsonObject
+                .Select((finding, index) => (JsonNode)new JsonObject
                 {
+                    ["id"] = PolicyId(index),
                     ["resource_address"] = finding.ResourceAddress,
                     ["doc_id"] = finding.Rule,
                     ["title"] = finding.Title,
@@ -185,8 +227,18 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
         return message.AppendLine("<plan_data>").AppendLine(StructuredCall.Escape(plan.ToCanonicalJson())).Append("</plan_data>").ToString();
     }
 
+    private static string PolicyId(int index) => $"P{index + 1}";
+
+    /// <summary>The position an ID names, or -1 for one that wasn't given.</summary>
+    private static int PolicyIndex(string id, int count) =>
+        id.StartsWith('P') && int.TryParse(id.AsSpan(1), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var number)
+            && number >= 1 && number <= count
+            ? number - 1
+            : -1;
+
     /// <summary>The findings in an answer, or null if it doesn't match the wire schema exactly.</summary>
-    private ParsedFindings? ParseFindings(string text, IReadOnlyList<StandardsDoc> docs, IReadOnlyList<ResourceCostChange>? costs)
+    private ParsedFindings? ParseFindings(
+        string text, IReadOnlyList<StandardsDoc> docs, IReadOnlyList<ResourceCostChange>? costs, IReadOnlyList<Finding> policies)
     {
         var output = StructuredCall.ParseWire<WireOutput>(text);
         if (output is null || output.Findings.Any(finding => finding.ResourceAddress.Length == 0 || finding.Title.Trim().Length == 0))
@@ -197,8 +249,21 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
         // On C13 the model judged a resource fine and listed it anyway, however the prompt was worded, so the
         // model answers the question and code acts on it. The field comes last in the schema, because when it
         // came first the model committed to true before reasoning, and then wrote a title saying the opposite.
+        // A policy finding gets its suggestion by ID and keeps everything else code gave it: the title, evidence and its
+        // being deterministic. So a deletion, which has no attribute to point at, gets one too, and the agent can't skip
+        // one by not repeating it (C28, C29). The arbiter merges it with the scanner's copy as before.
+        var suggested = output.PolicySuggestions
+            .Where(item => !string.IsNullOrWhiteSpace(item.Suggestion))
+            .Select(item => (Index: PolicyIndex(item.Id, policies.Count), item.Suggestion))
+            .Where(item => item.Index >= 0)
+            .DistinctBy(item => item.Index)
+            .Select(item => policies[item.Index] with { Agent = profile.Reporter, Suggestion = item.Suggestion!.Trim() });
+
         return new ParsedFindings(
-            [.. output.Findings.Where(finding => finding.BreaksStandard).Select(finding => ToFinding(finding, docs, costs))],
+            [
+                .. suggested,
+                .. output.Findings.Where(finding => finding.BreaksStandard).Select(finding => ToFinding(finding, docs, costs)),
+            ],
             output.Findings.Count(finding => !finding.BreaksStandard));
     }
 
@@ -224,7 +289,17 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
         };
     }
 
-    private sealed record WireOutput([property: JsonPropertyName("findings")] IReadOnlyList<WireFinding> Findings);
+    private sealed record WireOutput(
+        [property: JsonPropertyName("findings")] IReadOnlyList<WireFinding> Findings)
+    {
+        // Absent from the cost agent's answers, which the strict schema then guarantees.
+        [JsonPropertyName("policy_suggestions")]
+        public IReadOnlyList<WirePolicySuggestion> PolicySuggestions { get; init; } = [];
+    }
+
+    private sealed record WirePolicySuggestion(
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("suggestion")] string? Suggestion);
 
     private sealed record ParsedFindings(IReadOnlyList<Finding> Findings, int Retracted);
 
