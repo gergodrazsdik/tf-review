@@ -1,0 +1,14 @@
+---
+# The reviewer reads this from the PR's base commit, so changes apply after they merge.
+# tf-review reviews its own infra/ and always stays advisory, whatever blocking other repos turn on: a reviewer
+# outage or a wrong finding must never block the PR that fixes it.
+version: 1
+tool_version: 1.13.2
+standards:
+  repository: gergodrazsdik/tf-standards
+  commit: adf50af6607b4e2b28a7e3566db8adfdecabe683
+agents: [conventions, security, cost]
+# Reference material from Azure Policy, the Cloud Adoption Framework and the azurerm docs, chosen per agent.
+references: true
+gate:
+  mode: advisory

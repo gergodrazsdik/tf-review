@@ -36,6 +36,9 @@ on:
         required: true
       AZURE_SUBSCRIPTION_ID:
         required: true
+      PLAN_VARIABLES:
+        description: The project's required variables, as a JSON object. Bootstrap sets it where a project needs one.
+        required: false
 
 permissions:
   contents: read
@@ -139,8 +142,27 @@ jobs:
             -backend-config="key=${PROJECT##*/}.tfstate" \
             -backend-config="use_azuread_auth=true"
       # Without the state lock, because this plan is only reviewed, never applied, and PRs plan at the same time (D48).
+      # PLAN_VARIABLES gives the project's required variables. PR code can read them while it plans, like the
+      # plan identity, so they hold IDs, never credentials.
       - name: Plan
-        run: '"$BIN" -chdir="$PROJECT" plan -input=false -no-color -lock=false -out="$RUNNER_TEMP/out.tfplan"'
+        env:
+          PLAN_VARIABLES: ${{ secrets.PLAN_VARIABLES }}
+        run: |
+          args=()
+          if [ -n "$PLAN_VARIABLES" ]; then
+            vars="$RUNNER_TEMP/plan-variables.tfvars.json"
+            if ! printf '%s' "$PLAN_VARIABLES" | jq -e 'type == "object"' >/dev/null 2>&1; then
+              echo "PLAN_VARIABLES must be a JSON object of variable names and values." >&2
+              exit 1
+            fi
+            printf '%s' "$PLAN_VARIABLES" >"$vars"
+            args=(-var-file="$vars")
+          fi
+          status=0
+          "$BIN" -chdir="$PROJECT" plan -input=false -no-color -lock=false "${args[@]}" \
+            -out="$RUNNER_TEMP/out.tfplan" || status=$?
+          rm -f "$RUNNER_TEMP/plan-variables.tfvars.json"
+          exit "$status"
       - name: Redact
         run: |
           work="$RUNNER_TEMP/tf-review"

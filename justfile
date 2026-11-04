@@ -144,7 +144,7 @@ lint-dotnet:
 contracts:
     {{ check_jsonschema }} --check-metaschema docs/contracts/*.schema.json
     {{ check_jsonschema }} --schemafile docs/contracts/tf-review-config.schema.json \
-      docs/contracts/examples/tf-review.yml
+      docs/contracts/examples/tf-review.yml .tf-review.yml
     {{ check_jsonschema }} --schemafile docs/contracts/finding.schema.json \
       docs/contracts/examples/finding.json
     {{ check_jsonschema }} --schemafile docs/contracts/corpus-frontmatter.schema.json \
