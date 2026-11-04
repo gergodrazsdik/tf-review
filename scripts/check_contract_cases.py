@@ -135,6 +135,21 @@ cases = [
         ),
         True,
     ),
+    (
+        "part of a scope not reviewed, by resource",
+        "review-result",
+        changed(
+            result,
+            not_reviewed=[{"scope": "security", "reason": "plan_too_large", "resources": ["azurerm_subnet.a"]}],
+        ),
+        True,
+    ),
+    (
+        "an empty list of resources not reviewed",
+        "review-result",
+        changed(result, not_reviewed=[{"scope": "security", "reason": "plan_too_large", "resources": []}]),
+        False,
+    ),
 ]
 
 failed = 0

@@ -320,7 +320,12 @@ public sealed class ReviewRunner(
             outcome is AgentReviewed reviewed ? reviewed.Findings : [],
             retrieval.Docs,
             retrieval.OmittedDocIds,
-            outcome is AgentFailed failed ? [new NotReviewed(profile.Scope, failed.Reason)] : [],
+            outcome switch
+            {
+                AgentFailed failed => [new NotReviewed(profile.Scope, failed.Reason)],
+                AgentReviewed { SkippedBecause: { } reason, Skipped: var skipped } => [new NotReviewed(profile.Scope, reason) { Resources = skipped }],
+                _ => [],
+            },
             [.. referenceCalls, .. outcome.Calls])
         {
             Plan = slice,

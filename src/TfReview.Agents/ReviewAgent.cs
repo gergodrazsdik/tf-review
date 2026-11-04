@@ -19,6 +19,14 @@ public sealed record AgentReviewed(int PromptVersion, IReadOnlyList<AgentCall> C
 {
     /// <summary>Resources the model listed while saying they don't break the standard.</summary>
     public int Retracted { get; init; }
+
+    /// <summary>
+    /// What a large plan's batches didn't reach, and why: the batch cap, or a call that failed. Empty when the whole
+    /// slice was reviewed.
+    /// </summary>
+    public IReadOnlyList<string> Skipped { get; init; } = [];
+
+    public NotReviewedReason? SkippedBecause { get; init; }
 }
 
 /// <summary>The slice wasn't reviewed, and the comment says so instead of guessing.</summary>
@@ -33,8 +41,17 @@ public sealed record AgentFailed(int PromptVersion, IReadOnlyList<AgentCall> Cal
 /// </summary>
 public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan? attemptTimeout = null)
 {
-    // Above this the 30K TPM limit would reject the call, whatever the retries. M4 splits large plans.
-    private const int MaxUserMessageTokens = 20_000;
+    /// <summary>
+    /// Above this the 30K TPM limit would reject the call, whatever the retries, so a larger slice is reviewed in batches
+    /// under it, riskiest first.
+    /// </summary>
+    public const int MaxUserMessageTokens = 20_000;
+
+    /// <summary>
+    /// Batches per agent, one after another so they stay within the TPM limit: about 80K input tokens at most, which
+    /// bounds a large plan's cost and time. What's left is reported by resource rather than reviewed.
+    /// </summary>
+    public const int MaxBatches = 4;
 
     // Azure's strict mode needs every field required and rejects pattern and minItems, so this can't be
     // finding.schema.json. scripts/llm-smoke.cs proves this shape against the real model.
@@ -126,12 +143,144 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
         // Only findings for the standards it can cite, each with an ID its suggestion answers to.
         var policies = policyFindings.Where(finding => docs.Any(doc => doc.Id == finding.Rule)).ToList();
         var user = UserMessage(plan, docs, policies, costs, references);
-        if (TokenEstimate.Of(user) > MaxUserMessageTokens)
+        if (TokenEstimate.Of(user) <= MaxUserMessageTokens)
         {
-            return new AgentFailed(prompt.Version, calls, NotReviewedReason.PlanTooLarge);
+            var result = await this.CallAsync(prompt, docs, user, policies, costs, cancellationToken);
+            return result.Value is { } parsed
+                ? new AgentReviewed(prompt.Version, result.Calls, parsed.Findings) { Retracted = parsed.Retracted }
+                : new AgentFailed(prompt.Version, result.Calls, result.Failure ?? NotReviewedReason.InvalidOutput);
         }
 
-        var result = await StructuredCall.RunAsync(
+        return await this.ReviewInBatchesAsync(prompt, plan, docs, policies, costs, references, cancellationToken);
+    }
+
+    /// <summary>
+    /// Splits the plan into batches in the rules' risk order, so deletes, replacements, access and network changes go
+    /// first, and the cap cuts the routine end. A batch carries only its own resources' policy findings and cost figures.
+    /// </summary>
+    public static (IReadOnlyList<IReadOnlyList<string>> Batches, IReadOnlyList<string> Left) Batch(
+        CondensedPlan plan, Func<IReadOnlySet<string>, int> estimate, int maxTokens = MaxUserMessageTokens, int maxBatches = MaxBatches)
+    {
+        var batches = new List<IReadOnlyList<string>>();
+        var left = new List<string>();
+        var current = new List<string>();
+
+        foreach (var address in RiskOrchestrator.ByRules(plan).Select(item => item.ResourceAddress))
+        {
+            if (batches.Count == maxBatches)
+            {
+                left.Add(address);
+                continue;
+            }
+
+            if (estimate(new HashSet<string>([.. current, address], StringComparer.Ordinal)) <= maxTokens)
+            {
+                current.Add(address);
+                continue;
+            }
+
+            // One resource too large for a call on its own can't be reviewed at all.
+            if (current.Count == 0)
+            {
+                left.Add(address);
+                continue;
+            }
+
+            batches.Add(current);
+            current = [];
+            if (batches.Count < maxBatches && estimate(new HashSet<string>([address], StringComparer.Ordinal)) <= maxTokens)
+            {
+                current.Add(address);
+            }
+            else
+            {
+                left.Add(address);
+            }
+        }
+
+        if (current.Count > 0)
+        {
+            batches.Add(current);
+        }
+
+        return (batches, left);
+    }
+
+    private async Task<AgentOutcome> ReviewInBatchesAsync(
+        Prompt prompt,
+        CondensedPlan plan,
+        IReadOnlyList<StandardsDoc> docs,
+        IReadOnlyList<Finding> policies,
+        IReadOnlyList<ResourceCostChange>? costs,
+        IReadOnlyList<ReferenceDoc>? references,
+        CancellationToken cancellationToken)
+    {
+        (CondensedPlan Plan, List<Finding> Policies, List<ResourceCostChange>? Costs) Part(IReadOnlySet<string> addresses) => (
+            plan.OnlyAddresses(addresses),
+            [.. policies.Where(finding => addresses.Contains(finding.ResourceAddress))],
+            costs is null ? null : [.. costs.Where(cost => addresses.Contains(cost.ResourceAddress))]);
+
+        var (batches, left) = Batch(plan, addresses =>
+        {
+            var part = Part(addresses);
+            return TokenEstimate.Of(UserMessage(part.Plan, docs, part.Policies, part.Costs, references));
+        });
+
+        var calls = new List<AgentCall>();
+        var findings = new List<Finding>();
+        var retracted = 0;
+        var skipped = new List<string>();
+        NotReviewedReason? reason = left.Count > 0 ? NotReviewedReason.PlanTooLarge : null;
+
+        foreach (var batch in batches)
+        {
+            // After a failure the rest isn't tried: the TPM limit or an outage would fail it too.
+            if (skipped.Count > 0)
+            {
+                skipped.AddRange(batch);
+                continue;
+            }
+
+            var part = Part(new HashSet<string>(batch, StringComparer.Ordinal));
+            var result = await this.CallAsync(
+                prompt, docs, UserMessage(part.Plan, docs, part.Policies, part.Costs, references), part.Policies, part.Costs, cancellationToken);
+            calls.AddRange(result.Calls);
+            if (result.Value is { } parsed)
+            {
+                findings.AddRange(parsed.Findings);
+                retracted += parsed.Retracted;
+            }
+            else
+            {
+                skipped.AddRange(batch);
+                reason = result.Failure ?? NotReviewedReason.InvalidOutput;
+            }
+        }
+
+        skipped.AddRange(left);
+
+        // Nothing at all reviewed is the same as one call failing: the whole scope is reported, not each resource.
+        if (skipped.Count == plan.Changes().Count)
+        {
+            return new AgentFailed(prompt.Version, calls, reason ?? NotReviewedReason.PlanTooLarge);
+        }
+
+        return new AgentReviewed(prompt.Version, calls, findings)
+        {
+            Retracted = retracted,
+            Skipped = [.. skipped.Order(StringComparer.Ordinal)],
+            SkippedBecause = skipped.Count > 0 ? reason : null,
+        };
+    }
+
+    private Task<StructuredResult<ParsedFindings>> CallAsync(
+        Prompt prompt,
+        IReadOnlyList<StandardsDoc> docs,
+        string user,
+        IReadOnlyList<Finding> policies,
+        IReadOnlyList<ResourceCostChange>? costs,
+        CancellationToken cancellationToken) =>
+        StructuredCall.RunAsync(
             chat,
             profile.Name,
             SystemMessage(prompt, docs),
@@ -140,11 +289,6 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
             text => ParseFindings(text, docs, costs, policies),
             timeout,
             cancellationToken);
-
-        return result.Value is { } parsed
-            ? new AgentReviewed(prompt.Version, result.Calls, parsed.Findings) { Retracted = parsed.Retracted }
-            : new AgentFailed(prompt.Version, result.Calls, result.Failure ?? NotReviewedReason.InvalidOutput);
-    }
 
     /// <summary>The standards are sorted and nothing here varies per run, so the prefix can be cached from M2.</summary>
     private static string SystemMessage(Prompt prompt, IReadOnlyList<StandardsDoc> docs)

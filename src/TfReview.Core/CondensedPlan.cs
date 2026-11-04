@@ -110,6 +110,15 @@ public sealed class CondensedPlan
                 .Select(resource => KeyValuePair.Create(resource.Key, resource.Value?.DeepClone()))),
     });
 
+    /// <summary>A plan holding only the resources at these addresses, for a batch of a plan too large for one call.</summary>
+    public CondensedPlan OnlyAddresses(IReadOnlySet<string> keep) => new(new JsonObject
+    {
+        [ResourceChanges] = new JsonObject(
+            root[ResourceChanges]!.AsObject()
+                .Where(resource => keep.Contains(resource.Key))
+                .Select(resource => KeyValuePair.Create(resource.Key, resource.Value?.DeepClone()))),
+    });
+
     /// <summary>The changes in this plan, sorted by address, without any of their values.</summary>
     public IReadOnlyList<PlanChange> Changes() =>
     [

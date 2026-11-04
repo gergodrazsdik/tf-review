@@ -46,7 +46,9 @@ public static partial class CommentRenderer
 
         foreach (var missing in result.NotReviewed)
         {
-            comment.AppendLine().AppendLine($"Not reviewed: {Name(missing.Scope)} ({Name(missing.Reason)}).");
+            comment.AppendLine().AppendLine(missing.Resources is { Count: > 0 } resources
+                ? $"Not reviewed by {Name(missing.Scope)} ({Name(missing.Reason)}): {Listed(resources)}."
+                : $"Not reviewed: {Name(missing.Scope)} ({Name(missing.Reason)}).");
         }
 
         if (result.OmittedDocs is { Count: > 0 } omitted)
@@ -78,6 +80,14 @@ public static partial class CommentRenderer
     /// Shows untrusted text as an inline code span. GitHub doesn't parse markdown, HTML, mentions or links
     /// inside one, which is more reliable than escaping each character that could mean something.
     /// </summary>
+    // A large plan can leave hundreds out, and the comment has a size limit, so the rest is a count.
+    private static string Listed(IReadOnlyList<string> addresses)
+    {
+        const int Shown = 10;
+        var listed = string.Join(", ", addresses.Take(Shown).Select(Code));
+        return addresses.Count > Shown ? $"{listed} and {addresses.Count - Shown} more" : listed;
+    }
+
     public static string Code(string text)
     {
         var builder = new StringBuilder(Math.Min(text.Length, MaxTextLength));
@@ -245,7 +255,7 @@ public static partial class CommentRenderer
         NotReviewedReason.InvalidConfig => "the config is invalid",
         NotReviewedReason.StandardsUnavailable => "the standards couldn't be fetched",
         NotReviewedReason.ScannerFailed => "a scanner failed to run",
-        NotReviewedReason.PlanTooLarge => "the plan is too large for one model call",
+        NotReviewedReason.PlanTooLarge => "the plan is too large",
         _ => throw new ArgumentOutOfRangeException(nameof(reason)),
     };
 
