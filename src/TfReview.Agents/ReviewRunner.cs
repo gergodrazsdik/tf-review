@@ -8,7 +8,9 @@ namespace TfReview.Agents;
 /// <summary>The model the agents call, and the deployment name reported in the usage.</summary>
 public sealed record ReviewModel(IChatClient Chat, string Deployment);
 
-/// <summary>Where reference material goes, which part 6's suggestion evals compare.</summary>
+/// <summary>
+/// Where reference material goes. Per finding is the default (D50): per agent stays for the evals, which compare the two.
+/// </summary>
 public enum ReferencePlacement
 {
     /// <summary>Into each agent's prompt, searched for its slice (D42).</summary>
@@ -41,7 +43,7 @@ public sealed class ReviewRunner(
     InfracostRunner? infracost = null,
     CheckovRunner? checkov = null,
     IReferenceRetriever? references = null,
-    ReferencePlacement placement = ReferencePlacement.Agent)
+    ReferencePlacement placement = ReferencePlacement.Finding)
 {
     /// <summary>
     /// Each agent's share for references, apart from its standards' cap, so they can't push a rule out (D42). About

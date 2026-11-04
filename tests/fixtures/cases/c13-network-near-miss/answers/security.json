@@ -1,4 +1,4 @@
 {
-  "prompt_version": 5,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_network_security_rule.ssh\",\"doc_id\":\"POL-002\",\"attribute\":\"source_address_prefix\",\"title\":\"The inbound SSH rule allows port \\\"22\\\" from the private range \\\"10.0.0.0/8\\\", which does not violate the no-admin-ports-open-to-the-internet standard.\",\"suggestion\":\"No change is needed for this standard, but if this rule is meant to be internet-facing, restrict SSH to a bastion or private access path instead of opening it publicly.\",\"breaks_standard\":false}]}"
+  "prompt_version": 6,
+  "text": "{\"policy_suggestions\":[],\"findings\":[{\"resource_address\":\"azurerm_network_security_rule.ssh\",\"doc_id\":\"POL-002\",\"attribute\":\"source_address_prefix\",\"title\":\"Inbound SSH rule allows port 22 from the private range \\\"10.0.0.0/8\\\", which does not violate the no-admin-ports-from-the-internet standard.\",\"suggestion\":\"null\",\"breaks_standard\":false}]}"
 }

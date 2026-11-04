@@ -1,4 +1,4 @@
 {
-  "prompt_version": 5,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_network_security_rule.rdp\",\"doc_id\":\"POL-002\",\"attribute\":\"source_address_prefix\",\"title\":\"azurerm_network_security_rule.rdp allows RDP from \\\"Internet\\\", which exposes admin access to the public internet and violates the no-admin-ports-open standard.\",\"suggestion\":\"Change source_address_prefix to a private network or bastion-only source, such as a VNet CIDR or a specific trusted IP range.\",\"breaks_standard\":true}]}"
+  "prompt_version": 6,
+  "text": "{\"policy_suggestions\":[{\"id\":\"P1\",\"suggestion\":\"Change the rule to use a private source such as a bastion or VPN address range instead of \\\"Internet\\\" for RDP on port 3389.\"}],\"findings\":[]}"
 }

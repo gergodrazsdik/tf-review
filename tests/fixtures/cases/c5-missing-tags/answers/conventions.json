@@ -1,4 +1,4 @@
 {
-  "prompt_version": 5,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_virtual_network.seed\",\"doc_id\":\"ADR-002\",\"attribute\":\"tags\",\"title\":\"azurerm_virtual_network.seed is missing required tags because \\\"tags\\\" is null.\",\"suggestion\":\"Set non-empty owner, environment, and project tags on the virtual network.\",\"breaks_standard\":true}]}"
+  "prompt_version": 6,
+  "text": "{\"policy_suggestions\":[{\"id\":\"P1\",\"suggestion\":\"Add non-empty owner, environment, and project tags to azurerm_virtual_network.seed before applying.\"}],\"findings\":[]}"
 }

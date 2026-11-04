@@ -44,7 +44,7 @@ return args switch
     ["live", "--runs", var runs, .. var options] => await Live(
         int.Parse(runs, CultureInfo.InvariantCulture), Option(options, "--record"), options.Contains("--references"), Option(options, "--suggestions"),
         Option(options, "--cases")?.Split(','),
-        Option(options, "--placement") is "finding" ? ReferencePlacement.Finding : ReferencePlacement.Agent),
+        Option(options, "--placement") is "agent" ? ReferencePlacement.Agent : ReferencePlacement.Finding),
     ["retrieval", var labels] => await TfReview.Eval.RetrievalEval.RunAsync(labels, CasesDirectory, standardsDirectory, null),
     ["retrieval", var labels, "--report", var report] => await TfReview.Eval.RetrievalEval.RunAsync(labels, CasesDirectory, standardsDirectory, report),
     _ => Usage(),
@@ -248,7 +248,7 @@ async Task<int> Live(int runs, string? recordDirectory, bool withReferences, str
 }
 
 async Task<ReviewResult> Review(
-    string directory, IChatClient chat, string deployment = "replay", IReferenceRetriever? references = null, ReferencePlacement placement = ReferencePlacement.Agent)
+    string directory, IChatClient chat, string deployment = "replay", IReferenceRetriever? references = null, ReferencePlacement placement = ReferencePlacement.Finding)
 {
     var scans = new RecordedScans(directory);
     var runner = new ReviewRunner(

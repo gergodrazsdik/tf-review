@@ -1,4 +1,4 @@
 {
-  "prompt_version": 5,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_storage_account.public\",\"doc_id\":\"POL-001\",\"attribute\":\"allow_nested_items_to_be_public\",\"title\":\"azurerm_storage_account.public sets allow_nested_items_to_be_public to \\\"true\\\", which allows anonymous blob access and breaks the storage account hardening requirement.\",\"suggestion\":\"Set allow_nested_items_to_be_public to false.\",\"breaks_standard\":true}]}"
+  "prompt_version": 6,
+  "text": "{\"policy_suggestions\":[{\"id\":\"P1\",\"suggestion\":\"Set allow_nested_items_to_be_public to false on the storage account before applying.\"}],\"findings\":[{\"resource_address\":\"azurerm_storage_account.public\",\"doc_id\":\"POL-001\",\"attribute\":\"allow_nested_items_to_be_public\",\"title\":\"azurerm_storage_account.public sets allow_nested_items_to_be_public to 'true', which allows public nested items and violates the storage account hardening standard.\",\"suggestion\":\"Change allow_nested_items_to_be_public to false.\",\"breaks_standard\":true}]}"
 }

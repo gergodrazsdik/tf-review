@@ -139,3 +139,19 @@ The per-agent trial above pointed at retrieval: an agent's references are about 
 
 - C28: a deleted Cosmos DB account failed 15 of 15 runs, and waits in `tests/fixtures/pending/` until that is fixed. The security prompt tells the agent to ignore resources whose actions are only `delete`, so it never re-reports POL-004 on a deletion, and a reviewer gets the policy's finding with no suggestion at all.
 - C29: in 4 of 15 runs the security agent didn't re-report POL-002 on a port range holding 22, so that finding had no suggestion either.
+
+## Policy findings answered by ID (D51), and per finding by default: 2026-11-05
+
+The held-out cases C28 and C29 found policy findings left without a suggestion, because agents had to re-report each one as a new finding pointing at an attribute. A deletion has no attribute to point at, and the model sometimes skipped one. Conventions and security v6 answer each policy finding by ID instead, and code attaches the suggestion to the policy's own finding. `references: true` now means per-finding references (D50). The full suite, five runs per case:
+
+| Measure | Without references | Per finding |
+| --- | --- | --- |
+| Runs passing | 153 of 155 | 151 of 155 |
+| C28 (deletion) and C29 (port range) | 10 of 10 | 10 of 10 |
+| Failures | C26 twice: cost retracted a real increase | C4, C26 and C30 once each, the same way; C7 once, conventions reporting a valid owner tag |
+| Suggestion concepts, C18–C31 | 82 of 210 | 91 of 210 |
+| Estimated cost of a full run | About $0.37 | About $0.63 |
+
+C28 went from 0 of 15 to 10 of 10 with its expectations unchanged, and its suggestions now say what to confirm before the deletion. C29 went from 11 of 15 to 10 of 10.
+
+**The cost agent's misses aren't this change's.** It wrote the ADR-003 finding and then marked it as not breaking the standard, so code dropped it. The cost prompt didn't change, and giving it back its old schema made no difference (9 and 6 misses of 25 on the cost cases). `main` run the same day missed 4 of 15 on C4, C15 and C26, where C4 had never failed. Something on the model's side moved, and it's a task of its own.

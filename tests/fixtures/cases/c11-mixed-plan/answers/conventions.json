@@ -1,4 +1,4 @@
 {
-  "prompt_version": 5,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_virtual_network.untagged\",\"doc_id\":\"ADR-002\",\"attribute\":\"tags\",\"title\":\"azurerm_virtual_network.untagged has tags set to null, so required tags \\\"owner\\\", \\\"environment\\\", and \\\"project\\\" are missing.\",\"suggestion\":\"Set non-empty tags for owner, environment, and project on the virtual network.\",\"breaks_standard\":true},{\"resource_address\":\"azurerm_virtual_network.wrong_env\",\"doc_id\":\"ADR-002\",\"attribute\":\"tags\",\"title\":\"azurerm_virtual_network.wrong_env has tag \\\"environment\\\" set to \\\"production\\\", which is not an allowed value.\",\"suggestion\":\"Change the environment tag to one of dev, test, or prod.\",\"breaks_standard\":true}]}"
+  "prompt_version": 6,
+  "text": "{\"policy_suggestions\":[{\"id\":\"P1\",\"suggestion\":\"Add non-empty owner, environment, and project tags to azurerm_virtual_network.untagged before applying.\"}],\"findings\":[{\"resource_address\":\"azurerm_virtual_network.wrong_env\",\"doc_id\":\"ADR-002\",\"attribute\":\"tags\",\"title\":\"azurerm_virtual_network.wrong_env sets tag \\\"environment\\\" to \\\"production\\\", but ADR-002 requires \\\"dev\\\", \\\"test\\\", or \\\"prod\\\".\",\"suggestion\":\"Change the environment tag to one of dev, test, or prod.\",\"breaks_standard\":true}]}"
 }

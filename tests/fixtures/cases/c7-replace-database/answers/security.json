@@ -1,4 +1,4 @@
 {
-  "prompt_version": 5,
-  "text": "{\"findings\":[{\"resource_address\":\"azurerm_mssql_database.main\",\"doc_id\":\"POL-004\",\"attribute\":\"name\",\"title\":\"azurerm_mssql_database.main will be replaced because the database name changes from \\\"payments\\\" to \\\"payments-v2\\\", which can destroy data stored in the existing database.\",\"suggestion\":\"Keep the database name unchanged, or confirm the database is backed up or intentionally disposable before applying this replacement.\",\"breaks_standard\":true}]}"
+  "prompt_version": 6,
+  "text": "{\"policy_suggestions\":[{\"id\":\"P1\",\"suggestion\":\"Confirm the database is backed up or disposable before allowing the name change replacement, or change the plan to update it in place.\"}],\"findings\":[]}"
 }
