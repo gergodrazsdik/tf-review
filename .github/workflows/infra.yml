@@ -29,9 +29,7 @@ jobs:
   # variables from PLAN_VARIABLES (D52). It skips fork PRs itself, and stays advisory (.tf-review.yml).
   plan:
     if: github.event_name == 'pull_request'
-    # The rc pin is a test, and v0.0.12 replaces it before merge.
-    # yamllint disable-line rule:line-length
-    uses: gergodrazsdik/tf-review/.github/workflows/tf-review.yml@359b61d4a05fa000ea46cbb384b9c4412109ea6c # v0.0.12-rc.1
+    uses: gergodrazsdik/tf-review/.github/workflows/tf-review.yml@359b61d4a05fa000ea46cbb384b9c4412109ea6c # v0.0.12
     permissions:
       contents: read
       id-token: write
