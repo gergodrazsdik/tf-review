@@ -8,6 +8,16 @@ namespace TfReview.Agents;
 /// <summary>The model the agents call, and the deployment name reported in the usage.</summary>
 public sealed record ReviewModel(IChatClient Chat, string Deployment);
 
+/// <summary>Where reference material goes, which part 6's suggestion evals compare.</summary>
+public enum ReferencePlacement
+{
+    /// <summary>Into each agent's prompt, searched for its slice (D42).</summary>
+    Agent,
+
+    /// <summary>Searched for each finding after the review, and only ever added to its suggestion (D50).</summary>
+    Finding,
+}
+
 /// <summary>
 /// One review, from a redacted plan to a result. The plan came from a job that ran PR code, so it's
 /// redacted again here: that changes nothing on an honest plan, and refuses anything else. Every failure
@@ -21,6 +31,7 @@ public sealed record ReviewModel(IChatClient Chat, string Deployment);
 /// <param name="infracost">Prices the plan, or null when there's no token, which is reported as not reviewed.</param>
 /// <param name="checkov">Checks the plan, or null when it isn't available, which is reported as not reviewed.</param>
 /// <param name="references">Imported reference material, for a config that asks for it, or null when there's none (D42).</param>
+/// <param name="placement">Where references go when a config asks for them.</param>
 public sealed class ReviewRunner(
     IStandardsSource standards,
     ConftestRunner conftest,
@@ -29,7 +40,8 @@ public sealed class ReviewRunner(
     Action<string>? log = null,
     InfracostRunner? infracost = null,
     CheckovRunner? checkov = null,
-    IReferenceRetriever? references = null)
+    IReferenceRetriever? references = null,
+    ReferencePlacement placement = ReferencePlacement.Agent)
 {
     /// <summary>
     /// Each agent's share for references, apart from its standards' cap, so they can't push a rule out (D42). About
@@ -98,17 +110,18 @@ public sealed class ReviewRunner(
                 : new RiskOrchestrator(model.Chat).RankAsync(plan, cancellationToken);
 
             var referenceQuery = config.References && references is not null ? new ReferenceContext(LockFile.AzurermVersion(lockFile)) : null;
+            var agentReferences = placement == ReferencePlacement.Agent ? referenceQuery : null;
 
             // A failed scan already says that scope wasn't reviewed, and a cost agent without figures has nothing to judge.
             var passes = await Task.WhenAll(
                 Enabled(config, AgentProfile.Conventions)
-                    ? RunAgentAsync(AgentProfile.Conventions, plan, policyFindings, corpus, null, referenceQuery, cancellationToken)
+                    ? RunAgentAsync(AgentProfile.Conventions, plan, policyFindings, corpus, null, agentReferences, cancellationToken)
                     : Task.FromResult(AgentPass.Skipped),
                 Enabled(config, AgentProfile.Security)
-                    ? RunAgentAsync(AgentProfile.Security, plan, policyFindings, corpus, null, referenceQuery, cancellationToken)
+                    ? RunAgentAsync(AgentProfile.Security, plan, policyFindings, corpus, null, agentReferences, cancellationToken)
                     : Task.FromResult(AgentPass.Skipped),
                 cost is { } && cost.Resources.Any(resource => resource.Priced && resource.AfterUsd > resource.BeforeUsd)
-                    ? RunAgentAsync(AgentProfile.Cost, plan, [], corpus, cost.Resources, referenceQuery, cancellationToken)
+                    ? RunAgentAsync(AgentProfile.Cost, plan, [], corpus, cost.Resources, agentReferences, cancellationToken)
                     : Task.FromResult(AgentPass.Skipped));
 
             // Each agent's findings are checked against the documents in its own prompt, not everyone's.
@@ -120,6 +133,18 @@ public sealed class ReviewRunner(
             var arbitration = await this.arbiter.ArbitrateAsync(
                 [.. checks.SelectMany(check => check.Kept)], plan, [.. risk.Order.Select(item => item.ResourceAddress)], cancellationToken);
             Log(LlmArbiter.Name, arbitration.PromptVersion, arbitration.Calls);
+
+            // After the arbiter, so each problem is searched once, and before the result, which the comment renders.
+            var suggestions = placement == ReferencePlacement.Finding && referenceQuery is not null && model is not null && corpus is not null
+                ? await new ReferenceSuggester(references!, model.Chat)
+                    .SuggestAsync(arbitration.Findings, plan, corpus.Docs, referenceQuery.ProviderVersion, cancellationToken)
+                : null;
+            if (suggestions is not null)
+            {
+                Log(ReferenceSuggester.Name, suggestions.PromptVersion, suggestions.Calls);
+            }
+
+            var findings = suggestions?.Findings ?? arbitration.Findings;
 
             IReadOnlyList<NotReviewed> notReviewed =
             [
@@ -137,16 +162,16 @@ public sealed class ReviewRunner(
                 drops[ModelRetracted] = retracted;
             }
 
-            return new ReviewResult(1, commit, arbitration.Verdict, arbitration.Findings, notReviewed, drops)
+            return new ReviewResult(1, commit, arbitration.Verdict, findings, notReviewed, drops)
             {
                 RiskOrder = risk.Order.Count == 0 ? null : risk.Order,
                 Cost = cost,
                 StandardsCommit = config.Commit,
                 StandardsRepository = config.Repository,
-                DocPaths = DocPaths(arbitration.Findings, corpus),
+                DocPaths = DocPaths(findings, corpus),
                 OmittedDocs = omitted.Count == 0 ? null : omitted,
-                Usage = Usage([.. passes.SelectMany(pass => pass.Calls), .. risk.Calls, .. arbitration.Calls]),
-                References = referenceQuery is null ? null : ReferenceUseOf(passes),
+                Usage = Usage([.. passes.SelectMany(pass => pass.Calls), .. risk.Calls, .. arbitration.Calls, .. suggestions?.Calls ?? []]),
+                References = referenceQuery is null ? null : ReferenceUseOf([.. passes.Select(pass => pass.References), .. suggestions?.Retrievals ?? []]),
             };
         }
         catch (StandardsFetchException)
@@ -325,9 +350,9 @@ public sealed class ReviewRunner(
         }
     }
 
-    private static ReferenceUse ReferenceUseOf(IEnumerable<AgentPass> passes)
+    private static ReferenceUse ReferenceUseOf(IEnumerable<ReferenceRetrieval?> retrievals)
     {
-        var used = passes.Select(pass => pass.References).OfType<ReferenceRetrieval>().ToList();
+        var used = retrievals.OfType<ReferenceRetrieval>().ToList();
         return new ReferenceUse(
             used.Select(retrieval => retrieval.CorpusVersion).OfType<string>().FirstOrDefault(),
             used.Any(retrieval => retrieval.ProviderDocsMissing),

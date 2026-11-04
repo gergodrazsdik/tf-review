@@ -1,0 +1,4 @@
+{
+  "prompt_version": 5,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_storage_account.uploads\",\"doc_id\":\"POL-001\",\"attribute\":\"https_traffic_only_enabled\",\"title\":\"azurerm_storage_account.uploads sets https_traffic_only_enabled to \\\"false\\\", which violates the requirement to keep storage account traffic encrypted.\",\"suggestion\":\"Change https_traffic_only_enabled to true.\",\"breaks_standard\":true}]}"
+}

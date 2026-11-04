@@ -1,0 +1,4 @@
+{
+  "prompt_version": 5,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_postgresql_flexible_server.orders\",\"doc_id\":\"POL-004\",\"attribute\":\"geo_redundant_backup_enabled\",\"title\":\"azurerm_postgresql_flexible_server.orders is being replaced because \\\"geo_redundant_backup_enabled\\\" changes from false to true, which can destroy the existing server and its data.\",\"suggestion\":\"Keep the server unchanged, or back up and confirm the data is disposable before applying this replacement.\",\"breaks_standard\":true}]}"
+}

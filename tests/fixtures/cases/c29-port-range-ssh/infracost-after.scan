@@ -1,0 +1,28 @@
+{
+  "currency": "USD",
+  "summary": {
+    "projects": 1,
+    "resources": 1,
+    "costed_resources": 0,
+    "free_resources": 1,
+    "total_monthly_cost": "0"
+  },
+  "projects": [
+    {
+      "project_name": "after.json",
+      "path": "after.json",
+      "finops_results": [],
+      "resources": [
+        {
+          "name": "azurerm_network_security_rule.legacy",
+          "type": "azurerm_network_security_rule",
+          "is_supported": true,
+          "is_free": true,
+          "metadata": {
+            "deep_checksum": "49b83a53c2e7e531"
+          }
+        }
+      ]
+    }
+  ]
+}

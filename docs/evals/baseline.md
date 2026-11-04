@@ -118,3 +118,24 @@ So 5 of the first 6 passed on their first measurement, which is the fair estimat
 - **The arbiter's merging across many findings.** It has only seen C2 and C11.
 - **Infracost's prices.** C14 and C15 use hand-written prices to test ADR-003's arithmetic, and all scanner output is replayed from recordings.
 - **The rendered comment,** beyond the unit tests on it and reading real ones.
+
+## References per finding (D50): 2026-11-04
+
+The per-agent trial above pointed at retrieval: an agent's references are about its resources, not the problem a finding is about. D50 searches per finding instead, from the standard's title, the resource type and the attribute name, after the arbiter. One model call (suggester v1) may add one sentence, which code keeps only if it's grounded in an offered excerpt and isn't a rename of the fix. Agents get no references in this mode, so findings can't change. Five new held-out cases, C27–C31, were written before the code: a PostgreSQL server replaced to turn on geo-redundant backup, a Cosmos DB account deleted, a port range 20–25 open to the internet, a new Business Critical SQL database, and storage switched to plain HTTP. Five runs each:
+
+| C27–C31, 75 concepts | No references | Per agent | Per finding |
+| --- | --- | --- | --- |
+| Suggestion concepts | 28 | 21 | 27 |
+| Runs passing | 20 of 25 | 17 of 25 | 18 of 25 |
+| Estimated cost (25 reviews) | About $0.08 | About $0.25 | About $0.11 |
+
+**On the held-out cases it made no measurable difference.** It added a sentence to 4 of 25 findings, all on C27 and all on point: geo-redundant backup can only be set when a server is created, which is why the plan replaces it. The run failures aren't about references, because per finding the agents see exactly what they see without them (see below).
+
+**On seen cases it did more.** The full suite once in this mode (C1–C26) added a sentence to 30 of 114 findings that cite a standard: `prevent_destroy` for the replaced database (C7, 5 of 5), a savings plan or Spot VMs for resizes (C4), built-in job-function roles before `Owner` or User Access Administrator (C3, C19, C24), tags instead of details in names (C6), and soft delete for the key vault, which is on by default now so it adds little (C25). Nine were advice to use Azure Policy to allow only approved VM sizes (C4, C15, C26), which the prompt forbids. Leaving Azure Policy excerpts out didn't stop it, because the Cloud Adoption Framework says it too, and it lost C27's sentence, so instead code drops any added sentence recommending Azure Policy. That leaves 21 of 114, nearly all on point. The C1–C26 suite passed 129 of 130 in this mode (C26 once), and it costs about $0.70 for 155 reviews.
+
+**Not the default yet.** It's better than per-agent references on every measure taken: cost, noise, and findings it can't touch. But the held-out cases didn't show suggestions getting better, so whether `references: true` switches to it is a decision for the plan, not a result.
+
+**What the held-out cases found instead,** in all three columns alike:
+
+- C28: a deleted Cosmos DB account failed 15 of 15 runs, and waits in `tests/fixtures/pending/` until that is fixed. The security prompt tells the agent to ignore resources whose actions are only `delete`, so it never re-reports POL-004 on a deletion, and a reviewer gets the policy's finding with no suggestion at all.
+- C29: in 4 of 15 runs the security agent didn't re-report POL-002 on a port range holding 22, so that finding had no suggestion either.
