@@ -1,0 +1,17 @@
+{
+  "held_out": true,
+  "findings": [
+    {
+      "resource_address": "azurerm_network_security_rule.rdp",
+      "rule": "POL-002",
+      "agent": "security",
+      "deterministic": true
+    },
+    {
+      "resource_address": "azurerm_network_security_rule.rdp",
+      "rule": "CKV_AZURE_9",
+      "agent": "scanner",
+      "deterministic": true
+    }
+  ]
+}

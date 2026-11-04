@@ -36,6 +36,23 @@ The baseline holds. One run each way can't separate 83 from 84, and C13's and C1
 
 The demo turned references on afterwards (demo #37).
 
+## Do references make suggestions better? 2026-11-04
+
+Four held-out cases, C18–C21, each breaking a team policy, so the finding comes from the policy and reference material can only shape the suggestion (D42). Each has a `suggestions.json`: three concepts a good suggestion should mention, as patterns fixed before any model saw the case, including the Azure-specific guidance that only the references carry, such as just-in-time access for RDP or conditions on a role-granting role. `e2e-live` scores them and reports the score without failing a run on it. Five runs each way, same code:
+
+| Measure | Without references | With references |
+| --- | --- | --- |
+| Findings | 20 of 20 | 20 of 20 |
+| Suggestion concepts | 32 of 60 | 31 of 60 |
+| Concepts only the references carry (network rules, RBAC Administrator or a custom role, conditions or PIM, `prevent_destroy`, just-in-time) | 0 of 25 | 1 of 25 |
+| Estimated cost (20 reviews) | About $0.07 | About $0.19 |
+
+**References don't make suggestions better, on this measure.** Every run had two or three reference sources and no provider docs missing, so the material arrived. The suggestions read the same either way: the fix the team's standard names (HTTPS and TLS 1.2, a narrower scope, keeping the login, a bastion or private range), and nothing the references add. The prompts ask for the change that resolves the finding, which may be why. That's a hypothesis for a later prompt version, to test on new held-out cases rather than these.
+
+One pattern was wrong and fixed after the runs: C20's backup concept, `back ?up`, missed "backed up". The scores above use the fix for both columns; with the original pattern both were 28 of 60.
+
+The earlier side-by-side reading of C1–C17 found suggestions slightly more specific with references. This measure, which was fixed in advance, doesn't confirm that.
+
 ## The part 6 gate: 2026-11-03
 
 - Demo #38, an app subnet with an NSG allowing only HTTPS from the internet, was reviewed through the service with references on: the App posted a success check run and a "No findings" comment, which credits the reference sources and lists the NSG and rule to look at first. That's the right answer.

@@ -29,7 +29,11 @@ string[] profiles = [AgentProfile.Conventions.Name, AgentProfile.Security.Name, 
 // Relaxed escaping keeps recorded answers readable in a diff. These files are never rendered as HTML.
 JsonSerializerOptions fileOptions = new() { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
-var cases = Directory.GetDirectories(CasesDirectory).Order(StringComparer.Ordinal).ToArray();
+// Only directories with a plan, so a stray one such as a tool's own can't fail the run.
+var cases = Directory.GetDirectories(CasesDirectory)
+    .Where(directory => File.Exists(Path.Combine(directory, "plan.json")))
+    .Order(StringComparer.Ordinal)
+    .ToArray();
 var standardsDirectory = Environment.GetEnvironmentVariable("TF_STANDARDS_DIR")
     ?? throw new InvalidOperationException("TF_STANDARDS_DIR isn't set.");
 
@@ -38,7 +42,8 @@ return args switch
     ["replay"] => await Replay(),
     ["record-scans", .. var names] => await RecordScans(names),
     ["live", "--runs", var runs, .. var options] => await Live(
-        int.Parse(runs, CultureInfo.InvariantCulture), Option(options, "--record"), options.Contains("--references"), Option(options, "--suggestions")),
+        int.Parse(runs, CultureInfo.InvariantCulture), Option(options, "--record"), options.Contains("--references"), Option(options, "--suggestions"),
+        Option(options, "--cases")?.Split(',')),
     ["retrieval", var labels] => await TfReview.Eval.RetrievalEval.RunAsync(labels, CasesDirectory, standardsDirectory, null),
     ["retrieval", var labels, "--report", var report] => await TfReview.Eval.RetrievalEval.RunAsync(labels, CasesDirectory, standardsDirectory, report),
     _ => Usage(),
@@ -46,7 +51,7 @@ return args switch
 
 static int Usage()
 {
-    Console.Error.WriteLine("usage: eval replay\n       eval record-scans [case...]\n       eval live --runs <n> [--record <dir>] [--references] [--suggestions <dir>]\n       eval retrieval <labels.yml> [--report <file.md>]");
+    Console.Error.WriteLine("usage: eval replay\n       eval record-scans [case...]\n       eval live --runs <n> [--record <dir>] [--references] [--suggestions <dir>] [--cases <name,...>]\n       eval retrieval <labels.yml> [--report <file.md>]");
     return 2;
 }
 
@@ -125,8 +130,16 @@ static string? Option(string[] options, string name) =>
 
 // With --references the config turns reference material on, and agents read the real index with the lock file below.
 // The baseline has to hold with it, and --suggestions saves what each run suggested, to read against a run without.
-async Task<int> Live(int runs, string? recordDirectory, bool withReferences, string? suggestionsDirectory)
+// Cases with a suggestions.json also score their suggestions, which is reported and never fails a run.
+async Task<int> Live(int runs, string? recordDirectory, bool withReferences, string? suggestionsDirectory, string[]? only)
 {
+    var selected = only is null ? cases : cases.Where(directory => only.Contains(Path.GetFileName(directory), StringComparer.Ordinal)).ToArray();
+    if (only is not null && selected.Length != only.Length)
+    {
+        Console.Error.WriteLine($"No such case among: {string.Join(", ", only)}");
+        return 2;
+    }
+
     var endpoint = new Uri(Required("TF_REVIEW_OPENAI_ENDPOINT"));
     var deployment = Required("TF_REVIEW_OPENAI_DEPLOYMENT");
     using var client = LlmClient.Create(endpoint, deployment);
@@ -144,10 +157,15 @@ async Task<int> Live(int runs, string? recordDirectory, bool withReferences, str
     var totalCost = 0m;
     var inputTokens = 0L;
     var cachedTokens = 0L;
-    foreach (var directory in cases)
+    var conceptsFound = 0;
+    var conceptsAsked = 0;
+    foreach (var directory in selected)
     {
         var name = Path.GetFileName(directory);
         var passes = 0;
+        var scoring = SuggestionScore.Load(directory);
+        var caseFound = 0;
+        var caseAsked = 0;
         for (var run = 1; run <= runs; run++)
         {
             using var recording = new RecordingChat(client, profiles);
@@ -168,6 +186,16 @@ async Task<int> Live(int runs, string? recordDirectory, bool withReferences, str
 
             var problems = await Problems(directory, result);
             failures += Report(name, run, problems);
+            if (scoring is not null)
+            {
+                var (found, asked, missed) = scoring.Score(result.Findings);
+                caseFound += found;
+                caseAsked += asked;
+                if (missed.Count > 0)
+                {
+                    Console.WriteLine($"  {name} run {run}: suggestion missed {string.Join(", ", missed)}");
+                }
+            }
             totalCost += result.Usage is { } usage ? StepSummary.EstimateCost(usage) ?? 0 : 0;
             inputTokens += result.Usage?.InputTokens ?? 0;
             cachedTokens += result.Usage?.CachedInputTokens ?? 0;
@@ -196,14 +224,21 @@ async Task<int> Live(int runs, string? recordDirectory, bool withReferences, str
             }
         }
 
-        Console.WriteLine($"{name}: {passes} of {runs}");
+        Console.WriteLine(scoring is null ? $"{name}: {passes} of {runs}" : $"{name}: {passes} of {runs}, suggestion concepts {caseFound} of {caseAsked}");
+        conceptsFound += caseFound;
+        conceptsAsked += caseAsked;
     }
 
     var versions = string.Join(", ", profiles.Select(profile => $"{profile} v{Prompts.Load(profile).Version}"));
     Console.WriteLine(withReferences ? $"With reference material, re-ranked by {ReferenceSelector.Name} v{Prompts.Load(ReferenceSelector.Name).Version}." : "Without reference material.");
     Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"Prompts {versions}, model {deployment}, estimated cost ~${totalCost:0.0000}."));
     Console.WriteLine($"Input tokens: {inputTokens}, of which cached: {cachedTokens}.");
-    Console.WriteLine(failures == 0 ? $"PASS: {cases.Length} case(s), {runs} run(s) each." : $"FAIL: {failures} failed run(s).");
+    if (conceptsAsked > 0)
+    {
+        Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"Suggestion concepts: {conceptsFound} of {conceptsAsked} ({100.0 * conceptsFound / conceptsAsked:0}%)."));
+    }
+
+    Console.WriteLine(failures == 0 ? $"PASS: {selected.Length} case(s), {runs} run(s) each." : $"FAIL: {failures} failed run(s).");
     return failures == 0 ? 0 : 1;
 }
 
@@ -319,6 +354,51 @@ internal sealed record ExpectedFinding(
     [property: JsonPropertyName("rule")] string Rule,
     [property: JsonPropertyName("agent")] string Agent,
     [property: JsonPropertyName("deterministic")] bool Deterministic);
+
+/// <summary>
+/// What a good suggestion for each expected finding should mention, as case-insensitive patterns fixed before any model
+/// saw the case. It measures whether reference material makes suggestions more useful; a finding that's missing scores
+/// nothing for its concepts.
+/// </summary>
+internal sealed record SuggestionScore([property: JsonPropertyName("findings")] IReadOnlyList<SuggestionExpectation> Findings)
+{
+    public static SuggestionScore? Load(string directory)
+    {
+        var path = Path.Combine(directory, "suggestions.json");
+        return File.Exists(path) ? JsonSerializer.Deserialize<SuggestionScore>(File.ReadAllText(path)) : null;
+    }
+
+    public (int Found, int Asked, IReadOnlyList<string> Missed) Score(IEnumerable<Finding> findings)
+    {
+        var found = 0;
+        var asked = 0;
+        var missed = new List<string>();
+        var list = findings.ToList();
+        foreach (var expectation in Findings)
+        {
+            var finding = list.FirstOrDefault(item => item.ResourceAddress == expectation.ResourceAddress && item.Rule == expectation.Rule);
+            foreach (var (name, pattern) in expectation.Concepts)
+            {
+                asked++;
+                if (finding?.Suggestion is { } suggestion && Regex.IsMatch(suggestion, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+                {
+                    found++;
+                }
+                else
+                {
+                    missed.Add($"{expectation.Rule} {name}");
+                }
+            }
+        }
+
+        return (found, asked, missed);
+    }
+}
+
+internal sealed record SuggestionExpectation(
+    [property: JsonPropertyName("resource_address")] string ResourceAddress,
+    [property: JsonPropertyName("rule")] string Rule,
+    [property: JsonPropertyName("concepts")] IReadOnlyDictionary<string, string> Concepts);
 
 internal sealed record RecordedAnswer(
     [property: JsonPropertyName("prompt_version")] int PromptVersion,

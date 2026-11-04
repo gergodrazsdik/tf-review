@@ -32,8 +32,9 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     environment: review
-    # 85 reviews take about 13 minutes, and about 36 with references, which add a search and a re-ranking per agent.
-    timeout-minutes: 50
+    # 85 reviews took about 13 minutes, and about 36 with references, which add a search and a re-ranking per agent.
+    # With 21 cases, 105 reviews take about 45 minutes with references.
+    timeout-minutes: 70
     permissions:
       contents: read
       id-token: write

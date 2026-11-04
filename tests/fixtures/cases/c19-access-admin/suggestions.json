@@ -1,0 +1,13 @@
+{
+  "findings": [
+    {
+      "resource_address": "azurerm_role_assignment.pipeline",
+      "rule": "POL-003",
+      "concepts": {
+        "role": "Role Based Access Control Administrator|RBAC Administrator|custom role",
+        "scope": "resource group|single resource|specific resource",
+        "condition": "condition|PIM|Privileged Identity Management|eligible|time-bound|just-in-time"
+      }
+    }
+  ]
+}

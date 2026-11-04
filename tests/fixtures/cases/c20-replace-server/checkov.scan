@@ -1,0 +1,1227 @@
+{
+    "check_type": "terraform_plan",
+    "results": {
+        "failed_checks": [
+            {
+                "check_id": "CKV_AZURE_206",
+                "bc_check_id": null,
+                "check_name": "Ensure that Storage Accounts use replication",
+                "check_result": {
+                    "result": "FAILED",
+                    "evaluated_keys": [
+                        "account_replication_type"
+                    ]
+                },
+                "code_block": null,
+                "file_path": "/plan.json",
+                "file_abs_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "repo_file_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "file_line_range": [
+                    0,
+                    0
+                ],
+                "resource": "azurerm_storage_account.tfreview_canary",
+                "evaluations": null,
+                "check_class": "checkov.terraform.checks.resource.azure.StorageAccountsUseReplication",
+                "fixed_definition": null,
+                "entity_tags": null,
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": "azurerm_storage_account.tfreview_canary",
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": null,
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": null
+            },
+            {
+                "check_id": "CKV_AZURE_33",
+                "bc_check_id": null,
+                "check_name": "Ensure Storage logging is enabled for Queue service for read, write and delete requests",
+                "check_result": {
+                    "result": "FAILED",
+                    "evaluated_keys": [
+                        "account_kind"
+                    ]
+                },
+                "code_block": null,
+                "file_path": "/plan.json",
+                "file_abs_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "repo_file_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "file_line_range": [
+                    0,
+                    0
+                ],
+                "resource": "azurerm_storage_account.tfreview_canary",
+                "evaluations": null,
+                "check_class": "checkov.terraform.checks.resource.azure.StorageAccountLoggingQueueServiceEnabled",
+                "fixed_definition": null,
+                "entity_tags": null,
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": "azurerm_storage_account.tfreview_canary",
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": null,
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": null
+            },
+            {
+                "check_id": "CKV_AZURE_190",
+                "bc_check_id": null,
+                "check_name": "Ensure that Storage blobs restrict public access",
+                "check_result": {
+                    "result": "FAILED",
+                    "evaluated_keys": [
+                        "allow_nested_items_to_be_public"
+                    ]
+                },
+                "code_block": null,
+                "file_path": "/plan.json",
+                "file_abs_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "repo_file_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "file_line_range": [
+                    0,
+                    0
+                ],
+                "resource": "azurerm_storage_account.tfreview_canary",
+                "evaluations": null,
+                "check_class": "checkov.terraform.checks.resource.azure.StorageBlobRestrictPublicAccess",
+                "fixed_definition": null,
+                "entity_tags": null,
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": "azurerm_storage_account.tfreview_canary",
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": null,
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": null
+            },
+            {
+                "check_id": "CKV_AZURE_44",
+                "bc_check_id": null,
+                "check_name": "Ensure Storage Account is using the latest version of TLS encryption",
+                "check_result": {
+                    "result": "FAILED",
+                    "evaluated_keys": [
+                        "min_tls_version"
+                    ]
+                },
+                "code_block": null,
+                "file_path": "/plan.json",
+                "file_abs_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "repo_file_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "file_line_range": [
+                    0,
+                    0
+                ],
+                "resource": "azurerm_storage_account.tfreview_canary",
+                "evaluations": null,
+                "check_class": "checkov.terraform.checks.resource.azure.StorageAccountMinimumTlsVersion",
+                "fixed_definition": null,
+                "entity_tags": null,
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": "azurerm_storage_account.tfreview_canary",
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": null,
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": null
+            },
+            {
+                "check_id": "CKV_AZURE_59",
+                "bc_check_id": null,
+                "check_name": "Ensure that Storage accounts disallow public access",
+                "check_result": {
+                    "result": "FAILED",
+                    "evaluated_keys": [
+                        "public_network_access_enabled"
+                    ]
+                },
+                "code_block": null,
+                "file_path": "/plan.json",
+                "file_abs_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "repo_file_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "file_line_range": [
+                    0,
+                    0
+                ],
+                "resource": "azurerm_storage_account.tfreview_canary",
+                "evaluations": null,
+                "check_class": "checkov.terraform.checks.resource.azure.StorageAccountDisablePublicAccess",
+                "fixed_definition": null,
+                "entity_tags": null,
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": "azurerm_storage_account.tfreview_canary",
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": null,
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": null
+            },
+            {
+                "check_id": "CKV2_AZURE_38",
+                "bc_check_id": null,
+                "check_name": "Ensure soft-delete is enabled on Azure storage account",
+                "check_result": {
+                    "result": "FAILED",
+                    "entity": {
+                        "azurerm_storage_account": {
+                            "tfreview_canary": {
+                                "account_replication_type": [
+                                    "LRS"
+                                ],
+                                "account_tier": [
+                                    "Standard"
+                                ],
+                                "allow_nested_items_to_be_public": [
+                                    true
+                                ],
+                                "location": [
+                                    "germanywestcentral"
+                                ],
+                                "name": [
+                                    "tfreviewcanary"
+                                ],
+                                "resource_group_name": [
+                                    "canary"
+                                ],
+                                "__file__": [
+                                    "/tmp/tfreview-bHjoDT/plan.json"
+                                ],
+                                "__startline__": [
+                                    1
+                                ],
+                                "__endline__": [
+                                    1
+                                ],
+                                "start_line": [
+                                    0
+                                ],
+                                "end_line": [
+                                    0
+                                ],
+                                "__address__": "azurerm_storage_account.tfreview_canary",
+                                "__change_actions__": [
+                                    "create"
+                                ],
+                                "__change_keys__": []
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "blob_properties/delete_retention_policy",
+                        "blob_properties/delete_retention_policy/days",
+                        "account_kind"
+                    ]
+                },
+                "code_block": null,
+                "file_path": "/plan.json",
+                "file_abs_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "repo_file_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "file_line_range": [
+                    0,
+                    0
+                ],
+                "resource": "azurerm_storage_account.tfreview_canary",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": null,
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": "azurerm_storage_account.tfreview_canary",
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": {},
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": null,
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/tmp/tfreview-bHjoDT/plan.json"
+            },
+            {
+                "check_id": "CKV2_AZURE_47",
+                "bc_check_id": null,
+                "check_name": "Ensure storage account is configured without blob anonymous access",
+                "check_result": {
+                    "result": "FAILED",
+                    "entity": {
+                        "azurerm_storage_account": {
+                            "tfreview_canary": {
+                                "account_replication_type": [
+                                    "LRS"
+                                ],
+                                "account_tier": [
+                                    "Standard"
+                                ],
+                                "allow_nested_items_to_be_public": [
+                                    true
+                                ],
+                                "location": [
+                                    "germanywestcentral"
+                                ],
+                                "name": [
+                                    "tfreviewcanary"
+                                ],
+                                "resource_group_name": [
+                                    "canary"
+                                ],
+                                "__file__": [
+                                    "/tmp/tfreview-bHjoDT/plan.json"
+                                ],
+                                "__startline__": [
+                                    1
+                                ],
+                                "__endline__": [
+                                    1
+                                ],
+                                "start_line": [
+                                    0
+                                ],
+                                "end_line": [
+                                    0
+                                ],
+                                "__address__": "azurerm_storage_account.tfreview_canary",
+                                "__change_actions__": [
+                                    "create"
+                                ],
+                                "__change_keys__": []
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "allow_nested_items_to_be_public"
+                    ]
+                },
+                "code_block": null,
+                "file_path": "/plan.json",
+                "file_abs_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "repo_file_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "file_line_range": [
+                    0,
+                    0
+                ],
+                "resource": "azurerm_storage_account.tfreview_canary",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": null,
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": "azurerm_storage_account.tfreview_canary",
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": {},
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": null,
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/tmp/tfreview-bHjoDT/plan.json"
+            },
+            {
+                "check_id": "CKV_AZURE_24",
+                "bc_check_id": null,
+                "check_name": "Ensure that 'Auditing' Retention is 'greater than 90 days' for SQL servers",
+                "check_result": {
+                    "result": "FAILED",
+                    "entity": {
+                        "azurerm_mssql_server": {
+                            "orders": {
+                                "administrator_login": [
+                                    "ordersadmin"
+                                ],
+                                "azuread_administrator": [
+                                    []
+                                ],
+                                "connection_policy": [
+                                    "Default"
+                                ],
+                                "express_vulnerability_assessment_enabled": [
+                                    false
+                                ],
+                                "identity": [
+                                    []
+                                ],
+                                "location": [
+                                    "germanywestcentral"
+                                ],
+                                "minimum_tls_version": [
+                                    "1.2"
+                                ],
+                                "name": [
+                                    "sql-orders-prod"
+                                ],
+                                "outbound_network_restriction_enabled": [
+                                    false
+                                ],
+                                "primary_user_assigned_identity_id": [
+                                    null
+                                ],
+                                "public_network_access_enabled": [
+                                    false
+                                ],
+                                "resource_group_name": [
+                                    "rg-tf-review-demo-prod"
+                                ],
+                                "tags": [
+                                    {
+                                        "environment": "prod",
+                                        "owner": "gergodrazsdik",
+                                        "project": "tf-review-demo",
+                                        "__file__": "/tmp/tfreview-bHjoDT/plan.json",
+                                        "__startline__": 1,
+                                        "__endline__": 1,
+                                        "start_line": 0,
+                                        "end_line": 0
+                                    }
+                                ],
+                                "timeouts": [
+                                    null
+                                ],
+                                "transparent_data_encryption_key_vault_key_id": [
+                                    null
+                                ],
+                                "version": [
+                                    "12.0"
+                                ],
+                                "__file__": [
+                                    "/tmp/tfreview-bHjoDT/plan.json"
+                                ],
+                                "__startline__": [
+                                    1
+                                ],
+                                "__endline__": [
+                                    1
+                                ],
+                                "start_line": [
+                                    0
+                                ],
+                                "end_line": [
+                                    0
+                                ],
+                                "__address__": "azurerm_mssql_server.orders",
+                                "__change_actions__": [
+                                    "create"
+                                ],
+                                "__change_keys__": []
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "retention_in_days",
+                        "resource_type",
+                        "extended_auditing_policy/*/retention_in_days"
+                    ]
+                },
+                "code_block": null,
+                "file_path": "/plan.json",
+                "file_abs_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "repo_file_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "file_line_range": [
+                    0,
+                    0
+                ],
+                "resource": "azurerm_mssql_server.orders",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "environment": "prod",
+                    "owner": "gergodrazsdik",
+                    "project": "tf-review-demo",
+                    "__file__": "/tmp/tfreview-bHjoDT/plan.json",
+                    "__startline__": 1,
+                    "__endline__": 1,
+                    "start_line": 0,
+                    "end_line": 0
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": "azurerm_mssql_server.orders",
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": {},
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": null,
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/tmp/tfreview-bHjoDT/plan.json"
+            },
+            {
+                "check_id": "CKV2_AZURE_33",
+                "bc_check_id": null,
+                "check_name": "Ensure storage account is configured with private endpoint",
+                "check_result": {
+                    "result": "FAILED",
+                    "entity": {
+                        "azurerm_storage_account": {
+                            "tfreview_canary": {
+                                "account_replication_type": [
+                                    "LRS"
+                                ],
+                                "account_tier": [
+                                    "Standard"
+                                ],
+                                "allow_nested_items_to_be_public": [
+                                    true
+                                ],
+                                "location": [
+                                    "germanywestcentral"
+                                ],
+                                "name": [
+                                    "tfreviewcanary"
+                                ],
+                                "resource_group_name": [
+                                    "canary"
+                                ],
+                                "__file__": [
+                                    "/tmp/tfreview-bHjoDT/plan.json"
+                                ],
+                                "__startline__": [
+                                    1
+                                ],
+                                "__endline__": [
+                                    1
+                                ],
+                                "start_line": [
+                                    0
+                                ],
+                                "end_line": [
+                                    0
+                                ],
+                                "__address__": "azurerm_storage_account.tfreview_canary",
+                                "__change_actions__": [
+                                    "create"
+                                ],
+                                "__change_keys__": []
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "resource_type"
+                    ]
+                },
+                "code_block": null,
+                "file_path": "/plan.json",
+                "file_abs_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "repo_file_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "file_line_range": [
+                    0,
+                    0
+                ],
+                "resource": "azurerm_storage_account.tfreview_canary",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": null,
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": "azurerm_storage_account.tfreview_canary",
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": {},
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": null,
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/tmp/tfreview-bHjoDT/plan.json"
+            },
+            {
+                "check_id": "CKV_AZURE_23",
+                "bc_check_id": null,
+                "check_name": "Ensure that 'Auditing' is set to 'On' for SQL servers",
+                "check_result": {
+                    "result": "FAILED",
+                    "entity": {
+                        "azurerm_mssql_server": {
+                            "orders": {
+                                "administrator_login": [
+                                    "ordersadmin"
+                                ],
+                                "azuread_administrator": [
+                                    []
+                                ],
+                                "connection_policy": [
+                                    "Default"
+                                ],
+                                "express_vulnerability_assessment_enabled": [
+                                    false
+                                ],
+                                "identity": [
+                                    []
+                                ],
+                                "location": [
+                                    "germanywestcentral"
+                                ],
+                                "minimum_tls_version": [
+                                    "1.2"
+                                ],
+                                "name": [
+                                    "sql-orders-prod"
+                                ],
+                                "outbound_network_restriction_enabled": [
+                                    false
+                                ],
+                                "primary_user_assigned_identity_id": [
+                                    null
+                                ],
+                                "public_network_access_enabled": [
+                                    false
+                                ],
+                                "resource_group_name": [
+                                    "rg-tf-review-demo-prod"
+                                ],
+                                "tags": [
+                                    {
+                                        "environment": "prod",
+                                        "owner": "gergodrazsdik",
+                                        "project": "tf-review-demo",
+                                        "__file__": "/tmp/tfreview-bHjoDT/plan.json",
+                                        "__startline__": 1,
+                                        "__endline__": 1,
+                                        "start_line": 0,
+                                        "end_line": 0
+                                    }
+                                ],
+                                "timeouts": [
+                                    null
+                                ],
+                                "transparent_data_encryption_key_vault_key_id": [
+                                    null
+                                ],
+                                "version": [
+                                    "12.0"
+                                ],
+                                "__file__": [
+                                    "/tmp/tfreview-bHjoDT/plan.json"
+                                ],
+                                "__startline__": [
+                                    1
+                                ],
+                                "__endline__": [
+                                    1
+                                ],
+                                "start_line": [
+                                    0
+                                ],
+                                "end_line": [
+                                    0
+                                ],
+                                "__address__": "azurerm_mssql_server.orders",
+                                "__change_actions__": [
+                                    "create"
+                                ],
+                                "__change_keys__": []
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "resource_type",
+                        "extended_auditing_policy",
+                        "server_id"
+                    ]
+                },
+                "code_block": null,
+                "file_path": "/plan.json",
+                "file_abs_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "repo_file_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "file_line_range": [
+                    0,
+                    0
+                ],
+                "resource": "azurerm_mssql_server.orders",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "environment": "prod",
+                    "owner": "gergodrazsdik",
+                    "project": "tf-review-demo",
+                    "__file__": "/tmp/tfreview-bHjoDT/plan.json",
+                    "__startline__": 1,
+                    "__endline__": 1,
+                    "start_line": 0,
+                    "end_line": 0
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": "azurerm_mssql_server.orders",
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": {},
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": null,
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/tmp/tfreview-bHjoDT/plan.json"
+            },
+            {
+                "check_id": "CKV2_AZURE_40",
+                "bc_check_id": null,
+                "check_name": "Ensure storage account is not configured with Shared Key authorization",
+                "check_result": {
+                    "result": "FAILED",
+                    "entity": {
+                        "azurerm_storage_account": {
+                            "tfreview_canary": {
+                                "account_replication_type": [
+                                    "LRS"
+                                ],
+                                "account_tier": [
+                                    "Standard"
+                                ],
+                                "allow_nested_items_to_be_public": [
+                                    true
+                                ],
+                                "location": [
+                                    "germanywestcentral"
+                                ],
+                                "name": [
+                                    "tfreviewcanary"
+                                ],
+                                "resource_group_name": [
+                                    "canary"
+                                ],
+                                "__file__": [
+                                    "/tmp/tfreview-bHjoDT/plan.json"
+                                ],
+                                "__startline__": [
+                                    1
+                                ],
+                                "__endline__": [
+                                    1
+                                ],
+                                "start_line": [
+                                    0
+                                ],
+                                "end_line": [
+                                    0
+                                ],
+                                "__address__": "azurerm_storage_account.tfreview_canary",
+                                "__change_actions__": [
+                                    "create"
+                                ],
+                                "__change_keys__": []
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "shared_access_key_enabled"
+                    ]
+                },
+                "code_block": null,
+                "file_path": "/plan.json",
+                "file_abs_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "repo_file_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "file_line_range": [
+                    0,
+                    0
+                ],
+                "resource": "azurerm_storage_account.tfreview_canary",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": null,
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": "azurerm_storage_account.tfreview_canary",
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": {},
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": null,
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/tmp/tfreview-bHjoDT/plan.json"
+            },
+            {
+                "check_id": "CKV2_AZURE_41",
+                "bc_check_id": null,
+                "check_name": "Ensure storage account is configured with SAS expiration policy",
+                "check_result": {
+                    "result": "FAILED",
+                    "entity": {
+                        "azurerm_storage_account": {
+                            "tfreview_canary": {
+                                "account_replication_type": [
+                                    "LRS"
+                                ],
+                                "account_tier": [
+                                    "Standard"
+                                ],
+                                "allow_nested_items_to_be_public": [
+                                    true
+                                ],
+                                "location": [
+                                    "germanywestcentral"
+                                ],
+                                "name": [
+                                    "tfreviewcanary"
+                                ],
+                                "resource_group_name": [
+                                    "canary"
+                                ],
+                                "__file__": [
+                                    "/tmp/tfreview-bHjoDT/plan.json"
+                                ],
+                                "__startline__": [
+                                    1
+                                ],
+                                "__endline__": [
+                                    1
+                                ],
+                                "start_line": [
+                                    0
+                                ],
+                                "end_line": [
+                                    0
+                                ],
+                                "__address__": "azurerm_storage_account.tfreview_canary",
+                                "__change_actions__": [
+                                    "create"
+                                ],
+                                "__change_keys__": []
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "shared_access_key_enabled",
+                        "sas_policy",
+                        "sas_policy/expiration_period"
+                    ]
+                },
+                "code_block": null,
+                "file_path": "/plan.json",
+                "file_abs_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "repo_file_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "file_line_range": [
+                    0,
+                    0
+                ],
+                "resource": "azurerm_storage_account.tfreview_canary",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": null,
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": "azurerm_storage_account.tfreview_canary",
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": {},
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": null,
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/tmp/tfreview-bHjoDT/plan.json"
+            },
+            {
+                "check_id": "CKV2_AZURE_45",
+                "bc_check_id": null,
+                "check_name": "Ensure Microsoft SQL server is configured with private endpoint",
+                "check_result": {
+                    "result": "FAILED",
+                    "entity": {
+                        "azurerm_mssql_server": {
+                            "orders": {
+                                "administrator_login": [
+                                    "ordersadmin"
+                                ],
+                                "azuread_administrator": [
+                                    []
+                                ],
+                                "connection_policy": [
+                                    "Default"
+                                ],
+                                "express_vulnerability_assessment_enabled": [
+                                    false
+                                ],
+                                "identity": [
+                                    []
+                                ],
+                                "location": [
+                                    "germanywestcentral"
+                                ],
+                                "minimum_tls_version": [
+                                    "1.2"
+                                ],
+                                "name": [
+                                    "sql-orders-prod"
+                                ],
+                                "outbound_network_restriction_enabled": [
+                                    false
+                                ],
+                                "primary_user_assigned_identity_id": [
+                                    null
+                                ],
+                                "public_network_access_enabled": [
+                                    false
+                                ],
+                                "resource_group_name": [
+                                    "rg-tf-review-demo-prod"
+                                ],
+                                "tags": [
+                                    {
+                                        "environment": "prod",
+                                        "owner": "gergodrazsdik",
+                                        "project": "tf-review-demo",
+                                        "__file__": "/tmp/tfreview-bHjoDT/plan.json",
+                                        "__startline__": 1,
+                                        "__endline__": 1,
+                                        "start_line": 0,
+                                        "end_line": 0
+                                    }
+                                ],
+                                "timeouts": [
+                                    null
+                                ],
+                                "transparent_data_encryption_key_vault_key_id": [
+                                    null
+                                ],
+                                "version": [
+                                    "12.0"
+                                ],
+                                "__file__": [
+                                    "/tmp/tfreview-bHjoDT/plan.json"
+                                ],
+                                "__startline__": [
+                                    1
+                                ],
+                                "__endline__": [
+                                    1
+                                ],
+                                "start_line": [
+                                    0
+                                ],
+                                "end_line": [
+                                    0
+                                ],
+                                "__address__": "azurerm_mssql_server.orders",
+                                "__change_actions__": [
+                                    "create"
+                                ],
+                                "__change_keys__": []
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "resource_type"
+                    ]
+                },
+                "code_block": null,
+                "file_path": "/plan.json",
+                "file_abs_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "repo_file_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "file_line_range": [
+                    0,
+                    0
+                ],
+                "resource": "azurerm_mssql_server.orders",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "environment": "prod",
+                    "owner": "gergodrazsdik",
+                    "project": "tf-review-demo",
+                    "__file__": "/tmp/tfreview-bHjoDT/plan.json",
+                    "__startline__": 1,
+                    "__endline__": 1,
+                    "start_line": 0,
+                    "end_line": 0
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": "azurerm_mssql_server.orders",
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": {},
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": null,
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/tmp/tfreview-bHjoDT/plan.json"
+            },
+            {
+                "check_id": "CKV2_AZURE_2",
+                "bc_check_id": null,
+                "check_name": "Ensure that Vulnerability Assessment (VA) is enabled on a SQL server by setting a Storage Account",
+                "check_result": {
+                    "result": "FAILED",
+                    "entity": {
+                        "azurerm_mssql_server": {
+                            "orders": {
+                                "administrator_login": [
+                                    "ordersadmin"
+                                ],
+                                "azuread_administrator": [
+                                    []
+                                ],
+                                "connection_policy": [
+                                    "Default"
+                                ],
+                                "express_vulnerability_assessment_enabled": [
+                                    false
+                                ],
+                                "identity": [
+                                    []
+                                ],
+                                "location": [
+                                    "germanywestcentral"
+                                ],
+                                "minimum_tls_version": [
+                                    "1.2"
+                                ],
+                                "name": [
+                                    "sql-orders-prod"
+                                ],
+                                "outbound_network_restriction_enabled": [
+                                    false
+                                ],
+                                "primary_user_assigned_identity_id": [
+                                    null
+                                ],
+                                "public_network_access_enabled": [
+                                    false
+                                ],
+                                "resource_group_name": [
+                                    "rg-tf-review-demo-prod"
+                                ],
+                                "tags": [
+                                    {
+                                        "environment": "prod",
+                                        "owner": "gergodrazsdik",
+                                        "project": "tf-review-demo",
+                                        "__file__": "/tmp/tfreview-bHjoDT/plan.json",
+                                        "__startline__": 1,
+                                        "__endline__": 1,
+                                        "start_line": 0,
+                                        "end_line": 0
+                                    }
+                                ],
+                                "timeouts": [
+                                    null
+                                ],
+                                "transparent_data_encryption_key_vault_key_id": [
+                                    null
+                                ],
+                                "version": [
+                                    "12.0"
+                                ],
+                                "__file__": [
+                                    "/tmp/tfreview-bHjoDT/plan.json"
+                                ],
+                                "__startline__": [
+                                    1
+                                ],
+                                "__endline__": [
+                                    1
+                                ],
+                                "start_line": [
+                                    0
+                                ],
+                                "end_line": [
+                                    0
+                                ],
+                                "__address__": "azurerm_mssql_server.orders",
+                                "__change_actions__": [
+                                    "create"
+                                ],
+                                "__change_keys__": []
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "state",
+                        "resource_type"
+                    ]
+                },
+                "code_block": null,
+                "file_path": "/plan.json",
+                "file_abs_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "repo_file_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "file_line_range": [
+                    0,
+                    0
+                ],
+                "resource": "azurerm_mssql_server.orders",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "environment": "prod",
+                    "owner": "gergodrazsdik",
+                    "project": "tf-review-demo",
+                    "__file__": "/tmp/tfreview-bHjoDT/plan.json",
+                    "__startline__": 1,
+                    "__endline__": 1,
+                    "start_line": 0,
+                    "end_line": 0
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": "azurerm_mssql_server.orders",
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": {},
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": null,
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/tmp/tfreview-bHjoDT/plan.json"
+            },
+            {
+                "check_id": "CKV2_AZURE_1",
+                "bc_check_id": null,
+                "check_name": "Ensure storage for critical data are encrypted with Customer Managed Key",
+                "check_result": {
+                    "result": "FAILED",
+                    "entity": {
+                        "azurerm_storage_account": {
+                            "tfreview_canary": {
+                                "account_replication_type": [
+                                    "LRS"
+                                ],
+                                "account_tier": [
+                                    "Standard"
+                                ],
+                                "allow_nested_items_to_be_public": [
+                                    true
+                                ],
+                                "location": [
+                                    "germanywestcentral"
+                                ],
+                                "name": [
+                                    "tfreviewcanary"
+                                ],
+                                "resource_group_name": [
+                                    "canary"
+                                ],
+                                "__file__": [
+                                    "/tmp/tfreview-bHjoDT/plan.json"
+                                ],
+                                "__startline__": [
+                                    1
+                                ],
+                                "__endline__": [
+                                    1
+                                ],
+                                "start_line": [
+                                    0
+                                ],
+                                "end_line": [
+                                    0
+                                ],
+                                "__address__": "azurerm_storage_account.tfreview_canary",
+                                "__change_actions__": [
+                                    "create"
+                                ],
+                                "__change_keys__": []
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "customer_managed_key/key_vault_key_id",
+                        "resource_type"
+                    ]
+                },
+                "code_block": null,
+                "file_path": "/plan.json",
+                "file_abs_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "repo_file_path": "/tmp/tfreview-bHjoDT/plan.json",
+                "file_line_range": [
+                    0,
+                    0
+                ],
+                "resource": "azurerm_storage_account.tfreview_canary",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": null,
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": "azurerm_storage_account.tfreview_canary",
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": {},
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": null,
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/tmp/tfreview-bHjoDT/plan.json"
+            }
+        ]
+    },
+    "summary": {
+        "passed": 7,
+        "failed": 15,
+        "skipped": 0,
+        "parsing_errors": 0,
+        "resource_count": 2,
+        "checkov_version": "3.4.0"
+    }
+}
