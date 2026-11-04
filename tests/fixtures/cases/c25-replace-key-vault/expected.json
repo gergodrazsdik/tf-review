@@ -1,0 +1,12 @@
+{
+  "held_out": true,
+  "findings": [
+    {
+      "resource_address": "azurerm_key_vault.app",
+      "rule": "POL-004",
+      "agent": "security",
+      "deterministic": true
+    }
+  ],
+  "risk_first": "azurerm_key_vault.app"
+}

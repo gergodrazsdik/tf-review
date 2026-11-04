@@ -1,0 +1,4 @@
+{
+  "prompt_version": 5,
+  "text": "{\"findings\":[{\"resource_address\":\"azurerm_role_assignment.operations\",\"doc_id\":\"POL-003\",\"attribute\":\"role_definition_name\",\"title\":\"azurerm_role_assignment.operations grants \\\"Owner\\\" at management group scope \\\"/providers/Microsoft.Management/managementGroups/mg-platform\\\", which is wider than a subscription and can delegate broad access.\",\"suggestion\":\"Assign a narrower role, or move this assignment to a resource group or specific resource scope instead of the management group.\",\"breaks_standard\":true}]}"
+}

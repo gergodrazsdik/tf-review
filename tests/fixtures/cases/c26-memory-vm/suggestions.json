@@ -1,0 +1,13 @@
+{
+  "findings": [
+    {
+      "resource_address": "azurerm_linux_virtual_machine.main",
+      "rule": "ADR-003",
+      "concepts": {
+        "confirm": "confirm|intended|necessary|needed|justif",
+        "smaller_option": "smaller|right-?siz|Standard_[DE]4|D-series|general[- ]purpose|burstable|B-series",
+        "pricing": "reserv|savings plan|spot|auto-?shutdown|deallocat|schedul"
+      }
+    }
+  ]
+}
