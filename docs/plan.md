@@ -683,7 +683,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 
 **M4 · Hardening**
 
-- [x] Result cache keyed on resource change, agent, prompt version and corpus version: per model call on its whole input, which covers all four (D53). **You:** merge, approve `prod` (the `reviews` container gets `default_ttl = -1`), then the image release
+- [x] Result cache keyed on resource change, agent, prompt version and corpus version: per model call on its whole input, which covers all four (D53). Released as `image-v0.0.14` and proved on demo #43: a re-push with nothing changed got all 4 calls from the cache, with no tokens
 - [ ] Map-reduce for large PRs with risk-first ordering
 - [ ] Feedback from comment reactions turned into eval cases
 - [ ] Opt-in blocking on deterministic high findings

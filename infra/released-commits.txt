@@ -1,5 +1,4 @@
 # Commits of tf-review that callers may pin the reusable workflow to, one per line (D45). GitHub resolves a fork's
 # commit through its parent repo, so only this list proves one is really ours. A commit can't name itself, so each
 # release adds its commit here in a PR after tagging, and callers repin once that's applied.
-bd22a24770ecaae4ddb7fad9e369965604c0cfba
 359b61d4a05fa000ea46cbb384b9c4412109ea6c
