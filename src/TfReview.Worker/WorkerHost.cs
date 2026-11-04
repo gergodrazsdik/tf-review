@@ -18,6 +18,7 @@ public static class WorkerHost
     private const string AppKeySecret = "github-app-private-key";
     private const string InfracostSecret = "infracost-cli-token";
     private const string InfracostVariable = "INFRACOST_CLI_AUTHENTICATION_TOKEN";
+    private const string Database = "tfreview";
 
     private static readonly Uri GitHubApi = new("https://api.github.com/");
 
@@ -44,6 +45,12 @@ public static class WorkerHost
         appHttp.DefaultRequestHeaders.Authorization = null;
         var app = new GitHubApp(appHttp, Required("TF_REVIEW_GITHUB_APP_CLIENT_ID"), appKey);
 
+        // One client for the reference index and the result cache, which live in the same account.
+        var cosmos = new Microsoft.Azure.Cosmos.CosmosClient(
+            Required("TF_REVIEW_COSMOS_ENDPOINT"),
+            new DefaultAzureCredential(),
+            new Microsoft.Azure.Cosmos.CosmosClientOptions { ApplicationName = "tf-review", ConnectionMode = Microsoft.Azure.Cosmos.ConnectionMode.Gateway });
+
         using var standardsHttp = new HttpClient { BaseAddress = new Uri("https://codeload.github.com/"), Timeout = TimeSpan.FromSeconds(30) };
         var runner = new ReviewRunner(
             new GitHubTarballSource(standardsHttp),
@@ -52,14 +59,16 @@ public static class WorkerHost
             log: Console.WriteLine,
             infracost: new InfracostRunner(new ProcessRunner(InfracostRunner.EnvironmentVariables)),
             checkov: new CheckovRunner(new ProcessRunner()),
-            references: References());
+            references: References(cosmos),
+            answers: new CosmosAnswerStore(cosmos.GetContainer(Database, "reviews")));
 
         var worker = new ReviewWorker(
             stores.Queue,
             stores.Plans,
             stores.Statuses,
             (repository, cancellationToken) => app.OpenAsync(repository, GitHubApi, cancellationToken),
-            (plan, config, lockFile, commit, cancellationToken) => runner.RunAsync(plan, config, commit, cancellationToken, lockFile),
+            (plan, config, lockFile, commit, repositoryId, cancellationToken) =>
+                runner.RunAsync(plan, config, commit, cancellationToken, lockFile, repositoryId),
             Console.WriteLine);
 
         return await worker.RunOnceAsync(deadline.Token);
@@ -74,7 +83,7 @@ public static class WorkerHost
             : null;
 
     // Read-only use of the index the corpus workflow builds. Only configs asking for references get any (D42).
-    private static CosmosReferenceRetriever? References()
+    private static CosmosReferenceRetriever? References(Microsoft.Azure.Cosmos.CosmosClient cosmos)
     {
         var endpoint = Environment.GetEnvironmentVariable("TF_REVIEW_OPENAI_ENDPOINT");
         var deployment = Environment.GetEnvironmentVariable("TF_REVIEW_EMBEDDING_DEPLOYMENT");
@@ -83,13 +92,8 @@ public static class WorkerHost
             return null;
         }
 
-        var credential = new DefaultAzureCredential();
-        var container = new Microsoft.Azure.Cosmos.CosmosClient(
-                Required("TF_REVIEW_COSMOS_ENDPOINT"),
-                credential,
-                new Microsoft.Azure.Cosmos.CosmosClientOptions { ApplicationName = "tf-review", ConnectionMode = Microsoft.Azure.Cosmos.ConnectionMode.Gateway })
-            .GetContainer("tfreview", "references");
-        return new CosmosReferenceRetriever(container, AzureQueryEmbedder.Create(uri, deployment, credential));
+        return new CosmosReferenceRetriever(
+            cosmos.GetContainer(Database, "references"), AzureQueryEmbedder.Create(uri, deployment, new DefaultAzureCredential()));
     }
 
     // No model configured means the agents report "not reviewed", rather than the whole review failing.

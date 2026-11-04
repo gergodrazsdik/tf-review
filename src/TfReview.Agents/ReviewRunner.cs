@@ -34,6 +34,7 @@ public enum ReferencePlacement
 /// <param name="checkov">Checks the plan, or null when it isn't available, which is reported as not reviewed.</param>
 /// <param name="references">Imported reference material, for a config that asks for it, or null when there's none (D42).</param>
 /// <param name="placement">Where references go when a config asks for them.</param>
+/// <param name="answers">Keeps model answers between reviews of the same repo, or null for none (D53).</param>
 public sealed class ReviewRunner(
     IStandardsSource standards,
     ConftestRunner conftest,
@@ -43,7 +44,8 @@ public sealed class ReviewRunner(
     InfracostRunner? infracost = null,
     CheckovRunner? checkov = null,
     IReferenceRetriever? references = null,
-    ReferencePlacement placement = ReferencePlacement.Finding)
+    ReferencePlacement placement = ReferencePlacement.Finding,
+    IAnswerStore? answers = null)
 {
     /// <summary>
     /// Each agent's share for references, apart from its standards' cap, so they can't push a rule out (D42). About
@@ -56,15 +58,21 @@ public sealed class ReviewRunner(
     /// <summary>The evidence_drops key for resources a model listed while saying they don't break a standard.</summary>
     public const string ModelRetracted = "model_retracted";
 
-    private readonly IArbiter arbiter = arbiter ?? (model is null ? new RuleArbiter() : new LlmArbiter(model.Chat));
+    private readonly IArbiter? customArbiter = arbiter;
 
     /// <param name="redactedPlan">The plan, which is redacted again here.</param>
     /// <param name="configYaml">The config at the base commit.</param>
     /// <param name="commit">The commit reviewed.</param>
     /// <param name="cancellationToken">Stops the review.</param>
     /// <param name="lockFile">The project's lock file at the base commit, which says which provider docs apply.</param>
+    /// <param name="repositoryId">The repo's ID, which scopes the result cache. Without it nothing is cached.</param>
     public async Task<ReviewResult> RunAsync(
-        string redactedPlan, string? configYaml, string commit, CancellationToken cancellationToken = default, string? lockFile = null)
+        string redactedPlan,
+        string? configYaml,
+        string commit,
+        CancellationToken cancellationToken = default,
+        string? lockFile = null,
+        string? repositoryId = null)
     {
         if (new PlanRedactor().Redact(redactedPlan) is not Redacted redacted)
         {
@@ -95,6 +103,12 @@ public sealed class ReviewRunner(
                 };
             }
 
+            // Every model role goes through this, so each can reuse an answer to exactly the same input (D53).
+            var chat = model is null ? null
+                : answers is not null && repositoryId is not null ? new AnswerCache(model.Chat, answers, repositoryId, model.Deployment, log)
+                : model.Chat;
+            var arbitrator = customArbiter ?? (chat is null ? new RuleArbiter() : new LlmArbiter(chat));
+
             var plan = CondensedPlan.From(redacted.Plan);
             var policyFindings = ran.ToFindings(plan);
             var corpus = await LoadCorpusAsync(directory.FullName, cancellationToken);
@@ -107,9 +121,9 @@ public sealed class ReviewRunner(
                 : ([], null);
 
             // It decides only an order, so it can start alongside the agents and fail without costing them anything.
-            var ranking = model is null || plan.Changes().Count == 0
+            var ranking = chat is null || plan.Changes().Count == 0
                 ? Task.FromResult(new RiskRanking(RiskOrchestrator.ByRules(plan), [], null))
-                : new RiskOrchestrator(model.Chat).RankAsync(plan, cancellationToken);
+                : new RiskOrchestrator(chat).RankAsync(plan, cancellationToken);
 
             var referenceQuery = config.References && references is not null ? new ReferenceContext(LockFile.AzurermVersion(lockFile)) : null;
             var agentReferences = placement == ReferencePlacement.Agent ? referenceQuery : null;
@@ -117,13 +131,13 @@ public sealed class ReviewRunner(
             // A failed scan already says that scope wasn't reviewed, and a cost agent without figures has nothing to judge.
             var passes = await Task.WhenAll(
                 Enabled(config, AgentProfile.Conventions)
-                    ? RunAgentAsync(AgentProfile.Conventions, plan, policyFindings, corpus, null, agentReferences, cancellationToken)
+                    ? RunAgentAsync(chat, AgentProfile.Conventions, plan, policyFindings, corpus, null, agentReferences, cancellationToken)
                     : Task.FromResult(AgentPass.Skipped),
                 Enabled(config, AgentProfile.Security)
-                    ? RunAgentAsync(AgentProfile.Security, plan, policyFindings, corpus, null, agentReferences, cancellationToken)
+                    ? RunAgentAsync(chat, AgentProfile.Security, plan, policyFindings, corpus, null, agentReferences, cancellationToken)
                     : Task.FromResult(AgentPass.Skipped),
                 cost is { } && cost.Resources.Any(resource => resource.Priced && resource.AfterUsd > resource.BeforeUsd)
-                    ? RunAgentAsync(AgentProfile.Cost, plan, [], corpus, cost.Resources, agentReferences, cancellationToken)
+                    ? RunAgentAsync(chat, AgentProfile.Cost, plan, [], corpus, cost.Resources, agentReferences, cancellationToken)
                     : Task.FromResult(AgentPass.Skipped));
 
             // Each agent's findings are checked against the documents in its own prompt, not everyone's.
@@ -132,13 +146,13 @@ public sealed class ReviewRunner(
 
             var risk = await ranking;
             Log(RiskOrchestrator.Name, risk.PromptVersion, risk.Calls);
-            var arbitration = await this.arbiter.ArbitrateAsync(
+            var arbitration = await arbitrator.ArbitrateAsync(
                 [.. checks.SelectMany(check => check.Kept)], plan, [.. risk.Order.Select(item => item.ResourceAddress)], cancellationToken);
             Log(LlmArbiter.Name, arbitration.PromptVersion, arbitration.Calls);
 
             // After the arbiter, so each problem is searched once, and before the result, which the comment renders.
-            var suggestions = placement == ReferencePlacement.Finding && referenceQuery is not null && model is not null && corpus is not null
-                ? await new ReferenceSuggester(references!, model.Chat)
+            var suggestions = placement == ReferencePlacement.Finding && referenceQuery is not null && chat is not null && corpus is not null
+                ? await new ReferenceSuggester(references!, chat)
                     .SuggestAsync(arbitration.Findings, plan, corpus.Docs, referenceQuery.ProviderVersion, cancellationToken)
                 : null;
             if (suggestions is not null)
@@ -268,6 +282,7 @@ public sealed class ReviewRunner(
     }
 
     private async Task<AgentPass> RunAgentAsync(
+        IChatClient? chat,
         AgentProfile profile,
         CondensedPlan plan,
         IReadOnlyList<Finding> policyFindings,
@@ -281,7 +296,7 @@ public sealed class ReviewRunner(
             return AgentPass.NotReviewedFor(profile, NotReviewedReason.StandardsUnavailable);
         }
 
-        if (model is null)
+        if (chat is null)
         {
             return AgentPass.NotReviewedFor(profile, NotReviewedReason.Unavailable);
         }
@@ -294,10 +309,10 @@ public sealed class ReviewRunner(
 
         // Only when an agent has standards to judge by, because without them it isn't called at all.
         var (referenceDocs, referenceCalls) = retrieval.Docs.Count > 0 && referenceContext is not null
-            ? await this.RetrieveReferencesAsync(profile, slice, referenceContext, cancellationToken)
+            ? await this.RetrieveReferencesAsync(chat, profile, slice, referenceContext, cancellationToken)
             : (null, []);
 
-        var outcome = await new ReviewAgent(model.Chat, profile).ReviewAsync(
+        var outcome = await new ReviewAgent(chat, profile).ReviewAsync(
             slice, retrieval.Docs, policyFindings, costs, cancellationToken, referenceDocs?.Docs);
         Log(profile.Name, outcome.PromptVersion, outcome.Calls);
 
@@ -336,11 +351,12 @@ public sealed class ReviewRunner(
     // A failed search costs the agent its references, not its review: they can't create a finding anyway. With a model,
     // it re-ranks the search's candidates (D49).
     private async Task<(ReferenceRetrieval Retrieval, IReadOnlyList<AgentCall> Calls)> RetrieveReferencesAsync(
+        IChatClient chat,
         AgentProfile profile, CondensedPlan slice, ReferenceContext context, CancellationToken cancellationToken)
     {
         try
         {
-            var selection = await new ReferenceSelector(references!, model?.Chat)
+            var selection = await new ReferenceSelector(references!, chat)
                 .SelectAsync(ReferenceQueryFor(profile, slice, context.ProviderVersion), profile.Topics, slice, cancellationToken);
             Log(ReferenceSelector.Name, selection.PromptVersion, selection.Calls);
             return (selection.Retrieval, selection.Calls);

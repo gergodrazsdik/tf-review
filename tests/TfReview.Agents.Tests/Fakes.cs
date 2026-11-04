@@ -67,3 +67,31 @@ internal sealed class FakeProcesses(string output) : IProcessRunner
         return new ProcessResult(1, output);
     }
 }
+
+/// <summary>An answer store in memory, keyed by scope and key like the real one.</summary>
+internal sealed class MemoryAnswers : IAnswerStore
+{
+    private readonly Dictionary<(string Scope, string Key), string> answers = [];
+
+    public int Count => this.answers.Count;
+
+    public IEnumerable<string> Keys => this.answers.Keys.Select(entry => entry.Key);
+
+    public Task<string?> ReadAsync(string scope, string key, CancellationToken cancellationToken) =>
+        Task.FromResult(this.answers.GetValueOrDefault((scope, key)));
+
+    public Task WriteAsync(string scope, string key, string role, string answer, CancellationToken cancellationToken)
+    {
+        this.answers[(scope, key)] = answer;
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Replaces every stored answer, as a wire change would leave them.</summary>
+    public void Overwrite(string answer)
+    {
+        foreach (var entry in this.answers.Keys.ToList())
+        {
+            this.answers[entry] = answer;
+        }
+    }
+}
