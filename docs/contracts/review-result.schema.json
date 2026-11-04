@@ -68,6 +68,12 @@
               "scanner_failed",
               "plan_too_large"
             ]
+          },
+          "resources": {
+            "description": "Only part of the scope wasn't reviewed: these resources, by address. A large plan is reviewed in batches, riskiest first, and the rest is listed here when the batches stop at their cap or on a failure. Absent when none of the scope was reviewed.",
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string" }
           }
         }
       }

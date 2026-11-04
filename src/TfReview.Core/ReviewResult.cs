@@ -141,7 +141,16 @@ public sealed record Finding(
 
 public sealed record NotReviewed(
     [property: JsonPropertyName("scope")] ReviewScope Scope,
-    [property: JsonPropertyName("reason")] NotReviewedReason Reason);
+    [property: JsonPropertyName("reason")] NotReviewedReason Reason)
+{
+    /// <summary>
+    /// The resources left out, by address, when the scope was reviewed only in part: a large plan's batches stop at a cap
+    /// or a failure. Null when none of the scope was reviewed.
+    /// </summary>
+    [JsonPropertyName("resources")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? Resources { get; init; }
+}
 
 public sealed record TokenUsage(
     [property: JsonPropertyName("input_tokens")] long InputTokens,

@@ -26,6 +26,20 @@ public class CommentRendererTests
         await Assert.That(comment).Contains("Not reviewed: conventions (unavailable).");
     }
 
+    // A large plan's batches can stop short, and the comment names what they didn't reach, up to a point.
+    [Test]
+    public async Task Names_the_resources_a_scope_left_out()
+    {
+        var skipped = Enumerable.Range(0, 12).Select(index => $"azurerm_subnet.s{index:00}").ToList();
+        var result = new ReviewResult(1, Commit, Verdict.NoFindings, [], [new NotReviewed(ReviewScope.Security, NotReviewedReason.PlanTooLarge) { Resources = skipped }], new Dictionary<string, int>());
+
+        var comment = CommentRenderer.Render(result, Counts);
+
+        await Assert.That(comment).Contains(
+            "Not reviewed by security (the plan is too large): `azurerm_subnet.s00`, `azurerm_subnet.s01`, `azurerm_subnet.s02`, `azurerm_subnet.s03`, "
+            + "`azurerm_subnet.s04`, `azurerm_subnet.s05`, `azurerm_subnet.s06`, `azurerm_subnet.s07`, `azurerm_subnet.s08`, `azurerm_subnet.s09` and 2 more.");
+    }
+
     [Test]
     public async Task Summarizes_the_plan_without_zero_counts()
     {
