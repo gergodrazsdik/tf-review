@@ -686,7 +686,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 - [ ] Map-reduce for large PRs with risk-first ordering
 - [ ] Feedback from comment reactions turned into eval cases
 - [ ] Opt-in blocking on deterministic high findings
-- [ ] Self-review on `tf-review` with the advisory exception. First: `PLAN_VARIABLES` (D52) and `tf-review`'s own `.tf-review.yml`, always advisory. **You:** `just bootstrap-plan`, then `just bootstrap-apply`, which add the secret. Then a release, and a PR that points `infra.yml`'s plan at the released workflow
+- [x] Self-review on `tf-review` with the advisory exception. First: `PLAN_VARIABLES` (D52) and `tf-review`'s own `.tf-review.yml`, always advisory. Bootstrap applied 2026-11-04. `infra.yml`'s plan job now calls the released workflow (`v0.0.12`), so every PR to `infra/` is reviewed by the service, advisory. Proved on #100, its own PR: 19 resources planned with `PLAN_VARIABLES`, No findings
 - [ ] Claude Code plugin with the conventions skill and hooks
 - [ ] Gate: a second repo onboarded with one bootstrap map entry and the template
 
