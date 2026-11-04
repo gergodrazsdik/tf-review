@@ -155,3 +155,18 @@ The held-out cases C28 and C29 found policy findings left without a suggestion, 
 C28 went from 0 of 15 to 10 of 10 with its expectations unchanged, and its suggestions now say what to confirm before the deletion. C29 went from 11 of 15 to 10 of 10.
 
 **The cost agent's misses aren't this change's.** It wrote the ADR-003 finding and then marked it as not breaking the standard, so code dropped it. The cost prompt didn't change, and giving it back its old schema made no difference (9 and 6 misses of 25 on the cost cases). `main` run the same day missed 4 of 15 on C4, C15 and C26, where C4 had never failed. Something on the model's side moved, and it's a task of its own.
+
+## Cost v6: 2026-11-05
+
+The cost agent sometimes wrote an ADR-003 finding and then marked it `breaks_standard: false`, so code dropped it. `--show-answers` caught one, on C30: the title read "adds $1,785.90/month, from $0.00 to $1,785.90", and the last field asked whether the title "says the resource breaks the standard". A cost title only states figures, so it never says either way, and the model guessed: often on one day (`main` missed 4 of 15 runs on C4, C15 and C26) and rarely the next (1 of 30). The C13 field was written for titles that carry a judgement.
+
+Cost v6 names the rule the figures meet in the title, such as "adds more than $50 a month", and the last field checks the figures against that rule, with `false` when the title names none.
+
+| Measure | Result |
+| --- | --- |
+| Cost cases, ten runs each (C4, C14, C15, C26, C30) | 50 of 50, no finding retracted, and C14 still has none |
+| Full suite with per-finding references, five runs per case | 155 of 155, the first clean full run |
+| Suggestion concepts, C18–C31 | 96 of 210 |
+| Estimated cost of a full run | About $0.64 |
+
+v5 passed 29 of 30 on the day v6 was measured, so the score alone doesn't prove the fix: the evidence is that v6 removes the ambiguity the failed answer showed.

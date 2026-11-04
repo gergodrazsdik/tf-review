@@ -44,7 +44,8 @@ return args switch
     ["live", "--runs", var runs, .. var options] => await Live(
         int.Parse(runs, CultureInfo.InvariantCulture), Option(options, "--record"), options.Contains("--references"), Option(options, "--suggestions"),
         Option(options, "--cases")?.Split(','),
-        Option(options, "--placement") is "agent" ? ReferencePlacement.Agent : ReferencePlacement.Finding),
+        Option(options, "--placement") is "agent" ? ReferencePlacement.Agent : ReferencePlacement.Finding,
+        options.Contains("--show-answers")),
     ["retrieval", var labels] => await TfReview.Eval.RetrievalEval.RunAsync(labels, CasesDirectory, standardsDirectory, null),
     ["retrieval", var labels, "--report", var report] => await TfReview.Eval.RetrievalEval.RunAsync(labels, CasesDirectory, standardsDirectory, report),
     _ => Usage(),
@@ -52,7 +53,7 @@ return args switch
 
 static int Usage()
 {
-    Console.Error.WriteLine("usage: eval replay\n       eval record-scans [case...]\n       eval live --runs <n> [--record <dir>] [--references] [--suggestions <dir>] [--cases <name,...>] [--placement agent|finding]\n       eval retrieval <labels.yml> [--report <file.md>]");
+    Console.Error.WriteLine("usage: eval replay\n       eval record-scans [case...]\n       eval live --runs <n> [--record <dir>] [--references] [--suggestions <dir>] [--cases <name,...>] [--placement agent|finding] [--show-answers]\n       eval retrieval <labels.yml> [--report <file.md>]");
     return 2;
 }
 
@@ -132,7 +133,7 @@ static string? Option(string[] options, string name) =>
 // With --references the config turns reference material on, and agents read the real index with the lock file below.
 // The baseline has to hold with it, and --suggestions saves what each run suggested, to read against a run without.
 // Cases with a suggestions.json also score their suggestions, which is reported and never fails a run.
-async Task<int> Live(int runs, string? recordDirectory, bool withReferences, string? suggestionsDirectory, string[]? only, ReferencePlacement placement)
+async Task<int> Live(int runs, string? recordDirectory, bool withReferences, string? suggestionsDirectory, string[]? only, ReferencePlacement placement, bool showAnswers)
 {
     var selected = only is null ? cases : cases.Where(directory => only.Contains(Path.GetFileName(directory), StringComparer.Ordinal)).ToArray();
     if (only is not null && selected.Length != only.Length)
@@ -187,6 +188,15 @@ async Task<int> Live(int runs, string? recordDirectory, bool withReferences, str
 
             var problems = await Problems(directory, result);
             failures += Report(name, run, problems);
+
+            // For working out why a model answered as it did. Evals only see fixtures, so nothing private reaches the log.
+            if (showAnswers && problems.Count > 0)
+            {
+                foreach (var (agent, text) in recording.Answers.OrderBy(answer => answer.Key, StringComparer.Ordinal))
+                {
+                    Console.WriteLine($"  {name} run {run}: {agent} answered {text}");
+                }
+            }
             if (scoring is not null)
             {
                 var (found, asked, missed) = scoring.Score(result.Findings);
