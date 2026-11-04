@@ -42,7 +42,11 @@ resource "azurerm_role_assignment" "deployer_service_secrets" {
 resource "github_actions_variable" "service_allowed_repository_ids" {
   repository    = local.foundry_repo
   variable_name = "TF_REVIEW_ALLOWED_REPOSITORY_IDS"
-  value         = join(",", [for repo in sort(keys(var.repos)) : data.github_repository.repo[repo].repo_id])
+  value         = local.allowed_repository_ids
+}
+
+locals {
+  allowed_repository_ids = join(",", [for repo in sort(keys(var.repos)) : data.github_repository.repo[repo].repo_id])
 }
 
 # Builds the reference index, and nothing else holds these rights outside the service: the dry run and PRs can't reach

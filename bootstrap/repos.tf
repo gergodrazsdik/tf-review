@@ -36,6 +36,19 @@ locals {
         value = azurerm_user_assigned_identity.review[repo].client_id
       }
     }
+    ], [
+    # The required variables of a project the reusable workflow plans for review: today only tf-review's own infra/,
+    # which infra.yml gives the same values. A secret, because the tenant ID is one (D30).
+    {
+      "${local.foundry_repo}/PLAN_VARIABLES" = {
+        repo = local.foundry_repo
+        name = "PLAN_VARIABLES"
+        value = jsonencode({
+          tenant_id              = data.azurerm_client_config.current.tenant_id
+          allowed_repository_ids = local.allowed_repository_ids
+        })
+      }
+    }
   ])...)
 
   # Variable name => value, per repo.
