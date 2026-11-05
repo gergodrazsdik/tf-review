@@ -170,3 +170,38 @@ Cost v6 names the rule the figures meet in the title, such as "adds more than $5
 | Estimated cost of a full run | About $0.64 |
 
 v5 passed 29 of 30 on the day v6 was measured, so the score alone doesn't prove the fix: the evidence is that v6 removes the ambiguity the failed answer showed.
+
+## Candidate models: 2026-11-05
+
+Tier 1 brought Data Zone quota for gpt-6.1-sol and gpt-6-luna (D4). Both passed the structured output smoke test, then ran the full suite on every agent, five runs per case, without references, beside the same day's gpt-5.4-mini run on #108:
+
+| Measure | gpt-5.4-mini | gpt-6.1-sol | gpt-6-luna |
+| --- | --- | --- | --- |
+| Runs passing | 155 of 155 | 155 of 155 | 154 of 155 |
+| Failures | | | C18 once: conventions read the workload in `stexportsprod` as having to match the project tag, which ADR-001 doesn't say |
+| Suggestion concepts, C18–C31 | 92 of 210 | 103 of 210 | 81 of 210 |
+| Input tokens, of which cached | 484K, 283K (58%) | 484K, 427K (88%) | 484K, 427K (88%) |
+| Estimated cost of a full run | About $0.36 | About $0.37, about $0.54 with cache writes | About $0.03, about $0.04 with cache writes |
+
+The estimates use the Retail Prices API's list prices (`ModelPrices`), which leave out the GPT-6 models' cache writes ($3.00 and $0.15 a million); the second figure assumes the uncached input, 57K tokens, is what got written. Sol pays three times mini's input price but caches more of the prompt and writes less than half the output, about 15K tokens against 34K.
+
+Concepts missed, out of each case's concepts over five runs:
+
+| Case | mini | sol | luna |
+| --- | --- | --- | --- |
+| C19 access admin | 10 | 11 | 13 |
+| C20 replace server | 7 | 5 | 10 |
+| C21 RDP from the internet | 10 | 5 | 10 |
+| C23 inline SSH | 9 | 5 | 10 |
+| C24 Owner on a management group | 10 | 11 | 11 |
+| C25 replace Key Vault | 6 | 9 | 10 |
+| C27 replace PostgreSQL | 7 | 10 | 10 |
+| C29 SSH in a port range | 9 | 5 | 5 |
+| C30 business-critical database | 10 | 6 | 10 |
+| C18, C22, C26, C28, C31 | 40 | 40 | 40 |
+
+**Sol suggests better on network exposure** (C21, C23, C29) and C30, and worse on replacing data stores (C25, C27), all within the security agent, so the gain doesn't point to one agent over another. Its 103 is outside mini's range over three runs (88, 91, 92), but it's one sample.
+
+**Luna doesn't qualify for the agents.** D4 asks it to beat mini on the evals, not on price: it found fewer concepts and made the false positive mini also made once on #106. The roles that only order or pick (orchestrator, re-ranker) weren't measured on their own, and are where its price could count.
+
+Not adopted yet: one run each is the sample, and per-agent models (D4) need code before a split like sol for security and the arbiter can be measured.
