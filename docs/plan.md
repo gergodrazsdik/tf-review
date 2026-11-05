@@ -42,7 +42,7 @@ Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET S
 
 - [x] Convert the Azure trial to Pay-As-You-Go, then check Azure OpenAI quota in Germany West Central
 - [x] Delete the resource group the Foundry portal auto-created in Sweden Central
-- [ ] Get Data Zone Standard quota for gpt-6.1-sol and gpt-6-luna; this doesn't block M2, which can start on gpt-5.4-mini. A request on 2026-11-01 was declined for lack of resources. The same day Microsoft emailed that the subscription moved to Tier 1, which can take 3–4 days to activate, and Microsoft's Tier 1 table lists 100K TPM for both models. Re-check from 2026-11-05. If the decline was about regional capacity rather than the tier, Tier 1 may not change it. Available today: gpt-5.4-mini, Mistral-Large-3 and text-embedding-3-small
+- [x] Get Data Zone Standard quota for gpt-6.1-sol and gpt-6-luna: granted with Tier 1, 100K TPM each, seen 2026-11-05; this doesn't block M2, which can start on gpt-5.4-mini. A request on 2026-11-01 was declined for lack of resources. The same day Microsoft emailed that the subscription moved to Tier 1, which can take 3–4 days to activate, and Microsoft's Tier 1 table lists 100K TPM for both models. Re-check from 2026-11-05. If the decline was about regional capacity rather than the tier, Tier 1 may not change it. Available today: gpt-5.4-mini, Mistral-Large-3 and text-embedding-3-small
 - [ ] Before gpt-5.4-mini retires (2027-09-21): move to a newer small model through the eval suite
 - [ ] After .NET 11 GA (scheduled 2026-11-10): install the GA SDK through `update-sources`, pin `global.json` to `11.0.100` without `allowPrerelease`, and re-pin the base image digest
 - [ ] After a conftest release that fixes the go1.27.1, x/net and go-jose findings (v0.71.1 and `main` don't, checked 2026-11-01): go back to the release binary in the `Containerfile`, which also ends the difference described under "Policy tests pass but enforcement differs"
@@ -581,7 +581,7 @@ Work runs in this order, so the deterministic findings exist before the agents t
 *1. Decide the unknowns*
 
 - [x] Spike on cost deltas (2026-11-01, hand-built plans): a VM going from `Standard_B2s` to `Standard_D4s_v5` priced at $31.90 before and $141.70 after, a change of $109.79 a month, from plans rebuilt out of `resource_changes` (D31). Scanning the redacted plan as it stands gives zero resources and exit 0, and Checkov does the same (D32). Infracost also runs an org tagging policy that contradicts ADR-002, so only its cost fields are read
-- [ ] **You:** re-check gpt-6.1-sol and gpt-6-luna quota from 2026-11-05 (see Accounts)
+- [x] **You:** re-check gpt-6.1-sol and gpt-6-luna quota from 2026-11-05 (see Accounts): granted
 
 *2. Cost*
 
@@ -612,7 +612,7 @@ Work runs in this order, so the deterministic findings exist before the agents t
 *6. Evaluation and gate*
 
 - [x] Prompt-cache layout; `cached_tokens` logged per call. Measured on 2026-11-02: a quarter of input tokens were cached on an `e2e-live` run, so the layout works and needs no change. Real reviews show none, because they rarely repeat a prompt within minutes, so caching won't save much until M4's re-push flow
-- [ ] gpt-6.1-sol deployed for security and arbiter, and gpt-6-luna compared with gpt-5.4-mini on the eval suite, if quota is granted; each new model first passes the structured output smoke test, because Microsoft's supported list stops at the GPT-5.1 generation; models set per agent
+- [ ] gpt-6.1-sol deployed for security and arbiter, and gpt-6-luna compared with gpt-5.4-mini on the eval suite, if quota is granted; each new model first passes the structured output smoke test, because Microsoft's supported list stops at the GPT-5.1 generation; models set per agent. 2026-11-05: both deployed at 50K TPM for the comparison, with list prices in `ModelPrices` (sol $2.40/$0.12/$12.00, luna $0.12/$0.012/$0.60 per million in, cached in and out; mini $0.825/$0.0825/$4.95), and `e2e-live` and `llm-smoke` take a `deployment` choice when run by hand. Next: smoke test each, then the eval suite on each
 - [x] Terraform support through the `tool` input (D1): a project's lock file has to come from the tool that plans it, because the two record different provider registries, so moving a project between them isn't just a flag
 - [x] Eval suite in CI (`e2e-live`, 5 runs per case) with the baseline recorded in `docs/evals/baseline.md`, including held-out cases whose expected results were fixed before any model saw them. 5 of the first 6 passed; later samples found the security agent listing resources it had judged fine, and the arbiter dropping a correct finding, both fixed in code. Now 83 of 85 runs, and the cost agent's handling of ADR-003 is the known weak spot
 - [x] Gate: C1–C10 run in CI, baseline recorded. Passed 2026-11-02: `e2e-live` runs 17 cases, five times each, on any PR that changes the agents, prompts, fixtures or `TfReview.Core`, and `docs/evals/baseline.md` holds the results. The stronger models above stay open until quota allows

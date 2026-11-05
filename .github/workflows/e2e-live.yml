@@ -22,6 +22,11 @@ on:
         description: Give agents reference material from the index, which the baseline has to hold with.
         type: boolean
         default: false
+      deployment:
+        description: The model deployment, to compare candidates (D4). Pull requests use the repo's variable.
+        type: choice
+        options: [gpt-5.4-mini, gpt-6.1-sol, gpt-6-luna]
+        default: gpt-5.4-mini
 
 permissions:
   contents: read
@@ -69,7 +74,7 @@ jobs:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID_REVIEW }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           TF_REVIEW_OPENAI_ENDPOINT: ${{ vars.TF_REVIEW_OPENAI_ENDPOINT }}
-          TF_REVIEW_OPENAI_DEPLOYMENT: ${{ vars.TF_REVIEW_OPENAI_DEPLOYMENT }}
+          TF_REVIEW_OPENAI_DEPLOYMENT: ${{ inputs.deployment || vars.TF_REVIEW_OPENAI_DEPLOYMENT }}
           TF_REVIEW_COSMOS_ENDPOINT: https://cosmos-tf-review-prod.documents.azure.com:443/
           REFERENCES: ${{ inputs.references && '--references' || '' }}
         run: |

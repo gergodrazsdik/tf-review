@@ -7,6 +7,12 @@ on:
       - "scripts/llm-smoke.cs"
       - ".github/workflows/llm-smoke.yml"
   workflow_dispatch:
+    inputs:
+      deployment:
+        description: The model deployment, to compare candidates (D4). Pull requests use the repo's variable.
+        type: choice
+        options: [gpt-5.4-mini, gpt-6.1-sol, gpt-6-luna]
+        default: gpt-5.4-mini
 
 permissions:
   contents: read
@@ -41,7 +47,7 @@ jobs:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID_REVIEW }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           TF_REVIEW_OPENAI_ENDPOINT: ${{ vars.TF_REVIEW_OPENAI_ENDPOINT }}
-          TF_REVIEW_OPENAI_DEPLOYMENT: ${{ vars.TF_REVIEW_OPENAI_DEPLOYMENT }}
+          TF_REVIEW_OPENAI_DEPLOYMENT: ${{ inputs.deployment || vars.TF_REVIEW_OPENAI_DEPLOYMENT }}
           SDK_IMAGE: mcr.microsoft.com/dotnet/sdk:11.0-resolute
           SDK_DIGEST: sha256:3a9175b6c54b2f076817af1360f691c9994447b192faa48a1a1f112a516844c7
         run: |

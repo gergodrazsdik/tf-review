@@ -69,3 +69,42 @@ resource "azurerm_cognitive_deployment" "gpt_5_4_mini" {
     capacity = 100
   }
 }
+
+# Candidates from the Tier 1 quota (2026-11-05, 100K TPM each in Data Zone Standard), compared with gpt-5.4-mini on the
+# eval suite before any agent uses them (D4). Nothing calls them but the evals and the smoke test, which pick them by
+# name. Half the quota each limits what a loop could spend; a candidate that isn't adopted is removed again.
+resource "azurerm_cognitive_deployment" "gpt_6_1_sol" {
+  name                   = "gpt-6.1-sol"
+  cognitive_account_id   = azurerm_cognitive_account.foundry.id
+  version_upgrade_option = "NoAutoUpgrade"
+  depends_on             = [azurerm_cognitive_deployment.text_embedding_3_small]
+
+  model {
+    format  = "OpenAI"
+    name    = "gpt-6.1-sol"
+    version = "2026-09-29"
+  }
+
+  sku {
+    name     = "DataZoneStandard"
+    capacity = 50
+  }
+}
+
+resource "azurerm_cognitive_deployment" "gpt_6_luna" {
+  name                   = "gpt-6-luna"
+  cognitive_account_id   = azurerm_cognitive_account.foundry.id
+  version_upgrade_option = "NoAutoUpgrade"
+  depends_on             = [azurerm_cognitive_deployment.gpt_6_1_sol]
+
+  model {
+    format  = "OpenAI"
+    name    = "gpt-6-luna"
+    version = "2026-09-22"
+  }
+
+  sku {
+    name     = "DataZoneStandard"
+    capacity = 50
+  }
+}
