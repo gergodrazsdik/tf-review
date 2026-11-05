@@ -15,7 +15,7 @@ public sealed class TokenPacer(IChatClient inner, int tokensPerMinute = TokenPac
     : DelegatingChatClient(inner)
 {
     /// <summary>
-    /// 90% of the deployment's 100K capacity in infra/main.tf, which leaves room for the estimate being low and for
+    /// 90% of gpt-6.1-sol's 100K capacity in infra/main.tf, which leaves room for the estimate being low and for
     /// another review running at the same time. Change it with the capacity.
     /// </summary>
     public const int DefaultTokensPerMinute = 90_000;
