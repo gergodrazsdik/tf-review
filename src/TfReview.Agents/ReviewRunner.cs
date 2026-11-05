@@ -103,10 +103,13 @@ public sealed class ReviewRunner(
                 };
             }
 
-            // Every model role goes through this, so each can reuse an answer to exactly the same input (D53).
-            var chat = model is null ? null
-                : answers is not null && repositoryId is not null ? new AnswerCache(model.Chat, answers, repositoryId, model.Deployment, log)
-                : model.Chat;
+            // Every model role goes through this, so each can reuse an answer to exactly the same input (D53), and the
+            // review's calls share one TPM budget (D54). Neither is disposed: the model client underneath is shared.
+            IChatClient? chat = model is null ? null : new TokenPacer(model.Chat);
+            if (chat is not null && answers is not null && repositoryId is not null)
+            {
+                chat = new AnswerCache(chat, answers, repositoryId, model!.Deployment, log);
+            }
             var arbitrator = customArbiter ?? (chat is null ? new RuleArbiter() : new LlmArbiter(chat));
 
             var plan = CondensedPlan.From(redacted.Plan);

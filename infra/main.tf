@@ -60,10 +60,12 @@ resource "azurerm_cognitive_deployment" "gpt_5_4_mini" {
     version = "2026-03-17"
   }
 
-  # In thousands of tokens per minute. Well below the 200K quota, to limit how fast a runaway
-  # loop can spend; it's a rate limit, not a budget.
+  # In thousands of tokens per minute. Below the 200K quota, to limit how fast a runaway loop can
+  # spend: $5 to $30 an hour at most, by the mix of input and output; it's a rate limit, not a
+  # budget, which the budget alerts (D15) cover. A large plan's batches need
+  # this much (D54), and TokenPacer keeps a review's calls under 90% of it.
   sku {
     name     = "DataZoneStandard"
-    capacity = 30
+    capacity = 100
   }
 }
