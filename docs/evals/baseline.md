@@ -204,4 +204,12 @@ Concepts missed, out of each case's concepts over five runs:
 
 **Luna doesn't qualify for the agents.** D4 asks it to beat mini on the evals, not on price: it found fewer concepts and made the false positive mini also made once on #106. The roles that only order or pick (orchestrator, re-ranker) weren't measured on their own, and are where its price could count.
 
-Not adopted yet: one run each is the sample, and per-agent models (D4) need code before a split like sol for security and the arbiter can be measured.
+**Two more sol runs** confirmed it:
+
+| Run | Runs passing | Suggestion concepts | Cached input | Estimated cost, list and with cache writes |
+| --- | --- | --- | --- | --- |
+| Sol, first | 155 of 155 | 103 of 210 | 88% | About $0.37, about $0.54 |
+| Sol, second | 155 of 155 | 102 of 210 | 94% | About $0.30, about $0.39 |
+| Sol, third | 155 of 155 | 106 of 210 | 90% | About $0.35, about $0.50 |
+
+The same cases moved each time: C20, C21, C23, C29 and C30 better, C25 and C27 worse. All of them are the security agent's, so a model per agent wouldn't separate them. **gpt-6.1-sol became every role's model on 2026-11-05**, at about 1.1 to 1.5 times mini's cost; mini stays deployed as the fallback, and luna was removed. Sol's weaker POL-004 suggestions on replacing a data store (C25, C27) are a prompt task.

@@ -11,7 +11,7 @@ locals {
   # these names, so changing one here means changing it there too.
   foundry_repo         = "tf-review"
   foundry_account_name = "ais-tf-review-prod"
-  foundry_deployment   = "gpt-5.4-mini"
+  foundry_deployment   = "gpt-6.1-sol"
 
   # What calls the model directly: only tf-review's evals and smoke test, because the service reviews
   # everything else (D38).

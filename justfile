@@ -79,7 +79,7 @@ corpus-search text types version="5.12.0" ranking="hybrid":
 eval-retrieval report="":
     TF_STANDARDS_DIR="{{ justfile_directory() }}/../tf-standards" AZURE_TOKEN_CREDENTIALS=dev \
       TF_REVIEW_COSMOS_ENDPOINT=https://cosmos-tf-review-prod.documents.azure.com:443/ \
-      TF_REVIEW_OPENAI_ENDPOINT=https://ais-tf-review-prod.openai.azure.com/openai/v1/ TF_REVIEW_OPENAI_DEPLOYMENT=gpt-5.4-mini \
+      TF_REVIEW_OPENAI_ENDPOINT=https://ais-tf-review-prod.openai.azure.com/openai/v1/ TF_REVIEW_OPENAI_DEPLOYMENT=gpt-6.1-sol \
       dotnet run --project tests/TfReview.Eval -- retrieval tests/fixtures/retrieval/cases.yml {{ if report != "" { "--report " + report } else { "" } }}
 
 # Compare what the real service posted on the demo's seed PRs with what's expected; pass --rerun to review them again, which costs cents

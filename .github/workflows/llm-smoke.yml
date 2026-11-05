@@ -11,8 +11,8 @@ on:
       deployment:
         description: The model deployment, to compare candidates (D4). Pull requests use the repo's variable.
         type: choice
-        options: [gpt-5.4-mini, gpt-6.1-sol, gpt-6-luna]
-        default: gpt-5.4-mini
+        options: [gpt-6.1-sol, gpt-5.4-mini]
+        default: gpt-6.1-sol
 
 permissions:
   contents: read
