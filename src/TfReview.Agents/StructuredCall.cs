@@ -56,8 +56,17 @@ internal static class StructuredCall
             }
         }
 
+        var pacer = chat.GetService<TokenPacer>();
+        var promptTokens = TokenEstimate.Of(system) + TokenEstimate.Of(user);
+
         for (var attempt = 1; attempt <= MaxAttempts; attempt++)
         {
+            // Before the attempt's deadline starts, so waiting for room in the TPM budget doesn't count against it.
+            if (pacer is not null)
+            {
+                await pacer.ReserveAsync(promptTokens + maxOutputTokens, cancellationToken);
+            }
+
             var capture = new ResponseCapture(chat);
             var stopwatch = Stopwatch.StartNew();
             try
