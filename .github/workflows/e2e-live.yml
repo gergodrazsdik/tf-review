@@ -39,9 +39,9 @@ on:
 permissions:
   contents: read
 
-# A new push to the same PR cancels its run, and only one run of either eval workflow uses the model at a time: they
-# share the production deployment's 100K tokens a minute with the service (OPS-4). A third waiting run replaces the
-# second.
+# A new push to the same PR cancels its run, and only one e2e-live uses the model at a time: it shares the production
+# deployment's 100K tokens a minute with the service (OPS-4). GitHub keeps one waiting job per group, so a third run
+# replaces the waiting second.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true

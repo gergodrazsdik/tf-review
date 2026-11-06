@@ -17,9 +17,8 @@ on:
 permissions:
   contents: read
 
-# A new push to the same PR cancels its run, and only one run of either eval workflow uses the model at a time: they
-# share the production deployment's 100K tokens a minute with the service (OPS-4). A third waiting run replaces the
-# second.
+# A new push to the same PR cancels its run. A smoke test is a few calls, so unlike e2e-live it doesn't queue for the
+# model: GitHub keeps one waiting job per group, so sharing e2e-live's group would cancel a waiting e2e-live.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
@@ -30,9 +29,6 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     environment: review
-    concurrency:
-      group: model-evals
-      cancel-in-progress: false
     timeout-minutes: 10
     permissions:
       contents: read
