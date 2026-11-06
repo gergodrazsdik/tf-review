@@ -383,7 +383,7 @@ One storage account holds every repo's state, created once by a bootstrap projec
 
 | Identity | Federated subject | Rights |
 | --- | --- | --- |
-| Plan | `repo:<owner>@<owner-id>/<repo>@<repo-id>:pull_request` | Reader on the target scope, Blob Data Contributor on its own state container |
+| Plan | `repo:<owner>@<owner-id>/<repo>@<repo-id>:pull_request` | Reader on the target scope, Blob Data Reader on its own state container (it plans without the lock, D48), and Crypto User on its state key (D59) |
 | Apply | `repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:prod` | Write on the target scope, gated by environment approval |
 | Evals (`tf-review` only, from M3) | `repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:review` | Cognitive Services OpenAI User on the Foundry resource group, and from M3 reading the `tfreview` database for the live evals with references (D21, D24). Until M3 each repo had one for its review job |
 | Reviewer submit (M3) | No Azure identity: the API checks the GitHub OIDC token itself (D45) | Call the review API only |
@@ -774,7 +774,7 @@ Expected spend is about $5–30/month at roughly 100 PRs, almost all of it LLM t
 | .NET 11 is an STS release, and M1 starts on an RC | GA is scheduled for 2026-11-10; SDK and base image are pinned and moved together after GA; move to the next LTS before support ends |
 | Dependencies not built for .NET 11 | Agent Framework, Microsoft.Extensions.AI, Azure.Identity, TUnit and others ship no `net11.0` assets yet and run from their `net10.0` builds. A spike with a stub chat client and the live smoke test both passed on 2026-11-01, the latter with real gpt-5.4-mini calls on the RC3 SDK; re-run `llm-smoke.yml` after the GA re-pin and for each new model |
 | Unmarked secret reaches the model or a public comment | D25 only catches marked values and denylisted names, so a secret under an ordinary name passes. Comments render only code-controlled fields and escaped text; tighten the policy if a real miss appears, accepting new prompts and goldens. A GUID in a resource address, such as a `for_each` key, stays visible |
-| Branch push equals the plan identity | PR code in the plan job can mint its token and overwrite state, because that identity has Blob Data Contributor. D21 keeps LLM credentials away from it, but anyone who can edit the workflow gets both. Fork PRs are skipped; repos document who has write access |
+| Branch push equals the plan identity | PR code in the plan job can mint its token and read its repo's state, secrets included, because the plan needs them. It can't write state: the identity has Blob Data Reader only, since a forged state would make the next apply destroy what it names (review finding SEC-1). D21 keeps LLM credentials away from it. Fork PRs are skipped; repos document who has write access |
 | Prompt injection in plan text | A tag value can suppress a finding or plant text. Agents have no tools, severity is set by code, conftest backstops the Rego-covered cases, and the comment is sanitised; the comment states that no finding isn't approval |
 | Foundry outage, quota or retired model | The review job isn't a required check, has a timeout and posts "not reviewed" for that commit; the model version is pinned |
 | M1 gate passes by luck | 3 of 3 is weak evidence: a model with mediocre recall can pass. C9 and C10 make it harder to fake, and M2's baseline replaces it before anything depends on the numbers |

@@ -166,11 +166,13 @@ resource "azurerm_role_assignment" "apply_target" {
   principal_id         = azurerm_user_assigned_identity.apply[each.key].principal_id
 }
 
+# Read-only: PR plans run without the state lock (D48), so they never write state. With write access, PR code could
+# store a forged state that the next apply acts on.
 resource "azurerm_role_assignment" "plan_state" {
   for_each = var.repos
 
   scope                = azurerm_storage_container.repo[each.key].id
-  role_definition_name = "Storage Blob Data Contributor"
+  role_definition_name = "Storage Blob Data Reader"
   principal_id         = azurerm_user_assigned_identity.plan[each.key].principal_id
 }
 
