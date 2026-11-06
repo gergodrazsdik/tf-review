@@ -73,7 +73,8 @@ public static class WorkerHost
                 infracost: await InfracostAsync(Secrets(), cancellationToken),
                 checkov: new CheckovRunner(new ProcessRunner()),
                 references: References(cosmos),
-                answers: new CosmosAnswerStore(cosmos.GetContainer(Database, "reviews")));
+                answers: new CosmosAnswerStore(cosmos.GetContainer(Database, "reviews")),
+                timeLimits: ReviewTimeLimits.Worker);
         }
 
         var worker = new ReviewWorker(

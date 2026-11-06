@@ -118,7 +118,9 @@ public sealed partial class ReferenceSuggester(IReferenceRetriever retriever, IC
         Prompt prompt,
         CancellationToken cancellationToken)
     {
+        // Past the review's time a suggestion isn't worth a search: the finding stands without one.
         if (finding.Agent == Reporter.Scanner
+            || chat.GetService<ReviewClock>()?.Expired == true
             || docs.FirstOrDefault(doc => doc.Id == finding.Rule) is not { } standard
             || plan.TypeOf(finding.ResourceAddress) is not { } type)
         {

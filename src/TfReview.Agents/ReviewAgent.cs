@@ -242,6 +242,14 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
                 continue;
             }
 
+            // Past the review's time, the rest is reported rather than started (D54's partial result).
+            if (chat.GetService<ReviewClock>()?.Expired == true)
+            {
+                failed.AddRange(batch);
+                failure = NotReviewedReason.Timeout;
+                continue;
+            }
+
             var part = Part(new HashSet<string>(batch, StringComparer.Ordinal));
             var result = await this.CallAsync(
                 prompt, docs, UserMessage(part.Plan, docs, part.Policies, part.Costs, references), part.Policies, part.Costs, cancellationToken);

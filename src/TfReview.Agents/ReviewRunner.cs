@@ -34,6 +34,20 @@ public sealed record ReviewModel(IChatClient Chat, string Deployment)
 }
 
 /// <summary>
+/// How long one review may spend, from its start (D54's partial result): past <paramref name="StopStarting"/> no model
+/// call or batch starts, and at <paramref name="CutOff"/> running calls end as timed out. Both come before the job's
+/// own deadline, which would otherwise cancel the whole review.
+/// </summary>
+public sealed record ReviewTimeLimits(TimeSpan StopStarting, TimeSpan CutOff)
+{
+    /// <summary>
+    /// The worker's, inside its 14-minute deadline: an agent's call takes at most two 3-minute attempts, so one started
+    /// just before 9 minutes is cut at 12, which leaves about 2 minutes to finish and post.
+    /// </summary>
+    public static readonly ReviewTimeLimits Worker = new(TimeSpan.FromMinutes(9), TimeSpan.FromMinutes(12));
+}
+
+/// <summary>
 /// Where reference material goes. Per finding is the default (D50): per agent stays for the evals, which compare the two.
 /// </summary>
 public enum ReferencePlacement
@@ -60,6 +74,8 @@ public enum ReferencePlacement
 /// <param name="references">Imported reference material, for a config that asks for it, or null when there's none (D42).</param>
 /// <param name="placement">Where references go when a config asks for them.</param>
 /// <param name="answers">Keeps model answers between reviews of the same repo, or null for none (D53).</param>
+/// <param name="timeLimits">How long a review may spend, from its start, or null for no limit (D54's partial result).</param>
+/// <param name="time">The clock, for tests.</param>
 public sealed class ReviewRunner(
     IStandardsSource standards,
     ConftestRunner conftest,
@@ -70,7 +86,9 @@ public sealed class ReviewRunner(
     CheckovRunner? checkov = null,
     IReferenceRetriever? references = null,
     ReferencePlacement placement = ReferencePlacement.Finding,
-    IAnswerStore? answers = null)
+    IAnswerStore? answers = null,
+    ReviewTimeLimits? timeLimits = null,
+    TimeProvider? time = null)
 {
     /// <summary>
     /// Each agent's share for references, apart from its standards' cap, so they can't push a rule out (D42). About
@@ -114,6 +132,9 @@ public sealed class ReviewRunner(
             return ReviewResult.Failed(commit, ReviewScope.Plan, NotReviewedReason.InvalidConfig);
         }
 
+        // From the start, so slow scanners leave the model less time rather than pushing the review past the job's end.
+        using var clock = timeLimits is null ? null : new ReviewClock(timeLimits.StopStarting, timeLimits.CutOff, time);
+
         var directory = Directory.CreateTempSubdirectory("tfreview-standards-");
         try
         {
@@ -134,6 +155,11 @@ public sealed class ReviewRunner(
             if (chat is not null && answers is not null && repositoryId is not null)
             {
                 chat = new AnswerCache(chat, answers, repositoryId, model!.Deployment, log);
+            }
+
+            if (chat is not null && clock is not null)
+            {
+                chat = new ClockedChat(chat, clock);
             }
             var arbitrator = customArbiter ?? (chat is null ? new RuleArbiter() : new LlmArbiter(chat));
 

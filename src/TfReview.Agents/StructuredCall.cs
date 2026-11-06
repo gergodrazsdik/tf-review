@@ -59,19 +59,37 @@ internal static class StructuredCall
         var pacer = chat.GetService<TokenPacer>();
         var promptTokens = TokenEstimate.Of(system) + TokenEstimate.Of(user);
 
+        // The review's own time (D54): past it nothing new starts, and its cut-off ends a running attempt as a timeout,
+        // so the review can still post what it has. Only the caller's own token is a real cancellation.
+        var clock = chat.GetService<ReviewClock>();
+        using var limit = clock is null ? null : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, clock.CutOff);
+        var callToken = limit?.Token ?? cancellationToken;
+
         for (var attempt = 1; attempt <= MaxAttempts; attempt++)
         {
+            if (clock?.Expired == true)
+            {
+                return new StructuredResult<T>(null, NotReviewedReason.Timeout, calls);
+            }
+
             // Before the attempt's deadline starts, so waiting for room in the TPM budget doesn't count against it.
             if (pacer is not null)
             {
-                await pacer.ReserveAsync(promptTokens + maxOutputTokens, cancellationToken);
+                try
+                {
+                    await pacer.ReserveAsync(promptTokens + maxOutputTokens, callToken);
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    return new StructuredResult<T>(null, NotReviewedReason.Timeout, calls);
+                }
             }
 
             var capture = new ResponseCapture(chat);
             var stopwatch = Stopwatch.StartNew();
             try
             {
-                using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                using var deadline = CancellationTokenSource.CreateLinkedTokenSource(callToken);
                 deadline.CancelAfter(timeout);
                 await NewAgent(capture, name, system, schema, maxOutputTokens).RunAsync(user, cancellationToken: deadline.Token);
             }
