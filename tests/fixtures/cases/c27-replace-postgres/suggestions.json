@@ -4,9 +4,9 @@
       "resource_address": "azurerm_postgresql_flexible_server.orders",
       "rule": "POL-004",
       "concepts": {
-        "backup": "back(ed)? ?up|pg_dump|dump|export|point-in-time|restore|migrat",
-        "in_place": "geo_redundant_backup_enabled|keep the (original|existing|current)|in place|revert|unchanged|separate|new server|retain the (original|existing|current)|avoid (the |a |this )?replacement",
-        "replica": "read replica|replica|geo-restore|geo restore|zone[- ]redundant|high[_ ]availability"
+        "backup": "(?<!geo[- ]redundant )\\bback(ed)?[- ]?up(?!s? (are|is) (also )?replicated)|\\bpg_dump\\b|\\bdump\\b|\\bexport|\\bpoint-in-time\\b|(?<!geo[- ])\\brestore\\b|\\bmigrat",
+        "in_place": "\\bin[- ]place\\b|\\brevert|\\bkeep(ing)? (the |its )?(original|existing|current)\\b|\\bretain(ing)? the (original|existing|current)\\b|\\bavoid(ing)? (the |a |this )?replac|\\b(keep|keeping|leave|leaving)\\b[^.;]{0,60}\\bunchanged\\b",
+        "replica": "\\b(read )?replicas?\\b|\\bgeo[- ]restore\\b|\\bzone[- ]redundant\\b|\\bhigh[_ ]availability\\b"
       }
     }
   ]

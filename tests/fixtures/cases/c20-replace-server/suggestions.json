@@ -4,9 +4,9 @@
       "resource_address": "azurerm_mssql_server.orders",
       "rule": "POL-004",
       "concepts": {
-        "backup": "back(ed)? ?up|bacpac|export|point-in-time|restore|long-term retention|migrat",
-        "in_place": "administrator_login|revert|keep the (original|existing|current)|in place|retain the (original|existing|current)|avoid (the |a |this )?replacement",
-        "guard": "prevent_destroy|lifecycle"
+        "backup": "\\bback(ed)?[- ]?up|\\bbacpac\\b|\\bexport|\\bpoint-in-time\\b|\\brestore\\b|\\blong-term retention\\b|\\bmigrat",
+        "in_place": "\\bin[- ]place\\b|\\brevert|\\bkeep(ing)? (the |its )?(original|existing|current)\\b|\\bretain(ing)? the (original|existing|current)\\b|\\bavoid(ing)? (the |a |this )?replac|\\b(keep|keeping|leave|leaving)\\b[^.;]{0,60}\\bunchanged\\b",
+        "guard": "\\bprevent_destroy\\b|\\blifecycle\\b"
       }
     }
   ]

@@ -4,9 +4,9 @@
       "resource_address": "azurerm_role_assignment.pipeline",
       "rule": "POL-003",
       "concepts": {
-        "role": "Role Based Access Control Administrator|RBAC Administrator|custom role",
-        "scope": "resource group|single resource|specific resource",
-        "condition": "condition|PIM|Privileged Identity Management|eligible|time-bound|just-in-time"
+        "role": "\\bRole Based Access Control Administrator\\b|\\bRBAC Administrator\\b|\\bcustom role",
+        "scope": "\\bresource groups?\\b|\\bsingle resource\\b|\\bspecific resources?\\b",
+        "condition": "\\bconditions?\\b|\\bPIM\\b|\\bPrivileged Identity Management\\b|\\beligible\\b|\\btime-bound\\b|\\bjust-in-time\\b"
       }
     }
   ]

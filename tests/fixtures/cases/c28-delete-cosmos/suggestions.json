@@ -4,9 +4,9 @@
       "resource_address": "azurerm_cosmosdb_account.catalog",
       "rule": "POL-004",
       "concepts": {
-        "confirm": "confirm|intended|disposable",
-        "backup": "back(ed)? ?up|backup_policy|continuous|point-in-time|restore|export|migrat",
-        "guard": "prevent_destroy|lifecycle|resource lock|management lock|CanNotDelete|delete lock"
+        "confirm": "\\bdisposable\\b|\\bno longer (needed|used|in use)\\b|\\bunused\\b|\\bintend|\\bintention|\\bdeliberate|\\bon purpose\\b|\\b(is|are|was|be) (really |actually )?expected\\b",
+        "backup": "\\bback(ed)?[- ]?up|\\bbackup_policy\\b|\\bcontinuous\\b|\\bpoint-in-time\\b|\\brestore\\b|\\bexport|\\bmigrat",
+        "guard": "\\bprevent_destroy\\b|\\blifecycle\\b|\\bresource locks?\\b|\\bmanagement locks?\\b|\\bCanNotDelete\\b|\\bdelete locks?\\b"
       }
     }
   ]

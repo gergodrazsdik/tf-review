@@ -4,9 +4,9 @@
       "resource_address": "azurerm_role_assignment.operations",
       "rule": "POL-003",
       "concepts": {
-        "scope": "subscription|resource group",
-        "role": "Contributor|Reader|custom role",
-        "privileged_access": "PIM|Privileged Identity Management|eligible|time-bound|just-in-time"
+        "scope": "\\b(a|one|single|specific|individual|the) subscription\\b|\\bsubscription (level|scope)\\b|\\bresource groups?\\b",
+        "role": "\\bContributor\\b|\\bReader\\b|\\bcustom role",
+        "privileged_access": "\\bPIM\\b|\\bPrivileged Identity Management\\b|\\beligible\\b|\\btime-bound\\b|\\bjust-in-time\\b"
       }
     }
   ]

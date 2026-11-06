@@ -2,7 +2,20 @@
 
 What later prompts, models and retrieval changes have to beat. Each number is from `e2e-live`, which runs every case in `tests/fixtures/cases` five times against the real model. A case passes only if the whole set of findings matches, so an extra finding fails it like a missed one.
 
-## Current: 2026-11-02
+## Current: 2026-11-06
+
+Model gpt-6.1-sol for every role, at low reasoning effort. Prompts conventions, security and cost v6, orchestrator v1, arbiter v2, suggester v1. `tf-standards` at `adf50af`. Concept patterns as of 2026-11-06 (see [the rescoring](#concept-patterns-tightened-every-saved-run-rescored-2026-11-06)).
+
+| Measure | Result, over the seven saved runs without references, 2026-11-05 and 11-06 |
+| --- | --- |
+| Runs passing | 155 of 155 in each |
+| Suggestion concepts, C18–C31 | 111 to 115 of 210 |
+| Of those, on held-out cases (C18, C19, C21–C24, C31) | 47 to 50 of 105 |
+| Estimated cost of a full run | About $0.30 to $0.37 at list prices; with cache writes, $0.39 to $0.54 on the three runs it was worked out for |
+
+That's the bar. Only held-out cases say how the reviewer does on plans nobody tuned against; the others are regression cases (see [the held-out cases](#how-the-held-out-cases-went)). `e2e-live` reports the two kinds apart. Every concept score in the dated sections below used the patterns of its day; the rescored table at the end gives every saved run under today's, and `just rescore` reproduces it from `docs/evals/runs/`.
+
+## gpt-5.4-mini baseline: 2026-11-02
 
 Model gpt-5.4-mini at low reasoning effort. Prompts conventions v4, security v4, cost v4, orchestrator v1, arbiter v2. `tf-standards` at `adf50af`. Five runs per case, because three misled twice while this was being built.
 
@@ -80,7 +93,20 @@ On C18–C21, seen before and so only a check: v5 32 and 31, v6 30 and 36. Findi
 
 ## How the held-out cases went
 
-These are the honest part of the suite, because C1–C10 were used to tune the prompts, or are things a policy finds anyway. Held-out cases had their expected results fixed before any model saw them, and were measured once.
+These are the honest part of the suite, because C1–C10 were used to tune the prompts, or are things a policy finds anyway. Held-out cases had their expected results fixed before any model saw them. They run on every `e2e-live`, so "held out" can't mean measured once: it means nothing has been changed after reading their answers or failures, not a prompt, code or their suggestion patterns. Once something has, the case loses `held_out` in its `expected.json` and becomes a regression case, as C13 did below.
+
+On 2026-11-06 that rule was applied to the later cases too (MNT-1 of the 2026-11-06 review), and these lost the flag:
+
+| Case | What was changed after reading it |
+| --- | --- |
+| C11 | The arbiter can't drop findings (D36), after it dropped one here |
+| C14 | Cost v4: code supplies the percentage, after a 20% rise was flagged here |
+| C15, C26 | Cost v6, after the cost agent retracted real increases here (and on C4) |
+| C20, C25, C27 | Their `in_place` patterns, widened after reading gpt-6.1-sol's answers (#111) |
+| C28, C29 | Policy findings answered by ID (D51), after these failed |
+| C30 | Cost v6, written from this case's answer |
+
+Still held out: C12, C16, C17, C18, C19, C21, C22, C23, C24 and C31. C18–C26's suggestions were read in the 2026-11-04 prompt trial below, which wasn't shipped, so nothing changed from them. The flag is all a report has: `e2e-live` and `rescore` count held-out and tuned cases apart. New held-out cases are needed before the next prompt or model decision.
 
 | Case | Tests | First result |
 | --- | --- | --- |
@@ -137,10 +163,10 @@ The per-agent trial above pointed at retrieval: an agent's references are about 
 
 **What the held-out cases found instead,** in all three columns alike:
 
-- C28: a deleted Cosmos DB account failed 15 of 15 runs, and waits in `tests/fixtures/pending/` until that is fixed. The security prompt tells the agent to ignore resources whose actions are only `delete`, so it never re-reports POL-004 on a deletion, and a reviewer gets the policy's finding with no suggestion at all.
+- C28: a deleted Cosmos DB account failed 15 of 15 runs, and waited in `tests/fixtures/pending/` until D51 fixed it; it's been in the suite since, and `pending/` is gone. The security prompt tells the agent to ignore resources whose actions are only `delete`, so it never re-reports POL-004 on a deletion, and a reviewer gets the policy's finding with no suggestion at all.
 - C29: in 4 of 15 runs the security agent didn't re-report POL-002 on a port range holding 22, so that finding had no suggestion either.
 
-## Policy findings answered by ID (D51), and per finding by default: 2026-11-05
+## Policy findings answered by ID (D51), and per finding by default: 2026-11-04
 
 The held-out cases C28 and C29 found policy findings left without a suggestion, because agents had to re-report each one as a new finding pointing at an attribute. A deletion has no attribute to point at, and the model sometimes skipped one. Conventions and security v6 answer each policy finding by ID instead, and code attaches the suggestion to the policy's own finding. `references: true` now means per-finding references (D50). The full suite, five runs per case:
 
@@ -156,7 +182,7 @@ C28 went from 0 of 15 to 10 of 10 with its expectations unchanged, and its sugge
 
 **The cost agent's misses aren't this change's.** It wrote the ADR-003 finding and then marked it as not breaking the standard, so code dropped it. The cost prompt didn't change, and giving it back its old schema made no difference (9 and 6 misses of 25 on the cost cases). `main` run the same day missed 4 of 15 on C4, C15 and C26, where C4 had never failed. Something on the model's side moved, and it's a task of its own.
 
-## Cost v6: 2026-11-05
+## Cost v6: 2026-11-04
 
 The cost agent sometimes wrote an ADR-003 finding and then marked it `breaks_standard: false`, so code dropped it. `--show-answers` caught one, on C30: the title read "adds $1,785.90/month, from $0.00 to $1,785.90", and the last field asked whether the title "says the resource breaks the standard". A cost title only states figures, so it never says either way, and the model guessed: often on one day (`main` missed 4 of 15 runs on C4, C15 and C26) and rarely the next (1 of 30). The C13 field was written for titles that carry a judgement.
 
@@ -200,7 +226,7 @@ Concepts missed, out of each case's concepts over five runs:
 | C30 business-critical database | 10 | 6 | 10 |
 | C18, C22, C26, C28, C31 | 40 | 40 | 40 |
 
-**Sol suggests better on network exposure** (C21, C23, C29) and C30, and worse on replacing data stores (C25, C27), all within the security agent, so the gain doesn't point to one agent over another. Its 103 is outside mini's range over three runs (88, 91, 92), but it's one sample.
+**Sol suggests better on network exposure** (C21, C23, C29) and C30, and worse on replacing data stores (C25, C27), all within the security agent, so the gain doesn't point to one agent over another. This section first said sol's 103 was "outside mini's range over three runs (88, 91, 92)". That range mixed conditions: 91 was a run with references (2026-11-04, per finding), while sol's was without, and the same day's mini run without references, 82, was left out. The comparison that holds, from every saved run without references on the same prompts, is in [the rescoring](#concept-patterns-tightened-every-saved-run-rescored-2026-11-06): mini 88 to 97 over eight runs, sol 111 to 115 over seven.
 
 **Luna doesn't qualify for the agents.** D4 asks it to beat mini on the evals, not on price: it found fewer concepts and made the false positive mini also made once on #106. The roles that only order or pick (orchestrator, re-ranker) weren't measured on their own, and are where its price could count.
 
@@ -224,8 +250,61 @@ Sol's apparent weakness on replacing a data store (C25, C27) was in the patterns
 | gpt-6.1-sol, three runs | 103, 102, 106 | 112, 111, 113 | 5 and 5 each time, from 0 to 3 |
 | gpt-6-luna | 81 | 81 | 0 and 0 |
 
-Mini's and luna's scores don't move, so the wider pattern doesn't favour the model it was read from. What sol still misses there, C25's soft delete and C27's replica, isn't in POL-004: it's what per-finding references add, and these runs have none.
+This section first argued that because mini's and luna's scores didn't move, the wider pattern didn't favour the model it was read from. That's backwards: a pattern widened to one model's phrasing and matching no one else's is evidence it accepts that model's wording, not that it's neutral. Mini said the same thing as "avoid replacing the server", which neither pattern accepted, so the change scored the same concept for one model only. The 2026-11-06 patterns accept both. What sol still misses there, C25's soft delete and C27's replica, isn't in POL-004: it's what per-finding references add, and these runs have none.
 
 ## The near misses on gpt-6.1-sol: 2026-11-06
 
 C9, C13, C14 and C18 each failed now and then on gpt-5.4-mini, and C18 once on gpt-6-luna: a missed environment value, private SSH reported, a cost within ADR-003's limits reported, and a valid storage account name read as breaking ADR-001. On sol, ten more runs of each passed 40 of 40, which with its three full runs makes 25 of 25 each, for about $0.09. They stay in the suite as near misses; 25 runs can't rule out a rare miss.
+
+## Concept patterns tightened, every saved run rescored: 2026-11-06
+
+The 2026-11-06 review (MNT-2) found the suggestion patterns scoring wording that isn't the concept: a word inside another ("move" in "remove", "SAS" in "disastrous", "Standard" in "cost standard"), generic words ("confirm", "narrow", "separate", "new server", a bare "21"), and on C27 the very attribute that forces the replacement (`geo_redundant_backup_enabled` scored both backup and in-place). The patterns now:
+
+- use word boundaries;
+- drop the generic words. ADR-003's ask, to confirm the increase is intended, is still a concept on C26 and C30, but it needs the intent or need ("intended", "needed for", "justify"), not the verb. C28's "confirm" likewise needs the deletion to be intended or the data disposable;
+- never take a replace path's attribute as another concept, nor geo-redundant backups replicating to a paired region as C27's replica concept;
+- accept each concept's plain variants for every model alike: "avoid replacing" beside "avoid replacement", "keep ... unchanged", and on C29 removing the admin port from the range.
+
+`tests/TfReview.Eval.Tests/ConceptTests.cs` holds sentences that must and mustn't match, the review's examples among them, for every case. Every saved run was rescored with `just rescore`, which reads the suggestions kept in `docs/evals/runs/`: one file per run, the CI runs named by their Actions run ID, whose artifacts expire after 14 days. "At the time" is what the run printed; "after #111" is the patterns between #111 and this change.
+
+| Saved run | Model | References | Runs passing | At the time | After #111 | Now, of 210 | Held out now, of 105 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `2026-11-04-d51-none`, local, D51 | mini | none | 153 of 155 | 82 | 82 | 90 | 38 |
+| `2026-11-04-d51-finding`, local, D51 | mini | per finding | 151 of 155 | 91 | 91 | 95 | 38 |
+| `2026-11-04-d50-full-finding`, local, D50 | mini (v5 prompts) | per finding | | 90 | 91 | 93 | 43 |
+| `41853303470`, #95 | mini (cost v5) | none | 153 of 155 | 85 | 85 | 92 | 40 |
+| `41862615921`, #96 | mini | none | 154 of 155 | 88 | 88 | 91 | 39 |
+| `41908813773`, #101 | mini | none | 155 of 155 | 88 | 88 | 93 | 39 |
+| `41920080565`, #104 | mini | none | 155 of 155 | 92 | 92 | 96 | 43 |
+| `41923915636`, #104 | mini | none | 155 of 155 | 88 | 88 | 97 | 44 |
+| `42093001506`, #106 | mini | none | 155 of 155 | 92 | 92 | 95 | 41 |
+| `42102380469`, #108 | mini | none | 155 of 155 | 92 | 92 | 93 | 41 |
+| `42104673959`, dispatch | sol | none | 155 of 155 | 103 | 112 | 112 | 48 |
+| `42104678906`, dispatch | luna | none | 154 of 155 | 81 | 81 | 84 | 36 |
+| `42109636904`, dispatch | sol | none | 155 of 155 | 102 | 111 | 111 | 47 |
+| `42109642593`, dispatch | sol | none | 155 of 155 | 106 | 113 | 113 | 49 |
+| `42115702849`, #110 | mini | none | 154 of 155 | 91 | 91 | 96 | 42 |
+| `42116475283`, #110 | mini | none | 155 of 155 | 83 | 83 | 88 | 38 |
+| `42222458244`, #111 | sol | none | 155 of 155 | 112 | 112 | 112 | 48 |
+| `42222832383`, #111 | sol | none | 155 of 155 | 115 | 115 | 115 | 50 |
+| `42223704912`, #112 | sol | none | 155 of 155 | 104 | 113 | 113 | 48 |
+| `42234473307`, #115 | sol | none | 155 of 155 | 113 | 113 | 113 | 50 |
+
+The CI runs ran the whole suite five times; "at the time" for #112 used the patterns from before #111, which it branched from. The earlier, smaller trials rescore like this (concepts now, of what they asked, then on held-out cases):
+
+| Saved run | Section | At the time | Now | Held out now |
+| --- | --- | --- | --- | --- |
+| `2026-11-04-sug-off`, `-sug-on` | Do references make suggestions better? (C18–C21) | 32, 31 of 60 | 33, 31 | 23, 21 of 45 |
+| `2026-11-04-v5-off`, `-v5-on` | A prompt that asks for more, v5 (C22–C26) | 31, 32 of 75 | 31, 32 | 16, 17 of 45 |
+| `2026-11-04-v6-off`, `-v6-on` | The same, v6 (C18–C26) | 67, 73 of 135 | 67, 74 | 39, 47 of 90 |
+| `2026-11-04-d50-none`, `-agent`, `-finding` | References per finding (C27–C31) | 28, 21, 27 of 75 | 29, 23, 27 | 5, 5, 5 of 15 |
+| `2026-11-04-d50-no-policy-excerpts` | The same, Azure Policy excerpts left out | 33 of 75 | 36 | 10 of 30 |
+
+The cost v6 run with references (96 of 210) kept no suggestions, so it can't be rescored.
+
+**What changes, and what doesn't:**
+
+- **Sol still suggests better than mini,** by a margin the tightening didn't touch: mini 88 to 97 over its eight runs without references on the v6 prompts (#96 to #110), sol 111 to 115 over seven. On held-out cases only, mini 38 to 44 of 105 and sol 47 to 50. The ranges don't overlap, but the runs weren't back to back, and the suite changed around them (D53's cache, D54's batches), though not the prompts.
+- **Mini gained,** 1 to 9 a run, from accepting "avoid replacing", which mini and luna write and sol doesn't (sol writes "avoid replacement", which #111 had already accepted), less what it lost: the attribute on C20 and C27, "replicated" backups as C27's replica, and a bare "confirm" on C28. Sol's scores didn't move: none of its answers matched only through the wording dropped, and none says "avoid replacing".
+- **References per finding still don't make suggestions measurably better** on these cases (mini, D51 day: 90 without, 95 with; held out, 38 and 38).
+- **Luna stays below both** (84).

@@ -4,9 +4,9 @@
       "resource_address": "azurerm_storage_account.uploads",
       "rule": "POL-001",
       "concepts": {
-        "attribute": "https_traffic_only_enabled",
-        "clients": "client|application|SDK|connection string|endpoint|caller",
-        "secure_transfer": "secure transfer|TLS|min_tls_version|private endpoint"
+        "attribute": "\\bhttps_traffic_only_enabled\\b",
+        "clients": "\\bclients?\\b|\\bapplications?\\b|\\bSDKs?\\b|\\bconnection strings?\\b|(?<!private )\\bendpoints?\\b|\\bcallers?\\b",
+        "secure_transfer": "\\bsecure transfer\\b|\\bTLS\\b|\\bmin_tls_version\\b"
       }
     }
   ]

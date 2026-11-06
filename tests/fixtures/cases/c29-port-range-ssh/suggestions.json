@@ -4,9 +4,9 @@
       "resource_address": "azurerm_network_security_rule.legacy",
       "rule": "POL-002",
       "concepts": {
-        "narrow_ports": "destination_port_range|port 22|exclude 22|narrow|only the (FTP )?ports|20-21|21",
-        "private_path": "bastion|VPN|private (network|range|address)|ExpressRoute",
-        "secure_protocol": "SFTP|FTPS|secure (file|transfer)"
+        "narrow_ports": "\\bdestination_port_ranges?\\b|\\bport 22\\b|\\bexclud(e|es|ing) (port )?22\\b|\\bonly (the )?(FTP )?ports?\\b|\\b20-21\\b|\\b20 and 21\\b|\\bremov(e|es|ing) (the |those |any )?(admin |SSH |RDP |destination )?ports?\\b|\\b(drop|dropping)\\b[^.;]{0,20}\\b22\\b",
+        "private_path": "\\bbastion\\b|\\bVPN\\b|\\bprivate (network|range|address)|\\bExpressRoute\\b",
+        "secure_protocol": "\\bSFTP\\b|\\bFTPS\\b|\\bsecure (file|transfer)"
       }
     }
   ]

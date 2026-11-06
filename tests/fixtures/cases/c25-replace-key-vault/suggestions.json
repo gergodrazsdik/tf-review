@@ -4,9 +4,9 @@
       "resource_address": "azurerm_key_vault.app",
       "rule": "POL-004",
       "concepts": {
-        "soft_delete": "soft[- ]delete|purge|recover",
-        "backup": "back(ed)? ?up|export|copy|migrat|move",
-        "in_place": "keep the (original|existing|current)|in place|revert|unchanged|retain the (original|existing|current)|avoid (the |a |this )?replacement"
+        "soft_delete": "\\bsoft[- ]delet|\\bpurge|\\brecover",
+        "backup": "\\bback(ed)?[- ]?up|\\bexport|\\bcop(y|ies)\\b|\\bmigrat|\\bmov(e|ing)\\b",
+        "in_place": "\\bin[- ]place\\b|\\brevert|\\bkeep(ing)? (the |its )?(original|existing|current)\\b|\\bretain(ing)? the (original|existing|current)\\b|\\bavoid(ing)? (the |a |this )?replac|\\b(keep|keeping|leave|leaving)\\b[^.;]{0,60}\\bunchanged\\b"
       }
     }
   ]

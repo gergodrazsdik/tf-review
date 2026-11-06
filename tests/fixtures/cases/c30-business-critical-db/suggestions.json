@@ -4,9 +4,9 @@
       "resource_address": "azurerm_mssql_database.ledger",
       "rule": "ADR-003",
       "concepts": {
-        "confirm": "confirm|intended|necessary|needed|justif",
-        "smaller_option": "General Purpose|GP_|Standard|smaller|fewer vCores|serverless|right-?siz|Hyperscale",
-        "pricing": "reserv|Hybrid Benefit|license_type|BasePrice|savings plan|auto-?pause"
+        "confirm": "\\bintend|\\bintention|\\bjustif|\\bwarrant|\\b(is|are|was|be) (really |actually |truly )?(needed|necessary|required|expected)\\b|\\bneeded (for|by)\\b|\\b(workload|application|service|database|it) (really |actually )?(needs|requires)\\b",
+        "smaller_option": "\\bGeneral Purpose\\b|\\bGP_|\\bStandard (tier|edition|service tier|S[0-9])|\\bsmaller\\b|\\bfewer vCores\\b|\\bserverless\\b|\\bright-?siz|\\bHyperscale\\b",
+        "pricing": "\\breserv(ed|ation)|\\bHybrid Benefit\\b|\\blicense_type\\b|\\bBasePrice\\b|\\bsavings plans?\\b|\\bauto-?pause"
       }
     }
   ]
