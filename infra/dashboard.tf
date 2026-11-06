@@ -97,6 +97,16 @@ locals {
       KQL
     },
     {
+      title         = "Reviews given up, by cause (each also mails an alert)"
+      visualization = "table"
+      empty         = "No review was given up in this range."
+      query         = <<-KQL
+        AppMetrics | where TimeGenerated {TimeRange} and Name == "tfreview.give_ups"
+        | extend repository = tostring(Properties.repository), cause = tostring(Properties.cause)
+        | summarize give_ups = sum(Sum) by repository, cause | order by give_ups desc
+      KQL
+    },
+    {
       title         = "Review job runs per day"
       visualization = "barchart"
       query         = <<-KQL

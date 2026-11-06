@@ -89,6 +89,30 @@ resource "azurerm_consumption_budget_subscription" "monthly" {
       contact_emails = [var.budget_contact_email]
     }
   }
+
+  # Actual cost lags by up to a day, so a forecast warns before the month's spend arrives.
+  notification {
+    enabled        = true
+    threshold      = 100
+    threshold_type = "Forecasted"
+    operator       = "GreaterThanOrEqualTo"
+    contact_emails = [var.budget_contact_email]
+  }
+}
+
+# Where infra/'s alerts go. Here, because bootstrap already holds the address and keeps it out of the code; infra/
+# refers to it by name (OPS-2).
+resource "azurerm_monitor_action_group" "alerts" {
+  name                = "ag-${local.foundry_repo}-prod"
+  resource_group_name = azurerm_resource_group.target[local.foundry_repo].name
+  short_name          = "tfreview"
+  tags                = merge(local.common_tags, { project = local.foundry_repo })
+
+  email_receiver {
+    name                    = "owner"
+    email_address           = var.budget_contact_email
+    use_common_alert_schema = true
+  }
 }
 
 # Previous state versions go a day after they're superseded. Every state is encrypted and enforced (D59), so this is
