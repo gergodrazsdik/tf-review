@@ -55,7 +55,7 @@ Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET S
 
 ## Decision log
 
-All 61 decisions (D1–D61) are settled as of 2026-11-06; D19–D29 came from the M1 design council, D31–D34 from M2's spike, D35–D36 from building its orchestrator and arbiter, D37–D45 from planning M3, D46 from applying its infrastructure, D47 from designing the worker, D48 from the first load on the service, D49 from the retrieval evals, and D50–D61 from M3's suggestion evals, M4 and running the service since. Changing one means editing its row and the sections it affects in the same commit.
+All 62 decisions (D1–D62) are settled as of 2026-11-06; D19–D29 came from the M1 design council, D31–D34 from M2's spike, D35–D36 from building its orchestrator and arbiter, D37–D45 from planning M3, D46 from applying its infrastructure, D47 from designing the worker, D48 from the first load on the service, D49 from the retrieval evals, and D50–D61 from M3's suggestion evals, M4 and running the service since. Changing one means editing its row and the sections it affects in the same commit.
 
 | # | Decision | Choice | Why |
 | --- | --- | --- | --- |
