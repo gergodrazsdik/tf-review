@@ -16,13 +16,13 @@ public interface IAnswerStore
 /// <summary>
 /// The result cache (D53): a model call whose input is exactly the same as one already answered for this repo gets that
 /// answer back, without calling the model. The key covers everything the model is given, so a changed resource, standard,
-/// reference, prompt version or deployment is a new call. Only an answer that parsed is kept, and the cache can only
-/// ever cost a call: a store that fails or is slow is a miss.
+/// reference, prompt version, deployment or model version is a new call. Only an answer that parsed is kept, and the cache
+/// can only ever cost a call: a store that fails or is slow is a miss.
 /// </summary>
 /// <param name="inner">The model.</param>
 /// <param name="store">Where answers are kept.</param>
 /// <param name="scope">The repo's ID, which partitions the store.</param>
-/// <param name="deployment">The model deployment, which is part of the key.</param>
+/// <param name="deployment">The model deployment, with its version when known, which is part of the key.</param>
 /// <param name="log">Receives a line when the store fails, holding no prompt or answer text.</param>
 public sealed class AnswerCache(IChatClient inner, IAnswerStore store, string scope, string deployment, Action<string>? log = null)
     : DelegatingChatClient(inner)

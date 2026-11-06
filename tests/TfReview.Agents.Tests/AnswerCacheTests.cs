@@ -54,6 +54,17 @@ public class AnswerCacheTests
         await Assert.That(chat.Requests).Count().IsEqualTo(2);
     }
 
+    // BUG-9: a version changed in place keeps the deployment's name, and mustn't get the old model's answers.
+    [Test]
+    public async Task Another_model_version_doesnt_share_answers()
+    {
+        var before = new ReviewModel(new FakeChat(), "gpt-6.1-sol") { Version = "2026-09-29" };
+        var after = before with { Version = "2027-01-15" };
+
+        await Assert.That(before.CacheIdentity).IsNotEqualTo(after.CacheIdentity);
+        await Assert.That(new ReviewModel(new FakeChat(), "gpt-6.1-sol").CacheIdentity).IsEqualTo("gpt-6.1-sol");
+    }
+
     // A cached failure would come back on every push for a week, and the retry would get it too.
     [Test]
     public async Task Only_an_answer_that_parsed_is_kept()

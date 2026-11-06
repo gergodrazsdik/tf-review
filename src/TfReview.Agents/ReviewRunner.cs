@@ -11,8 +11,20 @@ public sealed record ReviewModel(IChatClient Chat, string Deployment)
     /// <summary>The variable naming one review's tokens-per-minute budget, which TokenPacer keeps under (D54).</summary>
     public const string TokensPerMinuteVariable = "TF_REVIEW_TOKENS_PER_MINUTE";
 
+    /// <summary>The variable naming the deployment's model version, which the result cache's key includes (D53).</summary>
+    public const string VersionVariable = "TF_REVIEW_OPENAI_MODEL_VERSION";
+
     /// <summary>One review's TPM budget: its share of the deployment's capacity (D54).</summary>
     public int TokensPerMinute { get; init; } = TokenPacer.DefaultFor(Deployment);
+
+    /// <summary>
+    /// The model version behind the deployment, such as 2026-09-29, when it's known. A version changed in place keeps the
+    /// deployment's name, so without it the cache would serve the old model's answers for up to a week (BUG-9).
+    /// </summary>
+    public string? Version { get; init; }
+
+    /// <summary>What the result cache's key holds for the model: the deployment, and its version when known.</summary>
+    public string CacheIdentity => this.Version is { Length: > 0 } version ? $"{this.Deployment}@{version}" : this.Deployment;
 
     /// <summary>
     /// The model from the environment, or null when none is configured, which the agents report as not reviewed.
@@ -26,7 +38,10 @@ public sealed record ReviewModel(IChatClient Chat, string Deployment)
             return null;
         }
 
-        var model = new ReviewModel(LlmClient.Create(uri, deployment), deployment);
+        var model = new ReviewModel(LlmClient.Create(uri, deployment), deployment)
+        {
+            Version = Environment.GetEnvironmentVariable(VersionVariable)?.Trim(),
+        };
         return TokenPacer.ParseBudget(Environment.GetEnvironmentVariable(TokensPerMinuteVariable)) is { } budget
             ? model with { TokensPerMinute = budget }
             : model;
@@ -154,7 +169,7 @@ public sealed class ReviewRunner(
             IChatClient? chat = model is null ? null : new TokenPacer(model.Chat, model.TokensPerMinute);
             if (chat is not null && answers is not null && repositoryId is not null)
             {
-                chat = new AnswerCache(chat, answers, repositoryId, model!.Deployment, log);
+                chat = new AnswerCache(chat, answers, repositoryId, model!.CacheIdentity, log);
             }
 
             if (chat is not null && clock is not null)
