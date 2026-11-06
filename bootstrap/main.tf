@@ -90,3 +90,25 @@ resource "azurerm_consumption_budget_subscription" "monthly" {
     }
   }
 }
+
+# Previous state versions go a day after they're superseded. Every state is encrypted and enforced (D59), so this is
+# what removes the plaintext versions written before, and keeps old versions from piling up. Recovery stays: soft
+# delete keeps a deleted version restorable for 30 days.
+resource "azurerm_storage_management_policy" "state" {
+  storage_account_id = azurerm_storage_account.state.id
+
+  rule {
+    name    = "expire-previous-state-versions"
+    enabled = true
+
+    filters {
+      blob_types = ["blockBlob"]
+    }
+
+    actions {
+      version {
+        delete_after_days_since_creation = 1
+      }
+    }
+  }
+}
