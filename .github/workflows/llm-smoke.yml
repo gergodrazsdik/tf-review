@@ -17,12 +17,22 @@ on:
 permissions:
   contents: read
 
+# A new push to the same PR cancels its run, and only one run of either eval workflow uses the model at a time: they
+# share the production deployment's 100K tokens a minute with the service (OPS-4). A third waiting run replaces the
+# second.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   smoke:
     # Fork PRs get no OIDC token or secrets, so they can't reach the model.
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     environment: review
+    concurrency:
+      group: model-evals
+      cancel-in-progress: false
     timeout-minutes: 10
     permissions:
       contents: read
