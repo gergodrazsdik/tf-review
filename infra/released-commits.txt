@@ -2,3 +2,4 @@
 # commit through its parent repo, so only this list proves one is really ours. A commit can't name itself, so each
 # release adds its commit here in a PR after tagging, and callers repin once that's applied.
 359b61d4a05fa000ea46cbb384b9c4412109ea6c
+d337f39c31040467a2e5a07226f373e34cb714ce
