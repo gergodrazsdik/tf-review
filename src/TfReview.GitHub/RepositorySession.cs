@@ -41,11 +41,16 @@ public sealed class RepositorySession(HttpClient http, string repository) : IAsy
     /// <summary>Advisory by default (D9): findings are neutral, and only a repo's own rules could make it fail one day.</summary>
     public async Task PostCheckRunAsync(ReviewResult result, CancellationToken cancellationToken = default)
     {
+        // Only a blocking finding fails the check (D9, D55): a model's opinion never does, and nor does "not reviewed",
+        // so an outage can't block a merge in a repo that requires this check.
+        var blocking = result.Findings.Count(finding => finding.Blocking);
+        var count = result.Findings.Count == 1 ? "1 finding" : $"{result.Findings.Count} findings";
         var (conclusion, title) = result.Verdict switch
         {
+            Verdict.Findings when blocking > 0 => ("failure", $"{count}, {blocking} blocking"),
             Verdict.NoFindings when result.NotReviewed.Count == 0 => ("success", "No findings"),
             Verdict.NoFindings => ("neutral", "No findings, and some of it wasn't reviewed"),
-            Verdict.Findings => ("neutral", result.Findings.Count == 1 ? "1 finding" : $"{result.Findings.Count} findings"),
+            Verdict.Findings => ("neutral", count),
             _ => ("neutral", "Not reviewed"),
         };
 

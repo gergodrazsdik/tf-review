@@ -339,6 +339,42 @@ public class ReviewWorkerTests
         await Assert.That(check.GetProperty("output").GetProperty("title").GetString()).IsEqualTo("1 finding");
     }
 
+    // D55: a repo that opted in gets a failed check only for what the runner marked blocking.
+    [Test]
+    public async Task A_blocking_finding_fails_the_check()
+    {
+        var world = new World();
+        world.Engine.Result = new ReviewResult(
+            1,
+            Head,
+            Verdict.Findings,
+            [
+                new Finding("azurerm_network_security_rule.a", "POL-002", Severity.High, Reporter.Security, true, "SSH", [new DocEvidence("POL-002")]) { Blocking = true },
+                new Finding("azurerm_virtual_network.a", "ADR-001", Severity.Low, Reporter.Scanner, true, "Name", [new DocEvidence("ADR-001")]),
+            ],
+            [],
+            new Dictionary<string, int>())
+        { Gate = GateMode.Blocking };
+
+        await world.RunAsync();
+
+        var check = world.GitHub.CheckRuns.Single();
+        await Assert.That(check.GetProperty("conclusion").GetString()).IsEqualTo("failure");
+        await Assert.That(check.GetProperty("output").GetProperty("title").GetString()).IsEqualTo("2 findings, 1 blocking");
+    }
+
+    // An outage can't block a merge, even in a repo that requires the check.
+    [Test]
+    public async Task Not_reviewed_stays_neutral_under_a_blocking_gate()
+    {
+        var world = new World();
+        world.Engine.Result = ReviewResult.Failed(Head, ReviewScope.Plan, NotReviewedReason.Unavailable) with { Gate = GateMode.Blocking };
+
+        await world.RunAsync();
+
+        await Assert.That(world.GitHub.CheckRuns.Single().GetProperty("conclusion").GetString()).IsEqualTo("neutral");
+    }
+
     private sealed class World
     {
         public DateTimeOffset Now { get; } = new(2026, 11, 2, 12, 0, 0, TimeSpan.Zero);

@@ -213,6 +213,68 @@ public class ReviewRunnerAgentTests
         await Assert.That(parsed.Usage!.Model).IsEqualTo("test-model");
     }
 
+    private const string BlockingConfig = Config + "\n" + """
+        gate:
+          mode: blocking
+        """;
+
+    private const string HighTagViolation = """
+        [{"namespace":"adr002","failures":[{"msg":"ADR-002: missing tags","metadata":{"details":
+        {"address":"azurerm_virtual_network.main","doc_id":"ADR-002","severity":"high","attribute":"tags"}}}]}]
+        """;
+
+    private static readonly string HighTagging = Tagging.Replace("severity: medium", "severity: high", StringComparison.Ordinal);
+
+    // D55: a policy's own high finding fails the check where the repo opted in.
+    [Test]
+    public async Task A_policys_high_finding_blocks_under_a_blocking_gate()
+    {
+        var result = await Run(VnetPlan, new FakeChat(FakeChat.Answer(Empty)), HighTagViolation, config: BlockingConfig);
+
+        await Assert.That(result.Gate).IsEqualTo(GateMode.Blocking);
+        await Assert.That(result.Findings.Single().Blocking).IsTrue();
+    }
+
+    [Test]
+    public async Task A_policys_medium_finding_doesnt_block()
+    {
+        var result = await Run(VnetPlan, new FakeChat(FakeChat.Answer(Empty)), TagViolation, config: BlockingConfig);
+
+        await Assert.That(result.Findings.Single().Blocking).IsFalse();
+    }
+
+    // D9: no merge is blocked by a model's opinion alone, however severe the standard.
+    [Test]
+    public async Task A_models_high_finding_never_blocks()
+    {
+        var result = await Run(VnetPlan, new FakeChat(FakeChat.Answer(Answer(Vnet))), NoViolations, HighTagging, BlockingConfig);
+
+        var finding = result.Findings.Single();
+        await Assert.That(finding.Severity).IsEqualTo(Severity.High);
+        await Assert.That(finding.Deterministic).IsFalse();
+        await Assert.That(finding.Blocking).IsFalse();
+    }
+
+    // A merged row takes the highest severity of what it merged, so a model's high mustn't lift a policy's medium into blocking.
+    [Test]
+    public async Task A_model_merging_into_a_policys_medium_finding_doesnt_make_it_block()
+    {
+        var result = await Run(VnetPlan, new FakeChat(FakeChat.Answer(Answer(Vnet))), TagViolation, HighTagging, BlockingConfig);
+
+        var finding = result.Findings.Single();
+        await Assert.That(finding.Deterministic).IsTrue();
+        await Assert.That(finding.Blocking).IsFalse();
+    }
+
+    [Test]
+    public async Task Nothing_blocks_under_the_default_advisory_gate()
+    {
+        var result = await Run(VnetPlan, new FakeChat(FakeChat.Answer(Empty)), HighTagViolation);
+
+        await Assert.That(result.Gate).IsEqualTo(GateMode.Advisory);
+        await Assert.That(result.Findings.Single().Blocking).IsFalse();
+    }
+
     // D53: the same review again, say a re-push that changed nothing the model sees, costs no model call.
     [Test]
     public async Task A_repeated_review_of_the_same_repo_reuses_the_answers()

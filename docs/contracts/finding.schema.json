@@ -58,6 +58,10 @@
       "type": "array",
       "items": { "type": "string", "minLength": 1 }
     },
+    "blocking": {
+      "description": "In a repo whose gate is blocking, this finding fails the check: deterministic, and reported as high by a policy or allowlisted scanner itself, never by a model or through a merge (D9, D55). Absent or false otherwise.",
+      "type": "boolean"
+    },
     "monthly_cost_delta_usd": {
       "description": "Cost agent only.",
       "type": "number"
