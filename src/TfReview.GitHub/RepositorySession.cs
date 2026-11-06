@@ -38,6 +38,10 @@ public sealed class RepositorySession(HttpClient http, string repository) : IAsy
     public Task<CommentAction> UpsertCommentAsync(int pullRequest, string body, CancellationToken cancellationToken = default) =>
         new StickyComment(http, repository, pullRequest).UpsertAsync(body, cancellationToken);
 
+    /// <summary>Writes the comment built from the one it replaces, so ticks on it can be read first (D56).</summary>
+    public Task<CommentAction> UpsertCommentAsync(int pullRequest, Func<string?, string> build, CancellationToken cancellationToken = default) =>
+        new StickyComment(http, repository, pullRequest).UpsertAsync(build, cancellationToken);
+
     /// <summary>Advisory by default (D9): findings are neutral, and only a repo's own rules could make it fail one day.</summary>
     public async Task PostCheckRunAsync(ReviewResult result, CancellationToken cancellationToken = default)
     {

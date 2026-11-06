@@ -23,6 +23,24 @@ public class StickyCommentTests
         await Assert.That(github.Writes.Single().Body).IsEqualTo("new body");
     }
 
+    // D56: the worker reads ticks from the comment it's about to replace.
+    [Test]
+    public async Task Builds_the_new_body_from_the_comment_it_replaces()
+    {
+        var github = new FakeGitHub(Comment(42, "tf-review-gergodrazsdik[bot]", Marked));
+        string? seen = "unset";
+
+        var http = new HttpClient(github) { BaseAddress = new Uri("https://api.example.test/") };
+        await new StickyComment(http, Repository, PullRequest).UpsertAsync(previous =>
+        {
+            seen = previous;
+            return "new body";
+        });
+
+        await Assert.That(seen).IsEqualTo(Marked);
+        await Assert.That(github.Writes.Single().Body).IsEqualTo("new body");
+    }
+
     // The service posts as the App, and the workflow as itself when the service is down (D39). Neither can leave
     // the other's older result standing.
     [Test]

@@ -21,6 +21,11 @@ public static class ReviewMetrics
     private static readonly Counter<long> Findings = Meter.CreateCounter<long>("tfreview.findings", "{finding}");
     private static readonly Counter<long> EvidenceDrops = Meter.CreateCounter<long>("tfreview.evidence_drops", "{finding}");
     private static readonly Counter<long> NotReviewedScopes = Meter.CreateCounter<long>("tfreview.not_reviewed", "{scope}");
+    private static readonly Counter<long> Dismissals = Meter.CreateCounter<long>("tfreview.dismissals", "{finding}");
+
+    /// <summary>A finding a reviewer ticked as wrong (D56), by rule only: never the resource or any plan text.</summary>
+    public static void RecordDismissal(string? rule, string repository) =>
+        Dismissals.Add(1, new TagList { { "rule", rule ?? "unknown" }, { "repository", repository } });
 
     /// <summary>One model call. A model with no known price reports its tokens and no cost.</summary>
     public static void RecordCall(
