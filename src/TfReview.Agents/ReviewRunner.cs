@@ -237,6 +237,7 @@ public sealed class ReviewRunner(
             return new ReviewResult(1, commit, arbitration.Verdict, findings, notReviewed, drops)
             {
                 Gate = config.Blocking ? GateMode.Blocking : GateMode.Advisory,
+                CommentMinSeverity = config.CommentMinSeverity,
                 RiskOrder = risk.Order.Count == 0 ? null : risk.Order,
                 Cost = cost,
                 StandardsCommit = config.Commit,

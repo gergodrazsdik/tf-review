@@ -33,6 +33,26 @@ public class TfReviewConfigTests
         await Assert.That(on.References).IsTrue();
     }
 
+    // MNT-5: the contract allows it, so it's read and checked rather than silently ignored.
+    [Test]
+    [Arguments("", null)]
+    [Arguments("thresholds:\n  comment_min_severity: low\n", TfReview.Core.Severity.Low)]
+    [Arguments("thresholds:\n  comment_min_severity: medium\n", TfReview.Core.Severity.Medium)]
+    [Arguments("thresholds:\n  comment_min_severity: high\n", TfReview.Core.Severity.High)]
+    public async Task Reads_the_comments_minimum_severity(string thresholds, TfReview.Core.Severity? expected)
+    {
+        var config = TfReviewConfig.Parse($"version: 1\nstandards:\n  repository: a/b\n  commit: {Sha}\n{thresholds}");
+
+        await Assert.That(config.CommentMinSeverity).IsEqualTo(expected);
+    }
+
+    [Test]
+    public async Task Refuses_a_minimum_severity_the_contract_doesnt_have()
+    {
+        await Assert.That(() => TfReviewConfig.Parse($"version: 1\nstandards:\n  repository: a/b\n  commit: {Sha}\nthresholds:\n  comment_min_severity: bogus\n"))
+            .Throws<ConfigException>();
+    }
+
     [Test]
     public async Task Cost_is_opt_in_because_it_needs_a_secret()
     {

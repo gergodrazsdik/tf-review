@@ -337,6 +337,22 @@ public class CommentRendererTests
         await Assert.That(comment).Contains("Dismiss `x[\"a|b\"]`");
     }
 
+    // MNT-5: a repo can keep lower findings out of its comment; they're still counted.
+    [Test]
+    public async Task Findings_below_the_repos_minimum_severity_arent_shown_but_counted()
+    {
+        var low = Finding("Low one") with { ResourceAddress = "azurerm_x.low", Severity = Severity.Low };
+        var high = Finding("High one") with { ResourceAddress = "azurerm_x.high", Severity = Severity.High };
+        var result = Result(Verdict.Findings, high, low) with { CommentMinSeverity = Severity.Medium };
+
+        var comment = CommentRenderer.Render(result, Counts);
+
+        await Assert.That(comment).Contains("**2 finding(s)**");
+        await Assert.That(comment).Contains("azurerm_x.high");
+        await Assert.That(comment).DoesNotContain("azurerm_x.low");
+        await Assert.That(comment).Contains("1 finding(s) below medium aren't shown");
+    }
+
     // MNT-28: nothing was cut, so there's no ellipsis.
     [Test]
     public async Task Text_of_exactly_the_limit_gets_no_ellipsis()

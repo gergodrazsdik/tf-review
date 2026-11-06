@@ -29,6 +29,10 @@
         "blocking"
       ]
     },
+    "comment_min_severity": {
+      "description": "The repo's thresholds.comment_min_severity when it's set: findings below it stay in findings and the check run's count, but out of the PR comment.",
+      "enum": ["low", "medium", "high"]
+    },
     "doc_paths": {
       "description": "Where each cited doc lives in that repository, by doc ID. Comments link only to these.",
       "type": "object",

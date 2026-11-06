@@ -44,20 +44,23 @@ public static partial class CommentRenderer
     /// <param name="record">Whether this rewrite counts new ticks.</param>
     public static RenderedComment Rewrite(ReviewResult result, PlanCounts? counts, string? previous, bool record)
     {
-        var rows = Math.Min(MaxRows, result.Findings.Count);
-        var rendered = Build(result, counts, previous, record, rows, trimmed: false);
+        // A repo can keep low findings out of its comment (MNT-5). They still count in the headline and the check run.
+        var visible = result.Findings.Where(finding => result.CommentMinSeverity is not { } min || finding.Severity >= min).ToList();
+        var rows = Math.Min(MaxRows, visible.Count);
+        var rendered = Build(result, visible, counts, previous, record, rows, trimmed: false);
         while (rendered.Body.Length > MaxLength && rows > 0)
         {
             rows = Math.Max(0, rows - RowStep);
-            rendered = Build(result, counts, previous, record, rows, trimmed: true);
+            rendered = Build(result, visible, counts, previous, record, rows, trimmed: true);
         }
 
         return rendered;
     }
 
-    private static RenderedComment Build(ReviewResult result, PlanCounts? counts, string? previous, bool record, int rows, bool trimmed)
+    private static RenderedComment Build(
+        ReviewResult result, IReadOnlyList<Finding> visible, PlanCounts? counts, string? previous, bool record, int rows, bool trimmed)
     {
-        var shown = result.Findings.Take(rows).ToList();
+        var shown = visible.Take(rows).ToList();
         var dismissals = Dismissals.Plan(shown, previous, record, MaxRows);
         var comment = new StringBuilder()
             .AppendLine(Marker)
@@ -79,7 +82,7 @@ public static partial class CommentRenderer
 
         if (result.Findings.Count > 0)
         {
-            AppendFindings(comment, result, shown, trimmed);
+            AppendFindings(comment, result, visible, shown, trimmed);
             if (shown.Count > 0)
             {
                 AppendDismissals(comment, shown, dismissals);
@@ -231,7 +234,8 @@ public static partial class CommentRenderer
         }
     }
 
-    private static void AppendFindings(StringBuilder comment, ReviewResult result, IReadOnlyList<Finding> shown, bool trimmed)
+    private static void AppendFindings(
+        StringBuilder comment, ReviewResult result, IReadOnlyList<Finding> visible, IReadOnlyList<Finding> shown, bool trimmed)
     {
         if (shown.Count > 0)
         {
@@ -246,12 +250,19 @@ public static partial class CommentRenderer
             }
         }
 
-        var hidden = result.Findings.Count - shown.Count;
+        var hidden = visible.Count - shown.Count;
         if (hidden > 0)
         {
             comment.AppendLine().AppendLine(trimmed
                 ? $"{hidden} more finding(s) aren't shown, to keep this comment under GitHub's size limit."
                 : $"{hidden} more finding(s) aren't shown.");
+        }
+
+        var below = result.Findings.Count - visible.Count;
+        if (below > 0 && result.CommentMinSeverity is { } min)
+        {
+            comment.AppendLine().AppendLine(
+                $"{below} finding(s) below {Name(min)} aren't shown, as this repo's `thresholds.comment_min_severity` asks. They still count in the check run.");
         }
     }
 

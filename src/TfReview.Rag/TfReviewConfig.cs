@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using TfReview.Core;
 using YamlDotNet.Core;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -15,6 +16,9 @@ public sealed partial record TfReviewConfig(string Repository, string Commit, IR
 {
     /// <summary>Whether agents get imported reference material as well as the team's rules (D42). Off by default.</summary>
     public bool References { get; init; }
+
+    /// <summary>Findings below this stay out of the PR comment, though they still count. Null shows every finding.</summary>
+    public Severity? CommentMinSeverity { get; init; }
 
     private static readonly string[] KnownAgents = ["conventions", "cost", "security"];
 
@@ -68,7 +72,20 @@ public sealed partial record TfReviewConfig(string Repository, string Commit, IR
             _ => throw new ConfigException("gate.mode must be advisory or blocking."),
         };
 
-        return new TfReviewConfig(repository, commit, agents, blocking) { References = file.References ?? false };
+        Severity? minSeverity = file.Thresholds?.CommentMinSeverity switch
+        {
+            null => null,
+            "low" => Severity.Low,
+            "medium" => Severity.Medium,
+            "high" => Severity.High,
+            _ => throw new ConfigException("thresholds.comment_min_severity must be low, medium or high."),
+        };
+
+        return new TfReviewConfig(repository, commit, agents, blocking)
+        {
+            References = file.References ?? false,
+            CommentMinSeverity = minSeverity,
+        };
     }
 
     [GeneratedRegex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")]

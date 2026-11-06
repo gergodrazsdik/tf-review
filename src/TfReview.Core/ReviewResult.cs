@@ -228,6 +228,14 @@ public sealed record ReviewResult(
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public GateMode? Gate { get; init; }
 
+    /// <summary>
+    /// The repo's <c>thresholds.comment_min_severity</c>, when it's set: findings below it stay in the result and the
+    /// check run's count, and out of the comment.
+    /// </summary>
+    [JsonPropertyName("comment_min_severity")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Severity? CommentMinSeverity { get; init; }
+
     [JsonPropertyName("standards_commit")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? StandardsCommit { get; init; }
