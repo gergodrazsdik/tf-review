@@ -8,7 +8,7 @@ standards:
   repository: gergodrazsdik/tf-standards
   commit: adf50af6607b4e2b28a7e3566db8adfdecabe683
 agents: [conventions, security, cost]
-# Reference material from Azure Policy, the Cloud Adoption Framework and the azurerm docs, chosen per agent.
+# Reference material from Azure Policy, the Cloud Adoption Framework and the azurerm docs, searched per finding (D50).
 references: true
 gate:
   mode: advisory
