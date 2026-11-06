@@ -50,11 +50,98 @@ public class DismissalsTests
     {
         var finding = Finding("azurerm_subnet.b");
 
-        var body = CommentRenderer.Render(Result(finding), null, new HashSet<string> { Dismissals.Key(finding) });
+        var body = CommentRenderer.Rewrite(Result(finding), null, Tick(CommentRenderer.Render(Result(finding), null)), record: true).Body;
 
         var dismissal = Dismissals.Ticked(body).Single();
         await Assert.That(dismissal.Recorded).IsTrue();
+        await Assert.That(CommentRenderer.Rewrite(Result(finding), null, body, record: true).CountedDismissals).IsEmpty();
     }
+
+    // BUG-2: a failed review, no findings, or a push where the finding is missing keeps the tick, hidden, until it's back.
+    [Test]
+    [Arguments(Verdict.NotReviewed)]
+    [Arguments(Verdict.NoFindings)]
+    [Arguments(Verdict.Findings)]
+    public async Task A_tick_survives_a_rewrite_that_doesnt_show_its_finding(Verdict verdict)
+    {
+        var finding = Finding("azurerm_subnet.b");
+        var ticked = Tick(CommentRenderer.Render(Result(finding), null));
+        var between = verdict switch
+        {
+            Verdict.NotReviewed => ReviewResult.Failed(Commit, ReviewScope.Plan, NotReviewedReason.Unavailable),
+            Verdict.NoFindings => new ReviewResult(1, Commit, Verdict.NoFindings, [], [], new Dictionary<string, int>()),
+            _ => Result(Finding("azurerm_subnet.c")),
+        };
+
+        var hidden = CommentRenderer.Rewrite(between, null, ticked, record: true);
+        var back = CommentRenderer.Rewrite(Result(finding), null, hidden.Body, record: true);
+
+        await Assert.That(hidden.CountedDismissals).IsEquivalentTo(new string?[] { "POL-002" });
+        await Assert.That(back.CountedDismissals).IsEmpty();
+        var dismissal = Dismissals.Ticked(back.Body).Single();
+        await Assert.That(dismissal.Key).IsEqualTo(Dismissals.Key(finding));
+        await Assert.That(dismissal.Recorded).IsTrue();
+        await Assert.That(back.Body).Contains("- [x] Dismiss `azurerm_subnet.b`");
+    }
+
+    // The workflow's fallback carries ticks over but leaves them to the worker to count, which has the metrics.
+    [Test]
+    public async Task A_rewrite_that_doesnt_record_carries_ticks_uncounted()
+    {
+        var finding = Finding("azurerm_subnet.b");
+        var ticked = Tick(CommentRenderer.Render(Result(finding), null));
+
+        var fallback = CommentRenderer.Rewrite(ReviewResult.Failed(Commit, ReviewScope.Plan, NotReviewedReason.Unavailable), null, ticked, record: false);
+        var next = CommentRenderer.Rewrite(Result(finding), null, fallback.Body, record: true);
+
+        await Assert.That(fallback.CountedDismissals).IsEmpty();
+        await Assert.That(next.CountedDismissals).IsEquivalentTo(new string?[] { "POL-002" });
+    }
+
+    // BUG-7: a box unticked after it was counted, then ticked again, isn't counted a second time.
+    [Test]
+    public async Task A_tick_counted_once_isnt_counted_again_after_an_untick()
+    {
+        var finding = Finding("azurerm_subnet.b");
+        var counted = CommentRenderer.Rewrite(Result(finding), null, Tick(CommentRenderer.Render(Result(finding), null)), record: true).Body;
+        var unticked = counted.Replace("- [x]", "- [ ]", StringComparison.Ordinal);
+
+        var kept = CommentRenderer.Rewrite(Result(finding), null, unticked, record: true).Body;
+        var again = CommentRenderer.Rewrite(Result(finding), null, Tick(kept), record: true);
+
+        await Assert.That(kept).Contains("recorded -->");
+        await Assert.That(again.CountedDismissals).IsEmpty();
+    }
+
+    // BUG-23: a tick stays when the arbiter merges its row into another one on the next push, or splits it out again.
+    [Test]
+    public async Task A_tick_follows_its_rule_through_a_merge_and_back()
+    {
+        var alone = Finding("azurerm_subnet.b", "ADR-002");
+        var merged = Finding("azurerm_subnet.b", "POL-001") with { RelatedRules = ["ADR-002"] };
+        var ticked = Tick(CommentRenderer.Render(Result(alone), null));
+
+        var asMerged = CommentRenderer.Rewrite(Result(merged), null, ticked, record: true).Body;
+        var apart = CommentRenderer.Rewrite(Result(alone, Finding("azurerm_subnet.b", "POL-001")), null, asMerged, record: true);
+
+        await Assert.That(asMerged).Contains("- [x] Dismiss `azurerm_subnet.b` (`POL-001`)");
+        await Assert.That(apart.Body).Contains("- [x] Dismiss `azurerm_subnet.b` (`ADR-002`)");
+        await Assert.That(apart.CountedDismissals).IsEmpty();
+    }
+
+    // The feedback script reads shown lines only, so a hidden one mustn't look like one.
+    [Test]
+    public async Task A_hidden_line_isnt_a_shown_one()
+    {
+        var ticked = Tick(CommentRenderer.Render(Result(Finding("azurerm_subnet.b")), null));
+
+        var hidden = CommentRenderer.Rewrite(ReviewResult.Failed(Commit, ReviewScope.Plan, NotReviewedReason.Unavailable), null, ticked, record: true).Body;
+
+        await Assert.That(hidden).DoesNotContain("- [x]");
+        await Assert.That(hidden).Contains("<!-- tf-review:dismissed ");
+    }
+
+    private static string Tick(string body) => body.Replace("- [ ]", "- [x]", StringComparison.Ordinal);
 
     // The address comes from the PR's plan, so it mustn't be able to make a line of its own, ticked or not.
     [Test]

@@ -5,6 +5,9 @@ using TfReview.Core;
 
 namespace TfReview.GitHub;
 
+/// <summary>A rendered comment, and the rules of the ticks it counts for the first time (D56).</summary>
+public sealed record RenderedComment(string Body, IReadOnlyList<string?> CountedDismissals);
+
 /// <summary>
 /// Renders the PR comment. Everything from a plan or a finding is shown through <see cref="Code"/>, because
 /// that text comes from the PR: a resource name could otherwise hold an image, a link or a mention.
@@ -18,11 +21,22 @@ public static partial class CommentRenderer
     private const int MaxRiskItems = 5;
     private const int MaxTextLength = 300;
 
+    /// <summary>A comment with nothing carried over from an earlier one.</summary>
+    public static string Render(ReviewResult result, PlanCounts? counts) => Rewrite(result, counts, null, record: false).Body;
+
+    /// <summary>
+    /// The comment that replaces <paramref name="previous"/>, carrying over every tick and count on it (D56). With
+    /// <paramref name="record"/>, ticks not yet counted are marked as counted and returned, for the caller to count once
+    /// the comment is written. The workflow's own fallback leaves that to the worker, which has the metrics.
+    /// </summary>
     /// <param name="result">The review.</param>
     /// <param name="counts">The plan's change counts, if known.</param>
-    /// <param name="dismissed">Keys of findings a reviewer already dismissed, which stay ticked (D56).</param>
-    public static string Render(ReviewResult result, PlanCounts? counts, IReadOnlySet<string>? dismissed = null)
+    /// <param name="previous">The comment being replaced, if there's one.</param>
+    /// <param name="record">Whether this rewrite counts new ticks.</param>
+    public static RenderedComment Rewrite(ReviewResult result, PlanCounts? counts, string? previous, bool record)
     {
+        var shown = result.Findings.Take(MaxRows).ToList();
+        var dismissals = Dismissals.Plan(shown, previous, record, MaxRows);
         var comment = new StringBuilder()
             .AppendLine(Marker)
             .AppendLine("### tf-review")
@@ -45,7 +59,7 @@ public static partial class CommentRenderer
         {
             comment.AppendLine();
             AppendFindings(comment, result);
-            AppendDismissals(comment, result, dismissed);
+            AppendDismissals(comment, shown, dismissals);
         }
 
         foreach (var missing in result.NotReviewed)
@@ -74,12 +88,23 @@ public static partial class CommentRenderer
             }
         }
 
-        return comment
+        comment
             .AppendLine()
             .AppendLine(result.Gate == GateMode.Blocking
                 ? "This repo blocks merges only on high findings a policy or scanner reported itself, marked blocking above; the rest of this review is advisory, and finding nothing doesn't mean a change is approved."
-                : "This review is advisory, and finding nothing doesn't mean a change is approved.")
-            .ToString();
+                : "This review is advisory, and finding nothing doesn't mean a change is approved.");
+
+        // Ticks and counts for findings not shown this time, hidden, so they come back with the finding (D56).
+        if (dismissals.Hidden.Count > 0)
+        {
+            comment.AppendLine();
+            foreach (var line in dismissals.Hidden)
+            {
+                comment.AppendLine(line);
+            }
+        }
+
+        return new RenderedComment(comment.ToString(), dismissals.Counted);
     }
 
     /// <summary>
@@ -163,14 +188,13 @@ public static partial class CommentRenderer
     private static string Signed(decimal amount) => (amount < 0 ? "-" : "+") + Money(Math.Abs(amount));
 
     // One box per shown finding, so a reviewer can say which one is wrong; reactions only rate a whole comment (D56).
-    private static void AppendDismissals(StringBuilder comment, ReviewResult result, IReadOnlySet<string>? dismissed)
+    private static void AppendDismissals(StringBuilder comment, IReadOnlyList<Finding> shown, DismissPlan dismissals)
     {
         comment.AppendLine().AppendLine("Wrong? Tick a finding to dismiss it, which helps tune the reviewer:").AppendLine();
-        foreach (var finding in result.Findings.Take(MaxRows))
+        foreach (var finding in shown)
         {
-            var ticked = dismissed?.Contains(Dismissals.Key(finding)) == true;
-            comment.AppendLine(
-                $"- [{(ticked ? "x" : " ")}] Dismiss {Code(finding.ResourceAddress)} ({Code(finding.Rule)}) {Dismissals.Marker(finding, recorded: ticked)}");
+            var (ticked, marker) = dismissals.Shown[finding];
+            comment.AppendLine($"- [{(ticked ? "x" : " ")}] Dismiss {Code(finding.ResourceAddress)} ({Code(finding.Rule)}) {marker}");
         }
     }
 

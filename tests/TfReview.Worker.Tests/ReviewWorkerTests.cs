@@ -470,14 +470,45 @@ public class ReviewWorkerTests
         var result = new ReviewResult(1, Head, Verdict.Findings, [finding], [], new Dictionary<string, int>());
         var world = new World();
         world.Engine.Result = result;
-        var previous = recorded
-            ? CommentRenderer.Render(result, null, new HashSet<string> { Dismissals.Key(finding) })
-            : CommentRenderer.Render(result, null).Replace("- [ ]", "- [x]", StringComparison.Ordinal);
-        world.GitHub.PreviousComment = previous;
+        var ticked = CommentRenderer.Render(result, null).Replace("- [ ]", "- [x]", StringComparison.Ordinal);
+        world.GitHub.PreviousComment = recorded ? CommentRenderer.Rewrite(result, null, ticked, record: true).Body : ticked;
 
         await world.RunAsync();
 
         await Assert.That(counted.Count(value => value == rule)).IsEqualTo(expected);
+    }
+
+    // BUG-7: a tick is counted once the comment holding its mark is written, so a failed write and its retry count it once.
+    [Test]
+    public async Task A_dismissal_isnt_counted_when_the_comment_cant_be_written()
+    {
+        using var measured = new Measured("tfreview.dismissals");
+        var finding = new Finding("azurerm_virtual_network.a", "ADR-001", Severity.Medium, Reporter.Scanner, true, "Name", [new DocEvidence("ADR-001")]);
+        var result = new ReviewResult(1, Head, Verdict.Findings, [finding], [], new Dictionary<string, int>());
+        var world = new World { Queued = Job with { Repository = "owner/write-fails" } };
+        world.Engine.Result = result;
+        world.GitHub.PreviousComment = CommentRenderer.Render(result, null).Replace("- [ ]", "- [x]", StringComparison.Ordinal);
+        world.GitHub.FailWrites = true;
+
+        await world.RunAsync();
+
+        await Assert.That(measured.For("owner/write-fails")).IsEmpty();
+    }
+
+    // BUG-2: the give-up's "not reviewed" keeps the tick, hidden, for the finding's return.
+    [Test]
+    public async Task A_give_up_keeps_the_ticks()
+    {
+        var finding = new Finding("azurerm_virtual_network.a", "ADR-001", Severity.Medium, Reporter.Scanner, true, "Name", [new DocEvidence("ADR-001")]);
+        var result = new ReviewResult(1, Head, Verdict.Findings, [finding], [], new Dictionary<string, int>());
+        var world = new World { Attempt = ReviewWorker.MaxAttempts + 1 };
+        world.GitHub.PreviousComment = CommentRenderer.Render(result, null).Replace("- [ ]", "- [x]", StringComparison.Ordinal);
+
+        await world.RunAsync();
+
+        var dismissal = Dismissals.Ticked(world.GitHub.Comments.Single()).Single();
+        await Assert.That(dismissal.Key).IsEqualTo(Dismissals.Key(finding));
+        await Assert.That(dismissal.Recorded).IsTrue();
     }
 
     // D55: a repo that opted in gets a failed check only for what the runner marked blocking.

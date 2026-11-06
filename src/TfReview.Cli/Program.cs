@@ -137,14 +137,15 @@ static async Task<int> Publish(string resultPath, string redactedPath, string co
         await File.WriteAllTextAsync(summaryPath, StepSummary.Render(result));
     }
 
-    var body = CommentRenderer.Render(result, counts);
-
     var repository = Required("GITHUB_REPOSITORY");
     var pullRequest = int.Parse(Required("PR_NUMBER"));
     var apiUrl = Environment.GetEnvironmentVariable("GITHUB_API_URL") ?? "https://api.github.com";
 
+    // Ticks on the comment it replaces carry over (D56). They aren't counted here, where there are no metrics, so they
+    // stay uncounted until the worker next rewrites the comment.
     using var http = StickyComment.CreateClient(new Uri(apiUrl.TrimEnd('/') + "/"), Required("GITHUB_TOKEN"));
-    var action = await new StickyComment(http, repository, pullRequest).UpsertAsync(body);
+    var action = await new StickyComment(http, repository, pullRequest)
+        .UpsertAsync(previous => CommentRenderer.Rewrite(result, counts, previous, record: false).Body);
     Console.WriteLine($"Comment {action.ToString().ToLowerInvariant()} for commit {commit}.");
     return 0;
 }
