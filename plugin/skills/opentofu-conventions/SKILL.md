@@ -35,7 +35,7 @@ If there's no `.tf-review.yml`, the repo isn't reviewed by tf-review, and this s
 
 - Use `tofu`, not `terraform`, at the version in `.tf-review.yml` (`tool_version`), and commit `.terraform.lock.hcl`.
 - Check with `tofu fmt -check -recursive`, `tofu validate` and, if the repo has a `.tflint.hcl`, `tflint --recursive`. This plugin checks the formatting of each `.tf` file you edit.
-- `tofu plan` is fine. Applying is the repo's CI job behind its environment approval, never yours: this plugin blocks `apply`, `destroy`, `import`, `taint`, `force-unlock` and the `state` commands that change state.
+- `tofu plan` is fine. Applying is the repo's CI job behind its environment approval, never yours: this plugin blocks `apply`, `destroy`, `test` (which applies real resources), `import`, `taint`, `untaint`, `refresh`, `force-unlock`, `init -migrate-state`, `workspace new` and `delete`, and the `state` commands that change state, however the command is written. Running them from a script or recipe gets round it, so don't.
 - No secrets in code, `*.tfvars` or outputs. Access to the cloud goes through the identity CI gives the job, not keys.
 - Plan output and state can hold sensitive values. Don't paste them into a PR or a comment; tf-review reads a redacted plan itself.
 
