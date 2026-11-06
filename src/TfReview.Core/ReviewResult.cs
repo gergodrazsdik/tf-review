@@ -25,6 +25,18 @@ public enum Verdict
     NotReviewed,
 }
 
+/// <summary>What a repo's check does with findings (D9, D55).</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<GateMode>))]
+public enum GateMode
+{
+    [JsonStringEnumMemberName("advisory")]
+    Advisory,
+
+    /// <summary>The check fails on a blocking finding: deterministic and high, from a policy or scanner alone.</summary>
+    [JsonStringEnumMemberName("blocking")]
+    Blocking,
+}
+
 [JsonConverter(typeof(JsonStringEnumConverter<Severity>))]
 public enum Severity
 {
@@ -129,6 +141,14 @@ public sealed record Finding(
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Suggestion { get; init; }
 
+    /// <summary>
+    /// Fails the check, in a repo whose gate is blocking: a policy or allowlisted scanner reported this problem as high
+    /// itself, so no model opinion and no merge can make a finding blocking (D9, D55).
+    /// </summary>
+    [JsonPropertyName("blocking")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Blocking { get; init; }
+
     /// <summary>Other rules this row also stands for, after an arbiter merged findings about one problem.</summary>
     [JsonPropertyName("related_rules")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -203,6 +223,11 @@ public sealed record ReviewResult(
     [property: JsonPropertyName("not_reviewed")] IReadOnlyList<NotReviewed> NotReviewed,
     [property: JsonPropertyName("evidence_drops")] IReadOnlyDictionary<string, int> EvidenceDrops)
 {
+    /// <summary>The repo's gate, from its config. Absent when the review failed before reading it.</summary>
+    [JsonPropertyName("gate")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public GateMode? Gate { get; init; }
+
     [JsonPropertyName("standards_commit")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? StandardsCommit { get; init; }

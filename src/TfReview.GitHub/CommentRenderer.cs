@@ -72,7 +72,9 @@ public static partial class CommentRenderer
 
         return comment
             .AppendLine()
-            .AppendLine("This review is advisory, and finding nothing doesn't mean a change is approved.")
+            .AppendLine(result.Gate == GateMode.Blocking
+                ? "This repo blocks merges only on high findings a policy or scanner reported itself, marked blocking above; the rest of this review is advisory, and finding nothing doesn't mean a change is approved."
+                : "This review is advisory, and finding nothing doesn't mean a change is approved.")
             .ToString();
     }
 
@@ -165,7 +167,7 @@ public static partial class CommentRenderer
         {
             var suggestion = finding.Suggestion is null ? string.Empty : Code(finding.Suggestion);
             comment.AppendLine(
-                $"| {Name(finding.Severity)} | {Code(finding.ResourceAddress)} | {Rules(finding, result)} | {Code(finding.Title)} | {suggestion} | {Source(finding)} |");
+                $"| {Name(finding.Severity)}{(finding.Blocking ? ", **blocking**" : string.Empty)} | {Code(finding.ResourceAddress)} | {Rules(finding, result)} | {Code(finding.Title)} | {suggestion} | {Source(finding)} |");
         }
 
         if (findings.Count > MaxRows)

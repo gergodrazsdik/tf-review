@@ -163,7 +163,7 @@ public sealed class ReviewRunner(
                 Log(ReferenceSuggester.Name, suggestions.PromptVersion, suggestions.Calls);
             }
 
-            var findings = suggestions?.Findings ?? arbitration.Findings;
+            var findings = Gate(config, suggestions?.Findings ?? arbitration.Findings, scanners.Kept);
 
             IReadOnlyList<NotReviewed> notReviewed =
             [
@@ -183,6 +183,7 @@ public sealed class ReviewRunner(
 
             return new ReviewResult(1, commit, arbitration.Verdict, findings, notReviewed, drops)
             {
+                Gate = config.Blocking ? GateMode.Blocking : GateMode.Advisory,
                 RiskOrder = risk.Order.Count == 0 ? null : risk.Order,
                 Cost = cost,
                 StandardsCommit = config.Commit,
@@ -201,6 +202,32 @@ public sealed class ReviewRunner(
         {
             directory.Delete(recursive: true);
         }
+    }
+
+    /// <summary>
+    /// Marks what fails the check in a blocking repo (D9, D55): a deterministic row standing for a problem a policy or
+    /// allowlisted scanner reported as high itself. It's judged on those findings before any merge, because a merged row
+    /// takes the highest severity of everything merged into it, which can include a model's.
+    /// </summary>
+    private static IReadOnlyList<Finding> Gate(TfReviewConfig config, IReadOnlyList<Finding> findings, IReadOnlyList<Finding> deterministic)
+    {
+        if (!config.Blocking)
+        {
+            return findings;
+        }
+
+        var high = deterministic
+            .Where(finding => finding.Deterministic && finding.Severity == Severity.High)
+            .Select(finding => (finding.ResourceAddress, finding.Rule))
+            .ToHashSet();
+
+        return
+        [
+            .. findings.Select(finding => finding.Deterministic
+                && new[] { finding.Rule }.Concat(finding.RelatedRules ?? []).Any(rule => high.Contains((finding.ResourceAddress, rule)))
+                    ? finding with { Blocking = true }
+                    : finding),
+        ];
     }
 
     private static bool Enabled(TfReviewConfig config, AgentProfile profile) => config.Agents.Contains(profile.Name, StringComparer.Ordinal);

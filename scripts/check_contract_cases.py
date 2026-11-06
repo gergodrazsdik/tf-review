@@ -145,6 +145,18 @@ cases = [
         True,
     ),
     (
+        "a blocking finding under a blocking gate",
+        "review-result",
+        changed(result, gate="blocking", findings=[changed(finding, blocking=True)]),
+        True,
+    ),
+    (
+        "a gate that isn't advisory or blocking",
+        "review-result",
+        changed(result, gate="strict"),
+        False,
+    ),
+    (
         "an empty list of resources not reviewed",
         "review-result",
         changed(result, not_reviewed=[{"scope": "security", "reason": "plan_too_large", "resources": []}]),

@@ -26,6 +26,19 @@ public class CommentRendererTests
         await Assert.That(comment).Contains("Not reviewed: conventions (unavailable).");
     }
 
+    [Test]
+    public async Task Marks_what_blocks_and_says_what_the_gate_does()
+    {
+        var blocking = new Finding("azurerm_network_security_rule.a", "POL-002", Severity.High, Reporter.Security, true, "SSH", [new DocEvidence("POL-002")]) { Blocking = true };
+        var result = new ReviewResult(1, Commit, Verdict.Findings, [blocking], [], new Dictionary<string, int>()) { Gate = GateMode.Blocking };
+
+        var comment = CommentRenderer.Render(result, Counts);
+
+        await Assert.That(comment).Contains("| high, **blocking** | `azurerm_network_security_rule.a` |");
+        await Assert.That(comment).Contains("This repo blocks merges only on high findings a policy or scanner reported itself");
+        await Assert.That(comment).DoesNotContain("This review is advisory");
+    }
+
     // A large plan's batches can stop short, and the comment names what they didn't reach, up to a point.
     [Test]
     public async Task Names_the_resources_a_scope_left_out()

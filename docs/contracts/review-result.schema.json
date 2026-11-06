@@ -22,6 +22,13 @@
       "type": "string",
       "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
     },
+    "gate": {
+      "description": "The repo's gate from its config: advisory, or blocking on findings marked blocking. Absent when the review failed before reading the config.",
+      "enum": [
+        "advisory",
+        "blocking"
+      ]
+    },
     "doc_paths": {
       "description": "Where each cited doc lives in that repository, by doc ID. Comments link only to these.",
       "type": "object",

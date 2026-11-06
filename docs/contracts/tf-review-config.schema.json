@@ -54,7 +54,7 @@
       "additionalProperties": false,
       "properties": {
         "mode": {
-          "description": "blocking fails the check only on deterministic high findings; LLM-only findings never block.",
+          "description": "blocking fails the check only on findings a policy or allowlisted scanner reported as high itself, never on a model's finding or through a merge; a review that couldn't run never fails it (D9, D55).",
           "enum": ["advisory", "blocking"],
           "default": "advisory"
         }
