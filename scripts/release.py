@@ -10,7 +10,10 @@ commits and a test before callers move. This script only does the steps in betwe
   trust             after the pin merges: open a PR adding main's commit to infra/released-commits.txt, and
                     retiring released commits no caller pins any more
   tag VERSION       after trust is applied and tested: tag vVERSION at the newest released commit, signed
-  repin VERSION     open a PR in each caller repo moving it to vVERSION
+  repin VERSION     open a PR in each caller repo moving it to vVERSION; with --standards COMMIT, its
+                    .tf-review.yml moves to that tf-standards commit in the same PR
+  standards [COMMIT]  open a PR moving tf-review's own standards pins (its .tf-review.yml, CI and evals) to a
+                    tf-standards commit, main's by default
   seeds             merge the demo's main into each seed branch, so GitHub keeps running their workflows
 
 Run it outside the Claude sandbox: it needs gh, git signing, crane and cosign. Merges stay the user's.
@@ -32,11 +35,23 @@ DEMO = f"{OWNER}/tf-review-demo"
 # Repos that call the reusable workflow; bootstrap's repos map onboards them.
 CALLERS = (DEMO, f"{OWNER}/tf-review-demo2")
 CALLER_WORKFLOW = ".github/workflows/plan.yml"
+CALLER_CONFIG = ".tf-review.yml"
+STANDARDS = f"{OWNER}/tf-standards"
+# The standards commit a .tf-review.yml reviews against.
+STANDARDS_PIN = re.compile(r"(?m)^(\s+commit: )([0-9a-f]{40})")
 IMAGE = f"ghcr.io/{REPO}"
 ROOT = Path(__file__).resolve().parent.parent
 APPS = ROOT / "infra" / "apps.tf"
 WORKFLOW = ROOT / ".github" / "workflows" / "tf-review.yml"
 RELEASED = ROOT / "infra" / "released-commits.txt"
+CONFIG = ROOT / CALLER_CONFIG
+# tf-review's own copies of its standards pin: its review, CI's policy tests, the live evals and the image smoke test.
+STANDARDS_FILES = (
+    CONFIG,
+    ROOT / ".github" / "workflows" / "ci.yml",
+    ROOT / ".github" / "workflows" / "e2e-live.yml",
+    ROOT / "tests" / "fixtures" / "tf-review-smoke.yml",
+)
 USES = re.compile(r"(tf-review/\.github/workflows/tf-review\.yml@)([0-9a-f]{40})( # )(v[0-9][^\s]*)")
 DIGEST = re.compile(rf"{re.escape(IMAGE)}@sha256:[0-9a-f]{{64}}")
 
@@ -105,6 +120,16 @@ def open_pr(branch, title, body):
     print(url)
 
 
+def standards_commit(commit):
+    """The full SHA of a tf-standards commit, or of its main when none is given."""
+    return gh_api(f"repos/{STANDARDS}/commits/{commit or 'main'}")["sha"]
+
+
+def caller_file(repo, path):
+    content = gh_api(f"repos/{repo}/contents/{path}")
+    return base64.b64decode(content["content"]).decode(), content["sha"]
+
+
 def wait_for_release(tag):
     print(f"Waiting for the release run of {tag}...")
     for _ in range(90):
@@ -145,6 +170,13 @@ def status(_):
     for repo, commit, version in caller_pins():
         trusted = "released" if commit in released else "NOT RELEASED"
         print(f"{repo:<35} {version} ({commit[:7] if commit else '-'}, {trusted})")
+    newest = standards_commit(None)
+    own = STANDARDS_PIN.search(CONFIG.read_text())
+    print(f"tf-standards main:      {newest[:7]}")
+    print(f"{REPO:<35} standards {own.group(2)[:7] if own else '-'}")
+    for repo in CALLERS:
+        pin_match = STANDARDS_PIN.search(caller_file(repo, CALLER_CONFIG)[0])
+        print(f"{repo:<35} standards {pin_match.group(2)[:7] if pin_match else '-'}")
     behind = git("rev-list", "--count", f"{image_tags[0]}..origin/main") if image_tags else "?"
     print(f"Commits on main since {image_tags[0] if image_tags else '-'}: {behind}")
 
@@ -205,25 +237,59 @@ def repin(options):
     commit = git("rev-list", "-n", "1", name)
     if commit not in released_commits():
         sys.exit(f"{name} ({commit[:7]}) isn't in infra/released-commits.txt, so callers would be refused.")
+    standards = standards_commit(options.standards) if options.standards else None
     for repo in CALLERS:
-        content = gh_api(f"repos/{repo}/contents/{CALLER_WORKFLOW}")
-        text = base64.b64decode(content["content"]).decode()
+        # Each change is its own commit on the PR's branch: the workflow pin, then the standards pin.
+        changes = []
+        text, sha = caller_file(repo, CALLER_WORKFLOW)
         updated = USES.sub(rf"\g<1>{commit}\g<3>{name}", text)
-        if updated == text:
-            print(f"{repo} already pins {name}.")
+        if updated != text:
+            changes.append((CALLER_WORKFLOW, updated, sha, f"Pin the reviewer to {name}"))
+        if standards:
+            text, sha = caller_file(repo, CALLER_CONFIG)
+            updated = STANDARDS_PIN.sub(rf"\g<1>{standards}", text, count=1)
+            if updated != text:
+                changes.append((CALLER_CONFIG, updated, sha, f"Review against tf-standards at {standards[:7]}"))
+        if not changes:
+            print(f"{repo} already pins {name}" + (f" and tf-standards {standards[:7]}." if standards else "."))
             continue
         base = gh_api(f"repos/{repo}/git/ref/heads/main")["object"]["sha"]
         branch = f"pin-reviewer-{name}"
         gh_api(f"repos/{repo}/git/refs", f"ref=refs/heads/{branch}", f"sha={base}", method="POST")
-        # Commits made through the API are signed by GitHub, which the main ruleset requires.
-        gh_api(f"repos/{repo}/contents/{CALLER_WORKFLOW}", f"message=Pin the reviewer to {name}",
-               f"content={base64.b64encode(updated.encode()).decode()}", f"sha={content['sha']}",
-               f"branch={branch}", method="PUT")
-        url = run("gh", "pr", "create", "-R", repo, "--head", branch, "--title", f"Pin the reviewer to {name}",
-                  "--body", f"Moves the reusable workflow to `{name}` (`{commit}`), which tf-review released "
-                            f"(D45). Opened by `scripts/release.py repin`.")
+        for path, content, blob, message in changes:
+            # Commits made through the API are signed by GitHub, which the main ruleset requires.
+            gh_api(f"repos/{repo}/contents/{path}", f"message={message}",
+                   f"content={base64.b64encode(content.encode()).decode()}", f"sha={blob}",
+                   f"branch={branch}", method="PUT")
+        body = f"Moves the reusable workflow to `{name}` (`{commit}`), which tf-review released (D45)."
+        if standards:
+            body += f" Reviews against tf-standards at `{standards}`."
+        title = f"Pin the reviewer to {name}" + (" and its standards" if standards else "")
+        url = run("gh", "pr", "create", "-R", repo, "--head", branch, "--title", title,
+                  "--body", body + " Opened by `scripts/release.py repin`.")
         print(url)
     print("After the demo's PR merges: scripts/release.py seeds")
+
+
+def standards_pin(options):
+    require_clean_main()
+    commit = standards_commit(options.commit)
+    current = STANDARDS_PIN.search(CONFIG.read_text())
+    if not current:
+        sys.exit(f"{CALLER_CONFIG} has no standards commit.")
+    old = current.group(2)
+    if old == commit:
+        sys.exit(f"tf-review already reviews against tf-standards {commit[:7]}.")
+    for path in STANDARDS_FILES:
+        text = path.read_text()
+        if old not in text:
+            sys.exit(f"{path.relative_to(ROOT)} doesn't pin {old[:7]}; move it by hand.")
+        path.write_text(text.replace(old, commit))
+    git("add", *map(str, STANDARDS_FILES))
+    body = (f"Moves tf-review's standards pins from `{old}` to `{commit}`: its own review (`{CALLER_CONFIG}`), "
+            f"CI's policy tests, the live evals and the image smoke test. Callers move with "
+            f"`scripts/release.py repin VERSION --standards {commit[:7]}`. Opened by `scripts/release.py standards`.")
+    open_pr(f"release/standards-{commit[:7]}", f"Review against tf-standards at {commit[:7]}", body)
 
 
 def seeds(_):
@@ -254,10 +320,16 @@ def main():
     pin_parser.add_argument("--workflow", action="store_true", help="pin the reusable workflow's image too")
     pin_parser.set_defaults(run=pin)
     commands.add_parser("trust").set_defaults(run=trust)
-    for name, function in (("tag", tag), ("repin", repin)):
-        sub = commands.add_parser(name)
-        sub.add_argument("version", help="like 0.0.13")
-        sub.set_defaults(run=function)
+    tag_parser = commands.add_parser("tag")
+    tag_parser.add_argument("version", help="like 0.0.13")
+    tag_parser.set_defaults(run=tag)
+    repin_parser = commands.add_parser("repin")
+    repin_parser.add_argument("version", help="like 0.0.13")
+    repin_parser.add_argument("--standards", metavar="COMMIT", help="also move the callers to this tf-standards commit")
+    repin_parser.set_defaults(run=repin)
+    standards_parser = commands.add_parser("standards")
+    standards_parser.add_argument("commit", nargs="?", help="a tf-standards commit; main's by default")
+    standards_parser.set_defaults(run=standards_pin)
     commands.add_parser("seeds").set_defaults(run=seeds)
     options = parser.parse_args()
     if options.run is pin and not options.tag.startswith("image-v"):
