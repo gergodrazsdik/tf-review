@@ -401,7 +401,7 @@ The grown corpus raises Cosmos storage and request units and takes one round of 
 | Azure OpenAI in Foundry | gpt-5.4-mini Data Zone deployment; later gpt-6.1-sol and `text-embedding-3-small`; a project so the new portal can open the account, which the review itself doesn't use | Pay-as-you-go, key auth disabled | M1 |
 | Role assignments (in bootstrap, D24) | Cognitive Services OpenAI User at resource group scope for each onboarded repo's review identity (M1–M2) and the service identity (M3), which also gets Storage Queue and Blob Data Contributor and Key Vault Secrets User there | — | M1 |
 | Cosmos DB for NoSQL | Vectors, review history, result cache, feedback | Free tier (1,000 RU/s, 25 GB), key auth disabled | M3 |
-| Storage account | Review queue and redacted plans (lifecycle rule deletes after 7 days) | Standard LRS | M3 |
+| Storage account | Review queue, redacted plans (lifecycle rule deletes after 7 days), and each review's result JSON in `results/{repository ID}/{review ID}.json` (kept longer, so a bad review can be looked into) | Standard LRS | M3 |
 | Container Apps | Review API (scale to zero) and the queue-scaled review job | Consumption-only environment, public ingress | M3 |
 | Key Vault | GitHub App private key, Infracost token | Standard, RBAC | M3 |
 | App Insights + Log Analytics | Traces, tokens, cache hit rate | Daily ingestion cap | M3 |
@@ -727,6 +727,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 - [x] Model input is bounded: the suggester searches and calls for at most 15 findings a review, 4 at a time; the orchestrator is sent the 300 riskiest changes by the rules; and over 150 findings the arbiter keeps the rules' result without a call (SEC-5, OPS-13)
 - [x] A hard daily stop on model spend, and the API's rate limit kept in Cosmos so scaling to zero doesn't reset it (D62; SEC-5, OPS-3 in part). **You:** set `TF_REVIEW_DAILY_BUDGET_USD` on the job in `infra/apps.tf` if $5 isn't right
 - [x] Tokens that aren't valid are counted in one log line every 5 minutes at most, rather than a line each, so a flood can't fill the 0.2 GB daily log cap (SEC-7 in part; `/healthz` keeping the API awake is infra's)
+- [x] Each review's result JSON is kept at `results/{repository ID}/{review ID}.json` in the service's storage account, best effort, so a bad review can be reconstructed after its plan and cached answers expire (OPS-19). **You:** add the `results` container in `infra/service.tf` and a lifecycle rule for it (prefix `results/`, for example 90 days); until then the worker logs that it couldn't keep the result and posts as usual. The plans rule's `plans/` prefix doesn't match it
 
 ## Evaluation
 

@@ -14,12 +14,16 @@ namespace TfReview.Service;
 public sealed record ServiceStores(IPlanStore Plans, IReviewQueue Queue, IReviewStatusStore Statuses)
 {
     private const string PlansContainer = "plans";
+    private const string ResultsContainer = "results";
     private const string QueueName = "reviews";
     private const string Database = "tfreview";
     private const string ReviewsContainer = "reviews";
 
     /// <summary>Durable counters, in the reviews container beside the statuses, or null for none (counted in memory).</summary>
     public ICounterStore? Counters { get; init; }
+
+    /// <summary>Where each review's result is kept, or null for nowhere.</summary>
+    public IResultStore? Results { get; init; }
 
     public static ServiceStores FromEnvironment()
     {
@@ -39,6 +43,7 @@ public sealed record ServiceStores(IPlanStore Plans, IReviewQueue Queue, IReview
             new CosmosStatusStore(reviews))
         {
             Counters = new CosmosCounterStore(reviews),
+            Results = new BlobResultStore(new BlobContainerClient(new Uri($"https://{account}.blob.core.windows.net/{ResultsContainer}"), credential)),
         };
     }
 
@@ -69,6 +74,19 @@ internal sealed class BlobPlanStore(BlobContainerClient container) : IPlanStore
     }
 
     private static string Name(string reviewId) => $"{reviewId}.json";
+}
+
+/// <summary>
+/// Results at <c>results/{repository ID}/{review ID}.json</c>, so infra's lifecycle rule decides how long they stay, and a
+/// repo's can be listed or removed together.
+/// </summary>
+internal sealed class BlobResultStore(BlobContainerClient container) : IResultStore
+{
+    public async Task SaveAsync(string repositoryId, string reviewId, string resultJson, CancellationToken cancellationToken = default)
+    {
+        using var content = new MemoryStream(Encoding.UTF8.GetBytes(resultJson));
+        await container.GetBlobClient($"{repositoryId}/{reviewId}.json").UploadAsync(content, overwrite: true, cancellationToken);
+    }
 }
 
 internal sealed class StorageReviewQueue(QueueClient queue) : IReviewQueue

@@ -32,6 +32,15 @@ public sealed record ReviewStatus(
     public string? Verdict { get; init; }
 }
 
+/// <summary>
+/// Each review's result JSON, kept so a bad review can be reconstructed after its plan and cached answers have expired
+/// (OPS-19). It holds what the comment shows and the usage, never plan values beyond that.
+/// </summary>
+public interface IResultStore
+{
+    Task SaveAsync(string repositoryId, string reviewId, string resultJson, CancellationToken cancellationToken = default);
+}
+
 public interface IPlanStore
 {
     Task SaveAsync(string reviewId, string plan, CancellationToken cancellationToken = default);

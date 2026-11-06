@@ -96,7 +96,8 @@ public static class WorkerHost
             async (plan, config, lockFile, commit, repositoryId, cancellationToken) =>
                 await (await RunnerAsync(cancellationToken)).RunAsync(plan, config, commit, cancellationToken, lockFile, repositoryId),
             Console.WriteLine,
-            budget: budget);
+            budget: budget,
+            results: stores.Results);
 
         return await worker.RunOnceAsync(deadline.Token);
     }

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using TfReview.Core;
 using TfReview.GitHub;
 using TfReview.Service;
@@ -26,7 +27,8 @@ public sealed class ReviewWorker(
     ReviewEngine engine,
     Action<string> log,
     TimeProvider? time = null,
-    IModelBudget? budget = null)
+    IModelBudget? budget = null,
+    IResultStore? results = null)
 {
     /// <summary>Longer than a job may run, so a message only comes back when the job really has gone.</summary>
     public static readonly TimeSpan Visibility = TimeSpan.FromMinutes(20);
@@ -148,6 +150,8 @@ public sealed class ReviewWorker(
             }
         }
 
+        await this.SaveResultAsync(job, result, cancellationToken);
+
         if ((await session.ReadPullRequestAsync(job.PullRequest, cancellationToken)).Head != job.Commit)
         {
             return this.Status(job, ReviewState.Superseded);
@@ -228,6 +232,24 @@ public sealed class ReviewWorker(
         }
 
         await session.PostCheckRunAsync(result, cancellationToken);
+    }
+
+    // Kept for looking into a bad review later (OPS-19), and never at the cost of posting it.
+    private async Task SaveResultAsync(ReviewJob job, ReviewResult result, CancellationToken cancellationToken)
+    {
+        if (results is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await results.SaveAsync(job.RepositoryId, job.ReviewId, JsonSerializer.Serialize(result), cancellationToken);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            log($"Couldn't keep review {job.ReviewId}'s result: {e.GetType().Name}.");
+        }
     }
 
     // A budget store that fails doesn't stop reviews: the Azure budget's alerts are still there behind it.

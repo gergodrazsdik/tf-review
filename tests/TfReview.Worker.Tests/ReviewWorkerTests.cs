@@ -390,6 +390,30 @@ public class ReviewWorkerTests
         await Assert.That(measured.For("owner/post-fails")).IsEmpty();
     }
 
+    // OPS-19: the result is kept, so a bad review can be looked into after its plan has gone.
+    [Test]
+    public async Task The_result_is_kept_by_repo_and_review()
+    {
+        var world = new World();
+
+        await world.RunAsync();
+
+        var (key, json) = world.Results.Saved.Single();
+        await Assert.That(key).IsEqualTo($"{Job.RepositoryId}/{Job.ReviewId}");
+        await Assert.That(ReviewResult.Parse(json).Commit).IsEqualTo(Head);
+    }
+
+    [Test]
+    public async Task A_result_that_cant_be_kept_is_still_posted()
+    {
+        var world = new World();
+        world.Results.Fail = true;
+
+        await Assert.That(await world.RunAsync()).IsEqualTo(0);
+
+        await Assert.That(world.GitHub.Comments.Count).IsEqualTo(1);
+    }
+
     // D62: past the day's limit the model isn't called, and the PR is told why.
     [Test]
     public async Task A_spent_daily_budget_says_not_reviewed_without_a_review()
@@ -607,6 +631,8 @@ public class ReviewWorkerTests
 
         public FakeBudget? Budget { get; init; }
 
+        public FakeResults Results { get; } = new();
+
         public List<string> Log { get; } = [];
 
         public ReviewStatus StatusOf(ReviewState state, DateTimeOffset at) =>
@@ -625,11 +651,30 @@ public class ReviewWorkerTests
                 this.Engine.RunAsync,
                 this.Log.Add,
                 new FixedTime(this.Now),
-                this.Budget);
+                this.Budget,
+                this.Results);
             return worker.RunOnceAsync();
         }
 
         public void Complete() => this.Completed = true;
+    }
+
+    private sealed class FakeResults : IResultStore
+    {
+        public List<(string Key, string Json)> Saved { get; } = [];
+
+        public bool Fail { get; set; }
+
+        public Task SaveAsync(string repositoryId, string reviewId, string resultJson, CancellationToken cancellationToken = default)
+        {
+            if (this.Fail)
+            {
+                throw new InvalidOperationException("No container.");
+            }
+
+            this.Saved.Add(($"{repositoryId}/{reviewId}", resultJson));
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeBudget : IModelBudget
