@@ -117,3 +117,10 @@ jobs:
           path: infra
       - name: Apply the plan
         run: tofu -chdir=infra apply -input=false -lock-timeout=5m main.tfplan
+      # The API scales to zero, so this also proves the new revision starts: its image, settings and identity.
+      - name: Check the API answers
+        run: |
+          url=$(tofu -chdir=infra output -raw api_url)
+          curl --fail --silent --show-error --retry 6 --retry-delay 10 --retry-all-errors --max-time 30 \
+            "$url/healthz" >/dev/null
+          echo "The API at $url answers."

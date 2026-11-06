@@ -765,7 +765,7 @@ Expected spend is about $5–30/month at roughly 100 PRs, almost all of it LLM t
 | Hallucinated findings | Evidence required per finding; arbiter drops unsupported ones; never blocks on LLM output alone |
 | Secrets leaking via plan JSON or public logs | Redact before any LLM call; no plan artifacts; `sensitive` variables |
 | Large PRs blow context and cost | Diff-only input, per-agent slices, token caps, map-reduce with risk-first ordering |
-| Reviewer outage blocks its own fix PR | Advisory check on `tf-review`; deploy as Container Apps revisions with smoke test |
+| Reviewer outage blocks its own fix PR | Advisory check on `tf-review`. Each apply ends by calling the API's `/healthz`, so a revision that doesn't start fails the run. That covers the API; the review job only shows itself on the next review. Rollback is a PR that pins the previous digest, applied the same way |
 | Token cost creep | Budget alerts (D15), result cache, prompt caching, cost per PR on the eval dashboard |
 | Container Apps fixed fee appears | Private endpoints and planned maintenance each add $0.10/hour (\~$73/month); keep public ingress with Entra/OIDC auth and leave both off |
 | Infracost v2 plugins run unverified | Plugins pinned by checksum in `INFRACOST_CLI_PLUGIN_DIR` locally and in CI; no signatures exist, so this stays a known gap; CLI updates only through the setup doc, never `infracost update` |
