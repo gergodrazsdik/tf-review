@@ -496,15 +496,24 @@ public sealed class ReviewRunner(
         }
     }
 
-    private TokenUsage? Usage(IReadOnlyList<AgentCall> calls) => calls.Count == 0
-        ? null
-        : new TokenUsage(calls.Sum(call => call.InputTokens), calls.Sum(call => call.OutputTokens))
+    // An answer from the cache isn't a model call, and its lookup isn't model time (BUG-21). It still has a metric of its
+    // own, which the dashboard's hit rate reads.
+    private TokenUsage? Usage(IReadOnlyList<AgentCall> calls)
+    {
+        if (calls.Count == 0)
         {
-            CachedInputTokens = calls.Sum(call => call.CachedInputTokens),
+            return null;
+        }
+
+        var made = calls.Where(call => call.Finish != AnswerCache.Finish).ToList();
+        return new TokenUsage(made.Sum(call => call.InputTokens), made.Sum(call => call.OutputTokens))
+        {
+            CachedInputTokens = made.Sum(call => call.CachedInputTokens),
             Model = model?.Deployment,
-            Calls = calls.Count,
-            LatencyMs = (long)calls.Sum(call => call.Latency.TotalMilliseconds),
+            Calls = made.Count,
+            LatencyMs = (long)made.Sum(call => call.Latency.TotalMilliseconds),
         };
+    }
 
     private sealed record AgentPass(
         IReadOnlyList<Finding> Findings,

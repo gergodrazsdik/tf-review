@@ -729,6 +729,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 - [x] Tokens that aren't valid are counted in one log line every 5 minutes at most, rather than a line each, so a flood can't fill the 0.2 GB daily log cap (SEC-7 in part; `/healthz` keeping the API awake is infra's)
 - [x] Each review's result JSON is kept at `results/{repository ID}/{review ID}.json` in the service's storage account, best effort, so a bad review can be reconstructed after its plan and cached answers expire (OPS-19). **You:** add the `results` container in `infra/service.tf` and a lifecycle rule for it (prefix `results/`, for example 90 days); until then the worker logs that it couldn't keep the result and posts as usual. The plans rule's `plans/` prefix doesn't match it
 - [x] The redactor keeps the IDs of the broad built-in roles (Owner, Contributor, Reader, User Access Administrator, Role Based Access Control Administrator), which are public constants POL-003 matches, while still masking the subscription beside them (BUG-12 in part)
+- [x] Smaller correctness fixes: answers from the cache aren't counted as model calls or model time in `usage`; a retracted item with a blank title no longer spoils the agent's answer; data source reads aren't counted as resource changes; the standards download retries a 5xx or 429 once; and a working directory of `.` reads the root's lock file (BUG-21, BUG-24, BUG-26, BUG-19, BUG-20)
 
 ## Evaluation
 

@@ -12,6 +12,12 @@ public sealed record PlanCounts(int ResourceChanges, IReadOnlyDictionary<string,
         var actions = new SortedDictionary<string, int>(StringComparer.Ordinal);
         foreach (var change in plan.Root["resource_changes"]!.AsArray())
         {
+            // A data source read is no change to a resource (BUG-26).
+            if (change!["mode"]?.GetValue<string>() == "data")
+            {
+                continue;
+            }
+
             var action = Classify(change!["change"]!["actions"]!.AsArray());
             actions[action] = actions.GetValueOrDefault(action) + 1;
         }

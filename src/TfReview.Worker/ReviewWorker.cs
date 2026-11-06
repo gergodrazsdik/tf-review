@@ -123,7 +123,7 @@ public sealed class ReviewWorker(
 
         // Also at the base commit: it says which provider docs apply, and a PR's own version isn't merged yet.
         var lockFile = job.WorkingDirectory is { } directory
-            ? await session.ReadFileAsync($"{directory.TrimEnd('/')}/.terraform.lock.hcl", pullRequest.Base, cancellationToken)
+            ? await session.ReadFileAsync(LockFilePath(directory), pullRequest.Base, cancellationToken)
             : null;
         var plan = await plans.ReadAsync(job.ReviewId, cancellationToken);
         ReviewResult result;
@@ -283,6 +283,16 @@ public sealed class ReviewWorker(
         {
             log($"Couldn't record review {job.ReviewId}'s model spend: {e.GetType().Name}.");
         }
+    }
+
+    /// <summary>
+    /// The lock file's path from the repo's root. "." and a leading "./" are the root itself, which the contents API
+    /// doesn't accept as a path segment (BUG-20).
+    /// </summary>
+    private static string LockFilePath(string directory)
+    {
+        var parts = directory.Split('/', StringSplitOptions.RemoveEmptyEntries).Where(part => part != ".");
+        return string.Join('/', [.. parts, ".terraform.lock.hcl"]);
     }
 
     private static PlanCounts? Counts(string? plan) =>

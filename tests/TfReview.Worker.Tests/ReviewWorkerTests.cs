@@ -108,6 +108,20 @@ public class ReviewWorkerTests
         await Assert.That(world.Engine.LockFile).IsEqualTo(Config);
     }
 
+    // BUG-20: the contents API takes the root's file as a plain name, not under ".".
+    [Test]
+    [Arguments(".", ".terraform.lock.hcl")]
+    [Arguments("./", ".terraform.lock.hcl")]
+    [Arguments("./infra/", "infra/.terraform.lock.hcl")]
+    public async Task A_working_directory_at_the_root_reads_the_roots_lock_file(string directory, string path)
+    {
+        var world = new World { Queued = Job with { WorkingDirectory = directory } };
+
+        await world.RunAsync();
+
+        await Assert.That(world.GitHub.Requests).Contains($"GET /repos/owner/repo/contents/{path}?ref={Base}");
+    }
+
     // Callers pinned to a workflow from before the working directory was sent.
     [Test]
     public async Task A_job_without_a_working_directory_reads_no_lock_file()

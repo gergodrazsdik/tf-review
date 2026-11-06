@@ -108,6 +108,12 @@ public sealed class GitHubTarballSource(HttpClient http) : IStandardsSource
         // Both parts passed the config's patterns, and the commit is a full SHA, so this can't move.
         var url = $"{config.Repository}/tar.gz/{config.Commit}";
         using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        // A 5xx or a 429 from codeload is usually gone a moment later, so it gets the retry (BUG-19). Anything else won't change.
+        if ((int)response.StatusCode >= 500 || response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+        {
+            throw new HttpRequestException($"Downloading the standards failed with HTTP {(int)response.StatusCode}.", null, response.StatusCode);
+        }
+
         if (!response.IsSuccessStatusCode)
         {
             throw new StandardsFetchException($"Downloading the standards failed with HTTP {(int)response.StatusCode}.");

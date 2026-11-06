@@ -290,6 +290,10 @@ public class ReviewRunnerAgentTests
         await Assert.That(again.Findings).IsEquivalentTo(first.Findings);
         await Assert.That(again.NotReviewed).IsEmpty();
         await Assert.That(again.Usage!.InputTokens).IsEqualTo(0);
+
+        // BUG-21: answers from the cache aren't model calls.
+        await Assert.That(again.Usage.Calls).IsEqualTo(0);
+        await Assert.That(again.Usage.LatencyMs).IsEqualTo(0);
     }
 
     [Test]

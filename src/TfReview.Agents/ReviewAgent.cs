@@ -399,7 +399,10 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
         string text, IReadOnlyList<StandardsDoc> docs, IReadOnlyList<ResourceCostChange>? costs, IReadOnlyList<Finding> policies)
     {
         var output = StructuredCall.ParseWire<WireOutput>(text);
-        if (output is null || output.Findings.Any(finding => finding.ResourceAddress.Length == 0 || finding.Title.Trim().Length == 0))
+        // Only a finding that stands needs an address and a title: one the model retracts is only counted, and a blank
+        // one shouldn't cost the whole answer (BUG-24).
+        if (output is null
+            || output.Findings.Any(finding => finding.BreaksStandard && (finding.ResourceAddress.Length == 0 || finding.Title.Trim().Length == 0)))
         {
             return null;
         }

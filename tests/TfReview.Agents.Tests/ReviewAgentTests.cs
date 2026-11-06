@@ -85,6 +85,22 @@ public class ReviewAgentTests
         await Assert.That(outcome.Retracted).IsEqualTo(1);
     }
 
+    // BUG-24: a retracted item is only counted, so a blank title on one doesn't cost the whole answer.
+    [Test]
+    public async Task A_retracted_item_with_no_title_doesnt_spoil_the_answer()
+    {
+        const string Answered = """
+            {"policy_suggestions":[],"findings":[
+            {"breaks_standard":false,"resource_address":"","doc_id":"ADR-002","attribute":"tags","title":" ","suggestion":null},
+            {"breaks_standard":true,"resource_address":"a.bad","doc_id":"ADR-002","attribute":"tags","title":"This does.","suggestion":null}]}
+            """;
+
+        var outcome = (AgentReviewed)await Review(new FakeChat(FakeChat.Answer(Answered)));
+
+        await Assert.That(outcome.Findings.Single().ResourceAddress).IsEqualTo("a.bad");
+        await Assert.That(outcome.Calls.Count).IsEqualTo(1);
+    }
+
     // Models write these naturally, and the evidence check needs the attribute itself.
     [Test]
     [Arguments("tags.environment")]

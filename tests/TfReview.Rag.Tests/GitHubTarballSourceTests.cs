@@ -126,6 +126,30 @@ public class GitHubTarballSourceTests
         await Assert.That(() => Source(handler).FetchAsync(Config, target.Path)).Throws<StandardsFetchException>();
     }
 
+    // BUG-19: a 5xx or 429 from codeload is usually gone a moment later, so it gets the same one more try.
+    [Test]
+    [Arguments(HttpStatusCode.BadGateway, 2, true)]
+    [Arguments(HttpStatusCode.ServiceUnavailable, 2, true)]
+    [Arguments(HttpStatusCode.TooManyRequests, 2, true)]
+    [Arguments(HttpStatusCode.NotFound, 1, false)]
+    public async Task Tries_once_more_after_a_server_error_or_a_rate_limit(HttpStatusCode first, int calls, bool fetched)
+    {
+        var handler = new StatusOnceHandler(first, Tarball(("top/adr/ADR-001.md", "doc")));
+        using var target = new TargetDirectory();
+        var source = new GitHubTarballSource(new HttpClient(handler) { BaseAddress = new Uri("https://codeload.example.test/") });
+
+        if (fetched)
+        {
+            await source.FetchAsync(Config, target.Path);
+        }
+        else
+        {
+            await Assert.That(() => source.FetchAsync(Config, target.Path)).Throws<StandardsFetchException>();
+        }
+
+        await Assert.That(handler.Calls).IsEqualTo(calls);
+    }
+
     // The bug this pins: a timeout wasn't caught, so the review crashed instead of saying what went wrong.
     [Test]
     public async Task Tries_once_more_after_a_timeout()
@@ -220,6 +244,19 @@ public class GitHubTarballSourceTests
             return Calls <= failures
                 ? Task.FromException<HttpResponseMessage>(failure)
                 : Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(body) });
+        }
+    }
+
+    private sealed class StatusOnceHandler(HttpStatusCode first, byte[] body) : HttpMessageHandler
+    {
+        public int Calls { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Calls++;
+            return Task.FromResult(Calls == 1
+                ? new HttpResponseMessage(first)
+                : new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(body) });
         }
     }
 
