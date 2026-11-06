@@ -108,6 +108,7 @@ locals {
     {
       title         = "Cosmos request units per hour (free tier: 1,000 RU/s)"
       visualization = "timechart"
+      empty         = "No request units in this range. Azure exports this metric only for minutes with requests, so it appears with the next review."
       query         = <<-KQL
         AzureMetrics | where TimeGenerated {TimeRange} and ResourceProvider == "MICROSOFT.DOCUMENTDB" and MetricName == "TotalRequestUnits"
         | summarize request_units = sum(Total) by bin(TimeGenerated, 1h)
@@ -116,6 +117,7 @@ locals {
     {
       title         = "Storage used (MB)"
       visualization = "timechart"
+      empty         = "No capacity figures in this range yet. Azure reports storage capacity about once an hour."
       query         = <<-KQL
         AzureMetrics | where TimeGenerated {TimeRange} and ResourceProvider == "MICROSOFT.STORAGE" and MetricName == "UsedCapacity"
         | summarize used_mb = round(max(Maximum) / 1000000, 1) by bin(TimeGenerated, 1d)
@@ -184,6 +186,7 @@ resource "azurerm_application_insights_workbook" "dashboard" {
             crossComponentResources  = [azurerm_log_analytics_workspace.service.id]
             timeContextFromParameter = "TimeRange"
             visualization            = tile.visualization
+            noDataMessage            = lookup(tile, "empty", "No data in this range.")
           }
         }
       ],
