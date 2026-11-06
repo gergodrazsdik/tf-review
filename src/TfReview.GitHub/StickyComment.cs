@@ -29,12 +29,16 @@ public sealed class StickyComment(HttpClient http, string repository, int pullRe
         return http;
     }
 
-    public async Task<CommentAction> UpsertAsync(string body, CancellationToken cancellationToken = default)
-    {
-        var request = new { body };
-        var existing = await FindAsync(cancellationToken);
+    public Task<CommentAction> UpsertAsync(string body, CancellationToken cancellationToken = default) =>
+        this.UpsertAsync(_ => body, cancellationToken);
 
-        using var response = existing is { } id
+    /// <summary>Writes the body built from the comment it replaces, or from null when there's none yet (D56).</summary>
+    public async Task<CommentAction> UpsertAsync(Func<string?, string> build, CancellationToken cancellationToken = default)
+    {
+        var existing = await FindAsync(cancellationToken);
+        var request = new { body = build(existing?.Body) };
+
+        using var response = existing is { Id: var id }
             ? await http.PatchAsJsonAsync($"repos/{repository}/issues/comments/{id}", request, cancellationToken)
             : await http.PostAsJsonAsync($"repos/{repository}/issues/{pullRequest}/comments", request, cancellationToken);
         response.EnsureSuccessStatusCode();
@@ -42,7 +46,7 @@ public sealed class StickyComment(HttpClient http, string repository, int pullRe
         return existing is null ? CommentAction.Created : CommentAction.Updated;
     }
 
-    private async Task<long?> FindAsync(CancellationToken cancellationToken)
+    private async Task<(long Id, string? Body)?> FindAsync(CancellationToken cancellationToken)
     {
         for (var page = 1; ; page++)
         {
@@ -56,7 +60,7 @@ public sealed class StickyComment(HttpClient http, string repository, int pullRe
                 var text = comment.GetProperty("body").GetString();
                 if (author is not null && BotLogins.Contains(author) && text?.StartsWith(CommentRenderer.Marker, StringComparison.Ordinal) == true)
                 {
-                    return comment.GetProperty("id").GetInt64();
+                    return (comment.GetProperty("id").GetInt64(), text);
                 }
             }
 

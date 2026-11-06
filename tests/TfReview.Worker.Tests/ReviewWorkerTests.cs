@@ -339,6 +339,64 @@ public class ReviewWorkerTests
         await Assert.That(check.GetProperty("output").GetProperty("title").GetString()).IsEqualTo("1 finding");
     }
 
+    // D56: a finding a reviewer ticked as wrong stays ticked on the next push, marked as already counted.
+    [Test]
+    public async Task A_dismissal_carries_over_to_the_next_push()
+    {
+        var finding = new Finding("azurerm_virtual_network.a", "ADR-001", Severity.Medium, Reporter.Scanner, true, "Name", [new DocEvidence("ADR-001")]);
+        var result = new ReviewResult(1, Head, Verdict.Findings, [finding], [], new Dictionary<string, int>());
+        var world = new World();
+        world.Engine.Result = result;
+        world.GitHub.PreviousComment = CommentRenderer.Render(result, null).Replace("- [ ]", "- [x]", StringComparison.Ordinal);
+
+        await world.RunAsync();
+
+        var dismissal = Dismissals.Ticked(world.GitHub.Comments.Single()).Single();
+        await Assert.That(dismissal.Key).IsEqualTo(Dismissals.Key(finding));
+        await Assert.That(dismissal.Recorded).IsTrue();
+    }
+
+    // Each dismissal reaches the metric once: a fresh tick counts, and one carried over from an earlier push doesn't.
+    [Test]
+    [Arguments("TEST-FRESH", false, 1)]
+    [Arguments("TEST-CARRIED", true, 0)]
+    public async Task A_dismissal_is_counted_once(string rule, bool recorded, int expected)
+    {
+        var counted = new ConcurrentBag<string>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meters) =>
+        {
+            if (instrument.Name == "tfreview.dismissals")
+            {
+                meters.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((_, _, tags, _) =>
+        {
+            foreach (var tag in tags)
+            {
+                if (tag.Key == "rule" && tag.Value is string value)
+                {
+                    counted.Add(value);
+                }
+            }
+        });
+        listener.Start();
+
+        var finding = new Finding("azurerm_virtual_network.a", rule, Severity.Medium, Reporter.Scanner, true, "Name", [new DocEvidence(rule)]);
+        var result = new ReviewResult(1, Head, Verdict.Findings, [finding], [], new Dictionary<string, int>());
+        var world = new World();
+        world.Engine.Result = result;
+        var previous = recorded
+            ? CommentRenderer.Render(result, null, new HashSet<string> { Dismissals.Key(finding) })
+            : CommentRenderer.Render(result, null).Replace("- [ ]", "- [x]", StringComparison.Ordinal);
+        world.GitHub.PreviousComment = previous;
+
+        await world.RunAsync();
+
+        await Assert.That(counted.Count(value => value == rule)).IsEqualTo(expected);
+    }
+
     // D55: a repo that opted in gets a failed check only for what the runner marked blocking.
     [Test]
     public async Task A_blocking_finding_fails_the_check()
@@ -505,6 +563,9 @@ public class ReviewWorkerTests
 
         public bool FailWrites { get; set; }
 
+        /// <summary>The App's comment already on the PR, if any.</summary>
+        public string? PreviousComment { get; set; }
+
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var path = request.RequestUri!.PathAndQuery;
@@ -527,7 +588,14 @@ public class ReviewWorkerTests
                     _ when path.Contains("/contents/", StringComparison.Ordinal) => this.ConfigFound
                         ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(Config) }
                         : new HttpResponseMessage(HttpStatusCode.NotFound),
-                    _ when path.Contains("/comments", StringComparison.Ordinal) => Json("[]"),
+                    _ when path.Contains("/comments", StringComparison.Ordinal) => Json(this.PreviousComment is null
+                        ? "[]"
+                        : new JsonArray(new JsonObject
+                        {
+                            ["id"] = 42,
+                            ["user"] = new JsonObject { ["login"] = "tf-review-gergodrazsdik[bot]" },
+                            ["body"] = this.PreviousComment,
+                        }).ToJsonString()),
                     _ => new HttpResponseMessage(HttpStatusCode.NotFound),
                 };
             }

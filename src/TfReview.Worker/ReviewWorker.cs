@@ -164,7 +164,20 @@ public sealed class ReviewWorker(
     private static async Task PostAsync(
         RepositorySession session, ReviewJob job, ReviewResult result, PlanCounts? counts, CancellationToken cancellationToken)
     {
-        await session.UpsertCommentAsync(job.PullRequest, CommentRenderer.Render(result, counts), cancellationToken);
+        // Ticks on the comment being replaced: new ones are counted once, and all of them stay ticked (D56).
+        await session.UpsertCommentAsync(
+            job.PullRequest,
+            previous =>
+            {
+                var ticked = Dismissals.Ticked(previous);
+                foreach (var dismissal in ticked.Where(dismissal => !dismissal.Recorded))
+                {
+                    ReviewMetrics.RecordDismissal(dismissal.Rule, job.Repository);
+                }
+
+                return CommentRenderer.Render(result, counts, ticked.Select(dismissal => dismissal.Key).ToHashSet(StringComparer.Ordinal));
+            },
+            cancellationToken);
         await session.PostCheckRunAsync(result, cancellationToken);
     }
 

@@ -87,6 +87,11 @@ eval-retrieval report="":
 service-eval *args:
     python3 scripts/service_eval.py {{ args }}
 
+# Draft negative eval cases from findings dismissed on the demo's PRs (D56) into a folder outside the repo; run it outside the Claude sandbox
+[group('dev')]
+feedback-cases out:
+    python3 scripts/feedback_cases.py --out {{ out }}
+
 # Save what real Checkov and Infracost say about the named eval cases, or all; needs the token from pass, so it's yours to run
 [group('dev')]
 record-scans *cases:

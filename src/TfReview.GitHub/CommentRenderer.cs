@@ -18,7 +18,10 @@ public static partial class CommentRenderer
     private const int MaxRiskItems = 5;
     private const int MaxTextLength = 300;
 
-    public static string Render(ReviewResult result, PlanCounts? counts)
+    /// <param name="result">The review.</param>
+    /// <param name="counts">The plan's change counts, if known.</param>
+    /// <param name="dismissed">Keys of findings a reviewer already dismissed, which stay ticked (D56).</param>
+    public static string Render(ReviewResult result, PlanCounts? counts, IReadOnlySet<string>? dismissed = null)
     {
         var comment = new StringBuilder()
             .AppendLine(Marker)
@@ -42,6 +45,7 @@ public static partial class CommentRenderer
         {
             comment.AppendLine();
             AppendFindings(comment, result);
+            AppendDismissals(comment, result, dismissed);
         }
 
         foreach (var missing in result.NotReviewed)
@@ -157,6 +161,18 @@ public static partial class CommentRenderer
     private static string Money(decimal amount) => amount.ToString("$#,##0.00", CultureInfo.InvariantCulture);
 
     private static string Signed(decimal amount) => (amount < 0 ? "-" : "+") + Money(Math.Abs(amount));
+
+    // One box per shown finding, so a reviewer can say which one is wrong; reactions only rate a whole comment (D56).
+    private static void AppendDismissals(StringBuilder comment, ReviewResult result, IReadOnlySet<string>? dismissed)
+    {
+        comment.AppendLine().AppendLine("Wrong? Tick a finding to dismiss it, which helps tune the reviewer:").AppendLine();
+        foreach (var finding in result.Findings.Take(MaxRows))
+        {
+            var ticked = dismissed?.Contains(Dismissals.Key(finding)) == true;
+            comment.AppendLine(
+                $"- [{(ticked ? "x" : " ")}] Dismiss {Code(finding.ResourceAddress)} ({Code(finding.Rule)}) {Dismissals.Marker(finding, recorded: ticked)}");
+        }
+    }
 
     private static void AppendFindings(StringBuilder comment, ReviewResult result)
     {
