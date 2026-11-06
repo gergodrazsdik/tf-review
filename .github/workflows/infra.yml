@@ -13,6 +13,9 @@ on:
   # To deploy what bootstrap changed, such as the allowlist after a repo is onboarded (D40). The prod environment
   # only takes main, and still waits for your approval.
   workflow_dispatch:
+  # Weekly drift check: the plan of main fails when Azure no longer matches it.
+  schedule:
+    - cron: "17 6 * * 1"
 
 permissions:
   contents: read
@@ -39,8 +42,55 @@ jobs:
       pull-requests: write
     secrets: inherit
 
-  apply:
+  # Plans main with the plan identity, so the approval below comes after a plan you can read in this job's log, and
+  # the apply does exactly that plan. The plan file is encrypted with the state key (D59), so its artifact is too.
+  plan-main:
     if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID_PLAN }}
+    outputs:
+      changes: ${{ steps.plan.outputs.changes }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: 1.13.2
+          tofu_wrapper: false
+      - name: Init
+        run: scripts/tofu-init.sh
+      - name: Plan
+        id: plan
+        # Without the lock, like PR plans (D48): the apply takes it, and refuses this plan if the state moved since.
+        run: |
+          status=0
+          tofu -chdir=infra plan -input=false -no-color -lock=false -detailed-exitcode -out=main.tfplan || status=$?
+          case $status in
+            0) echo "changes=false" >>"$GITHUB_OUTPUT" ;;
+            2) echo "changes=true" >>"$GITHUB_OUTPUT" ;;
+            *) exit "$status" ;;
+          esac
+      - name: Fail on drift
+        if: github.event_name == 'schedule' && steps.plan.outputs.changes == 'true'
+        run: |
+          echo "::error::infra/ has drifted from main, or main has changes nobody applied. The plan above shows which."
+          exit 1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.plan.outputs.changes == 'true' && github.event_name != 'schedule'
+        with:
+          name: main-tfplan
+          path: infra/main.tfplan
+          retention-days: 1
+          if-no-files-found: error
+
+  apply:
+    needs: plan-main
+    if: needs.plan-main.outputs.changes == 'true' && github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     environment: prod
     concurrency:
@@ -61,5 +111,9 @@ jobs:
           tofu_wrapper: false
       - name: Init
         run: scripts/tofu-init.sh
-      - name: Apply
-        run: tofu -chdir=infra apply -input=false -auto-approve -lock-timeout=5m
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: main-tfplan
+          path: infra
+      - name: Apply the plan
+        run: tofu -chdir=infra apply -input=false -lock-timeout=5m main.tfplan

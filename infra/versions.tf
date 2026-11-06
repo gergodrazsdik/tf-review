@@ -37,6 +37,12 @@ terraform {
       method   = method.aes_gcm.state
       enforced = true
     }
+
+    # Plan files too: the apply path passes one between jobs as an artifact, and it holds state values.
+    plan {
+      method   = method.aes_gcm.state
+      enforced = true
+    }
   }
 }
 

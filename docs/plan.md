@@ -383,7 +383,7 @@ One storage account holds every repo's state, created once by a bootstrap projec
 
 | Identity | Federated subject | Rights |
 | --- | --- | --- |
-| Plan | `repo:<owner>@<owner-id>/<repo>@<repo-id>:pull_request` | Reader on the target scope, Blob Data Reader on its own state container (it plans without the lock, D48), and Crypto User on its state key (D59) |
+| Plan | `repo:<owner>@<owner-id>/<repo>@<repo-id>:pull_request`, and `...:ref:refs/heads/main` for the plan before an apply | Reader on the target scope, Blob Data Reader on its own state container (it plans without the lock, D48), and Crypto User on its state key (D59) |
 | Apply | `repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:prod` | Write on the target scope, gated by environment approval |
 | Evals (`tf-review` only, from M3) | `repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:review` | Cognitive Services OpenAI User on the Foundry resource group, and from M3 reading the `tfreview` database for the live evals with references (D21, D24). Until M3 each repo had one for its review job |
 | Reviewer submit (M3) | No Azure identity: the API checks the GitHub OIDC token itself (D45) | Call the review API only |
@@ -490,15 +490,16 @@ Review job (no PR code, `review` environment, holds the review identity; not a r
 
 **Apply path (consumer workflow)**
 
-- Trigger on merge to `main`; job uses environment `prod` with you as required reviewer
-- Re-plan and apply, or apply the reviewed plan file if state is unchanged (Terraform refuses a stale plan)
+- Trigger on merge to `main`. A `plan-main` job plans `main` with the plan identity, which has a federated credential for `main` too, and prints the plan to its log. The `apply` job, in environment `prod` with you as required reviewer, applies exactly that plan file, so you approve a plan you can read rather than whatever `main` produces at apply time. OpenTofu refuses the file if the state moved since
+- The plan file goes from one job to the next as a 1-day artifact. It holds state values, so the `encryption` block encrypts plans as well as state with the repo's state key (D59), enforced, and only that repo's plan and apply identities can read it
+- A weekly scheduled run of `plan-main` fails when the plan isn't empty, which catches drift and changes nobody applied
 - `concurrency` group per state key, `cancel-in-progress: false`
 
 **Repo settings (public repos)**
 
 - Third-party actions pinned to full commit SHAs with `pinact`; a `lint` job runs `just lint` (which includes `actionlint`) and, where a repo has OpenTofu code, `just validate`
 - Require approval for workflow runs from outside collaborators; never `pull_request_target`
-- No raw plan files as artifacts or in PR comments; the only plan artifact is the redacted one with 1-day retention (D21); mark sensitive variables `sensitive` so logs stay clean
+- No raw plan files as artifacts or in PR comments. A PR's only plan artifact is the redacted one with 1-day retention (D21); the apply path's plan file is encrypted with the state key (D59). Mark sensitive variables `sensitive` so logs stay clean
 - Rulesets from `.github/rulesets/main.json` (see Setup); the review check stays advisory until M4
 - `tf-review-demo` and `tf-standards` are template repositories
 - Repos are public, so other repos call `tf-review`'s reusable workflow without extra access settings

@@ -130,6 +130,17 @@ resource "azurerm_federated_identity_credential" "plan" {
   subject                   = "${local.github_oidc_subject[each.key]}:pull_request"
 }
 
+# Plans main before an apply, and weekly for drift, so the apply's approval comes after a plan you can read.
+resource "azurerm_federated_identity_credential" "plan_main" {
+  for_each = var.repos
+
+  name                      = "github-main"
+  user_assigned_identity_id = azurerm_user_assigned_identity.plan[each.key].id
+  audience                  = ["api://AzureADTokenExchange"]
+  issuer                    = local.github_oidc_issuer
+  subject                   = "${local.github_oidc_subject[each.key]}:ref:refs/heads/main"
+}
+
 resource "azurerm_federated_identity_credential" "apply" {
   for_each = var.repos
 
