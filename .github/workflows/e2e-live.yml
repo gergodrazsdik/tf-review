@@ -6,9 +6,17 @@ name: e2e-live
 on:
   pull_request:
     paths:
+      # Everything the eval's reviews run through, and what builds it: which docs an agent sees (Rag), what the
+      # scanners report (Scanners), the reference retriever (Service), and the SDK and package versions.
       - "prompts/**"
       - "src/TfReview.Agents/**"
       - "src/TfReview.Core/**"
+      - "src/TfReview.Rag/**"
+      - "src/TfReview.Scanners/**"
+      - "src/TfReview.Service/**"
+      - "Directory.Packages.props"
+      - "Directory.Build.props"
+      - "global.json"
       - "tests/TfReview.Eval/**"
       - "tests/fixtures/cases/**"
       - ".github/workflows/e2e-live.yml"
@@ -47,8 +55,9 @@ jobs:
     concurrency:
       group: model-evals
       cancel-in-progress: false
-    # 85 reviews took about 13 minutes, and about 36 with references, which add a search and a re-ranking per agent.
-    # With 21 cases, 105 reviews take about 45 minutes with references.
+    # Without references, the 155 reviews of 31 cases took 5 to 20 minutes on 2026-11-04 to 11-06. No full run with
+    # references per finding has been timed here; per agent, 85 reviews took about 36 minutes, which would be about
+    # 66 for 155, so time the next run with references against this limit.
     timeout-minutes: 70
     permissions:
       contents: read
