@@ -26,7 +26,8 @@ internal enum RedactionLayers
 /// <item>Replaces marked values, and values under secret-like names, with placeholders.</item>
 /// <item>Sweeps harvested values out of everything else, including keys and base64 or URL-encoded forms.</item>
 /// <item>Replaces GUIDs in changes, because resource IDs hold subscription and tenant IDs, and this plan
-/// reaches a public artifact and could be quoted in a public comment.</item>
+/// reaches a public artifact and could be quoted in a public comment. The broad built-in roles' IDs stay, because they're
+/// public constants that POL-003 checks for.</item>
 /// <item>Re-scans the result, and refuses the plan if any harvested value survived.</item>
 /// </list>
 /// Anything malformed refuses the plan. Known gaps: an unmarked secret under an ordinary name passes, and so
@@ -48,6 +49,19 @@ public sealed class PlanRedactor
 
     private static readonly Regex Guid = new(
         @"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Azure's built-in role definition IDs, which are the same in every tenant and public, so they identify no one.
+    /// POL-003 matches broad roles granted by ID, which a placeholder would hide.
+    /// </summary>
+    private static readonly HashSet<string> BuiltInRoles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "8e3af657-a8ff-443c-a75c-2fe8c4bcb635", // Owner
+        "b24988ac-6180-42a0-ab88-20f7382dd24c", // Contributor
+        "acdd72a7-3385-48ef-bd42-f606fba81ae7", // Reader
+        "18d7d88d-d35e-4fb5-a5c3-7773c4a72b09", // User Access Administrator
+        "f58310d9-a9f6-439a-9e8d-f62e7b41a168", // Role Based Access Control Administrator
+    };
 
     private static readonly string[] SecretNames =
     [
@@ -501,7 +515,9 @@ public sealed class PlanRedactor
     }
 
     private static string MaskGuids(string text, Scope scope) =>
-        Guid.Replace(text, match => scope.PlaceholderFor(match.Value.ToLowerInvariant()));
+        Guid.Replace(text, match => BuiltInRoles.Contains(match.Value)
+            ? match.Value
+            : scope.PlaceholderFor(match.Value.ToLowerInvariant()));
 
     private string Sweep(string text, List<SecretForm> forms, Scope scope)
     {

@@ -409,6 +409,25 @@ public class PlanRedactorTests
         await Assert.That(json).Contains("keep-me");
     }
 
+    // POL-003 matches broad roles granted by ID. These IDs are public and the same in every tenant, so they stay, while
+    // the subscription in the same value is still masked.
+    [Test]
+    [Arguments("8e3af657-a8ff-443c-a75c-2fe8c4bcb635")]
+    [Arguments("18D7D88D-D35E-4FB5-A5C3-7773C4A72B09")]
+    public async Task Keeps_the_broad_built_in_role_ids(string role)
+    {
+        var assignment = $$"""
+            {"address":"azurerm_role_assignment.a","type":"azurerm_role_assignment","change":{"actions":["create"],"before":null,
+            "after":{"role_definition_id":"/subscriptions/{{SubscriptionId}}/providers/Microsoft.Authorization/roleDefinitions/{{role}}"},
+            "after_unknown":{},"before_sensitive":{},"after_sensitive":{} } }
+            """;
+
+        var json = RedactedJson(PlanOf(assignment));
+
+        await Assert.That(json).Contains($"/roleDefinitions/{role}");
+        await Assert.That(json).DoesNotContain(SubscriptionId);
+    }
+
     // Otherwise an unchanged ID would look like a change.
     [Test]
     public async Task An_unchanged_guid_gets_the_same_placeholder_on_both_sides()
