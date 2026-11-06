@@ -62,8 +62,10 @@ resource "azurerm_monitor_scheduled_query_rules_alert_v2" "log_cap" {
   }
 }
 
-# A review takes minutes, so a message still on the queue hours later means the job isn't taking it: a bad image, an
-# environment that can't start, or a scaling rule that stopped firing.
+# A review takes minutes, so messages on the queue for hours mean the job isn't taking them: a bad image, an
+# environment that can't start, or a scaling rule that stopped firing. Azure reports the queue's length about hourly
+# and only as an average, so this needs it at one or more on average over six hours, which one review in flight
+# when a sample is taken can't reach.
 resource "azurerm_monitor_metric_alert" "queue_stuck" {
   name                = "alert-tf-review-queue-stuck-prod"
   resource_group_name = data.azurerm_resource_group.target.name
@@ -77,9 +79,9 @@ resource "azurerm_monitor_metric_alert" "queue_stuck" {
   criteria {
     metric_namespace = "Microsoft.Storage/storageAccounts/queueServices"
     metric_name      = "QueueMessageCount"
-    aggregation      = "Minimum"
-    operator         = "GreaterThan"
-    threshold        = 0
+    aggregation      = "Average"
+    operator         = "GreaterThanOrEqual"
+    threshold        = 1
   }
 
   action {
