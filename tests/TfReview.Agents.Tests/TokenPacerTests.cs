@@ -7,6 +7,27 @@ public class TokenPacerTests
 {
     private static readonly DateTimeOffset Start = new(2026, 11, 5, 12, 0, 0, TimeSpan.Zero);
 
+    // MNT-11, OPS-5: several jobs share one deployment, so each review's budget comes from infra.
+    [Test]
+    [Arguments(null, null)]
+    [Arguments("", null)]
+    [Arguments("30000", 30_000)]
+    [Arguments("1000", null)]
+    [Arguments("-30000", null)]
+    [Arguments("lots", null)]
+    public async Task A_budget_comes_from_the_variable_when_its_a_sensible_number(string? value, int? expected)
+    {
+        await Assert.That(TokenPacer.ParseBudget(value)).IsEqualTo(expected);
+    }
+
+    // BUG-10: the fallback model has half the capacity, and pacing it at the main one's budget brings back the 429s.
+    [Test]
+    public async Task The_fallback_model_gets_its_own_default()
+    {
+        await Assert.That(new ReviewModel(new FakeChat(), "gpt-5.4-mini").TokensPerMinute).IsEqualTo(TokenPacer.FallbackTokensPerMinute);
+        await Assert.That(new ReviewModel(new FakeChat(), "gpt-6.1-sol").TokensPerMinute).IsEqualTo(TokenPacer.DefaultTokensPerMinute);
+    }
+
     [Test]
     public async Task A_call_that_fits_goes_now()
     {

@@ -6,7 +6,32 @@ using TfReview.Scanners;
 namespace TfReview.Agents;
 
 /// <summary>The model the agents call, and the deployment name reported in the usage.</summary>
-public sealed record ReviewModel(IChatClient Chat, string Deployment);
+public sealed record ReviewModel(IChatClient Chat, string Deployment)
+{
+    /// <summary>The variable naming one review's tokens-per-minute budget, which TokenPacer keeps under (D54).</summary>
+    public const string TokensPerMinuteVariable = "TF_REVIEW_TOKENS_PER_MINUTE";
+
+    /// <summary>One review's TPM budget: its share of the deployment's capacity (D54).</summary>
+    public int TokensPerMinute { get; init; } = TokenPacer.DefaultFor(Deployment);
+
+    /// <summary>
+    /// The model from the environment, or null when none is configured, which the agents report as not reviewed.
+    /// </summary>
+    public static ReviewModel? FromEnvironment()
+    {
+        var endpoint = Environment.GetEnvironmentVariable("TF_REVIEW_OPENAI_ENDPOINT");
+        var deployment = Environment.GetEnvironmentVariable("TF_REVIEW_OPENAI_DEPLOYMENT");
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) || string.IsNullOrEmpty(deployment))
+        {
+            return null;
+        }
+
+        var model = new ReviewModel(LlmClient.Create(uri, deployment), deployment);
+        return TokenPacer.ParseBudget(Environment.GetEnvironmentVariable(TokensPerMinuteVariable)) is { } budget
+            ? model with { TokensPerMinute = budget }
+            : model;
+    }
+}
 
 /// <summary>
 /// Where reference material goes. Per finding is the default (D50): per agent stays for the evals, which compare the two.
@@ -105,7 +130,7 @@ public sealed class ReviewRunner(
 
             // Every model role goes through this, so each can reuse an answer to exactly the same input (D53), and the
             // review's calls share one TPM budget (D54). Neither is disposed: the model client underneath is shared.
-            IChatClient? chat = model is null ? null : new TokenPacer(model.Chat);
+            IChatClient? chat = model is null ? null : new TokenPacer(model.Chat, model.TokensPerMinute);
             if (chat is not null && answers is not null && repositoryId is not null)
             {
                 chat = new AnswerCache(chat, answers, repositoryId, model!.Deployment, log);

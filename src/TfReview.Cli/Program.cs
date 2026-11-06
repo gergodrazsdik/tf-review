@@ -77,7 +77,7 @@ static async Task<int> Review(string redactedPath, string configPath, string out
         var runner = new ReviewRunner(
             new GitHubTarballSource(http),
             new ConftestRunner(new ProcessRunner()),
-            ModelFromEnvironment(),
+            ReviewModel.FromEnvironment(),
             log: Console.WriteLine,
 
             // Without a token a scan waits forever for a login.
@@ -170,16 +170,6 @@ static async Task<int> Submit(string redactedPath, string commit, string configP
         Task.Delay,
         Console.WriteLine);
     return await submitter.SubmitAsync(plan, commit, configPath, workingDirectory) ? 0 : 1;
-}
-
-// No model configured means the agent reports "not reviewed", rather than the whole review failing.
-static ReviewModel? ModelFromEnvironment()
-{
-    var endpoint = Environment.GetEnvironmentVariable("TF_REVIEW_OPENAI_ENDPOINT");
-    var deployment = Environment.GetEnvironmentVariable("TF_REVIEW_OPENAI_DEPLOYMENT");
-    return Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) && !string.IsNullOrEmpty(deployment)
-        ? new ReviewModel(LlmClient.Create(uri, deployment), deployment)
-        : null;
 }
 
 // A missing file is expected when an earlier job failed.

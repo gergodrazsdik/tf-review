@@ -68,7 +68,7 @@ public static class WorkerHost
             return runner = new ReviewRunner(
                 new GitHubTarballSource(standardsHttp),
                 new ConftestRunner(new ProcessRunner()),
-                Model(),
+                ReviewModel.FromEnvironment(),
                 log: Console.WriteLine,
                 infracost: await InfracostAsync(Secrets(), cancellationToken),
                 checkov: new CheckovRunner(new ProcessRunner()),
@@ -128,16 +128,6 @@ public static class WorkerHost
 
         return new CosmosReferenceRetriever(
             cosmos.GetContainer(Database, "references"), AzureQueryEmbedder.Create(uri, deployment, new DefaultAzureCredential()));
-    }
-
-    // No model configured means the agents report "not reviewed", rather than the whole review failing.
-    private static ReviewModel? Model()
-    {
-        var endpoint = Environment.GetEnvironmentVariable("TF_REVIEW_OPENAI_ENDPOINT");
-        var deployment = Environment.GetEnvironmentVariable("TF_REVIEW_OPENAI_DEPLOYMENT");
-        return Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) && !string.IsNullOrEmpty(deployment)
-            ? new ReviewModel(LlmClient.Create(uri, deployment), deployment)
-            : null;
     }
 
     private static string Required(string name) => Environment.GetEnvironmentVariable(name) is { Length: > 0 } value
