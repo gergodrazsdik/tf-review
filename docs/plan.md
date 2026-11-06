@@ -230,7 +230,7 @@ Containerfile
 - **Auth**: `DefaultAzureCredential` everywhere: `az login` locally, OIDC in CI, managed identity in Azure; key auth disabled on Foundry and Cosmos
 - **LLM client**: `OpenAIClient` with `BearerTokenPolicy` (scope `https://ai.azure.com/.default`) on the resource's `/openai/v1/` endpoint, exposed as `IChatClient`; no `Azure.AI.OpenAI` package. That constructor is experimental, so `OPENAI001` is suppressed for it
 - **Config**: `appsettings.json` and environment for the service; `.tf-review.yml` per repo for enabled agents, thresholds, gate mode and the `tf-standards` commit, read from the PR's base commit (D27)
-- **Observability**: OpenTelemetry traces and metrics to App Insights: tokens, cached tokens, latency and cost per agent call, findings per agent, evidence-check drops
+- **Observability**: OpenTelemetry traces and metrics to App Insights: tokens, cached tokens, latency and cost per agent call, findings per agent, evidence-check drops, and reviews the worker gave up on (`tfreview.give_ups`)
 - **PR output**: one sticky comment per PR (hidden marker), rewritten on each push: verdict line, monthly cost delta, a table by severity, collapsible details per resource with links to the cited `tf-standards` docs at the pinned commit
 - **Check run** `tf-review`: neutral in advisory mode, failure only for opted-in blocking findings (D55); a failed review reports itself with a link to the logs and never blocks in advisory mode
 
@@ -711,6 +711,10 @@ Work runs in this order, so the unknowns surface before anything depends on them
 - Fix suggestions as GitHub suggested changes
 - [x] OpenTofu state encryption with a key held in Key Vault (D59). Done 2026-11-06: bootstrap made the vault and keys (#122); tf-review #124, demo #53 and demo2 #2 added the `encryption` block, and their applies rewrote each state encrypted (the blobs hold only `encrypted_data`, `encryption_version`, `meta`, `lineage` and `serial`); this change removes the fallback and sets `enforced = true`. The key provider reads `use_oidc` only from its block, not from `ARM_USE_OIDC`, so the block sets it; a laptop falls through to the Azure CLI. The plaintext state versions blob versioning kept go through bootstrap's lifecycle rule, which deletes previous state versions a day after they're superseded; deleting them by hand failed with `OperationNotAllowedOnAutomaticSnapshot`, and soft delete still keeps a deleted version restorable for 30 days
 - Self-hosted Infracost pricing, which also switches off its telemetry, before any client repo is onboarded
+
+**Service fixes from the 2026-11-06 review** (`docs/reviews/2026-11-06/findings.md`)
+
+- [x] The worker sets itself up after it takes a message: the App's key, the Infracost token and the clients. A Key Vault, secret or setting fault fails a try of that message and ends in "not reviewed" after 3, instead of crashing every execution while the message waits a week. A missing Infracost token costs only the cost scope. Without the App the give-up still marks the review failed, finishes the message and logs `ERROR`. Every give-up counts in `tfreview.give_ups` (`repository`, `cause`, `posted`), for an alert, and a give-up for a commit that's no longer the head posts nothing (OPS-1, MNT-12, BUG-1, MNT-3)
 
 ## Evaluation
 

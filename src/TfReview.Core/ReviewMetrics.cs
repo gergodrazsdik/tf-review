@@ -22,6 +22,14 @@ public static class ReviewMetrics
     private static readonly Counter<long> EvidenceDrops = Meter.CreateCounter<long>("tfreview.evidence_drops", "{finding}");
     private static readonly Counter<long> NotReviewedScopes = Meter.CreateCounter<long>("tfreview.not_reviewed", "{scope}");
     private static readonly Counter<long> Dismissals = Meter.CreateCounter<long>("tfreview.dismissals", "{finding}");
+    private static readonly Counter<long> GiveUps = Meter.CreateCounter<long>("tfreview.give_ups", "{review}");
+
+    /// <summary>
+    /// A review the worker gave up on after its tries (D39), which an alert can fire on. The cause is a fixed word or an
+    /// exception's type name, and posted says whether the PR was told.
+    /// </summary>
+    public static void RecordGiveUp(string repository, string cause, bool posted) =>
+        GiveUps.Add(1, new TagList { { "repository", repository }, { "cause", cause }, { "posted", posted } });
 
     /// <summary>A finding a reviewer ticked as wrong (D56), by rule only: never the resource or any plan text.</summary>
     public static void RecordDismissal(string? rule, string repository) =>

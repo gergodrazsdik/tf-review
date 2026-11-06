@@ -54,7 +54,7 @@ public sealed class ReviewWorker(
         if (message.DequeueCount > MaxAttempts)
         {
             log($"Review {job.ReviewId} has used up its tries.");
-            await this.GiveUpAsync(job, message);
+            await this.GiveUpAsync(job, message, NotReviewedReason.Unavailable, "tries_used_up");
             return 1;
         }
 
@@ -75,11 +75,14 @@ public sealed class ReviewWorker(
         }
         catch (Exception e)
         {
-            // Only the type, because a message could quote the plan or a model's answer.
+            // Only the type, because a message could quote the plan or a model's answer. This also catches the job's own
+            // setup, such as reading the App's key, which happens after the message is taken, so that it counts as a try
+            // and ends in "not reviewed" like any other failure (D39).
             log($"Review {job.ReviewId} failed on try {message.DequeueCount}: {e.GetType().Name}.");
             if (message.DequeueCount >= MaxAttempts)
             {
-                await this.GiveUpAsync(job, message);
+                var reason = e is OperationCanceledException ? NotReviewedReason.Timeout : NotReviewedReason.Unavailable;
+                await this.GiveUpAsync(job, message, reason, e.GetType().Name);
             }
 
             return 1;
@@ -129,29 +132,50 @@ public sealed class ReviewWorker(
             return this.Status(job, ReviewState.Superseded);
         }
 
-        ReviewMetrics.RecordResult(result, job.Repository);
         await PostAsync(session, job, result, Counts(plan), cancellationToken);
+
+        // After posting, so a post that fails and comes back as a retry isn't counted twice.
+        ReviewMetrics.RecordResult(result, job.Repository);
         return this.Status(job, ReviewState.Done) with { Verdict = VerdictName(result) };
     }
 
-    // Its own time, because it may be here since the job's deadline passed. Each step can fail by itself.
-    private async Task GiveUpAsync(ReviewJob job, ReceivedJob message)
+    // Its own time, because it may be here since the job's deadline passed. Each step can fail by itself. The cause is a
+    // fixed word or an exception's type name, for the log and the metric.
+    private async Task GiveUpAsync(ReviewJob job, ReceivedJob message, NotReviewedReason reason, string cause)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(50));
         var cancellationToken = timeout.Token;
+        var state = ReviewState.Failed;
+        var posted = false;
         try
         {
             await using var session = await open(job.Repository, cancellationToken);
-            await PostAsync(session, job, ReviewResult.Failed(job.Commit, ReviewScope.Plan, NotReviewedReason.Unavailable), null, cancellationToken);
+
+            // Like a review, a give-up for an older commit mustn't replace what a newer push posted.
+            if ((await session.ReadPullRequestAsync(job.PullRequest, cancellationToken)).Head != job.Commit)
+            {
+                state = ReviewState.Superseded;
+            }
+            else
+            {
+                await PostAsync(session, job, ReviewResult.Failed(job.Commit, ReviewScope.Plan, reason), null, cancellationToken);
+                posted = true;
+            }
         }
         catch (Exception e)
         {
-            log($"Couldn't post that review {job.ReviewId} failed: {e.GetType().Name}.");
+            // Nothing reaches the PR, which then shows nothing for this commit, so this has to stand out.
+            log($"ERROR: review {job.ReviewId} gave up, and couldn't say so on the PR: {e.GetType().Name}.");
+        }
+
+        if (state == ReviewState.Failed)
+        {
+            ReviewMetrics.RecordGiveUp(job.Repository, cause, posted);
         }
 
         try
         {
-            await statuses.WriteAsync(this.Status(job, ReviewState.Failed), cancellationToken);
+            await statuses.WriteAsync(this.Status(job, state), cancellationToken);
         }
         catch (Exception e)
         {

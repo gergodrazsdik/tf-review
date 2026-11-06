@@ -307,6 +307,89 @@ public class ReviewWorkerTests
         await Assert.That(world.Statuses.Last.State).IsEqualTo(ReviewState.Failed);
     }
 
+    // OPS-1: setup such as reading the App's key happens after the message is taken, so it fails a try like a review does.
+    [Test]
+    public async Task A_setup_failure_counts_as_a_try()
+    {
+        var world = new World { Attempt = 1 };
+        world.OpenThrows = new InvalidOperationException("Key Vault is down");
+
+        await Assert.That(await world.RunAsync()).IsEqualTo(1);
+
+        await Assert.That(world.Completed).IsFalse();
+        await Assert.That(world.Engine.Calls).IsEqualTo(0);
+    }
+
+    // OPS-1: with no App to post through, the review still ends, loudly, and is counted as given up.
+    [Test]
+    public async Task A_setup_failure_on_the_last_try_gives_up_loudly()
+    {
+        using var measured = new Measured("tfreview.give_ups");
+        var world = new World { Attempt = ReviewWorker.MaxAttempts, Queued = Job with { Repository = "owner/setup-fails" } };
+        world.OpenThrows = new InvalidOperationException("Key Vault is down");
+
+        await Assert.That(await world.RunAsync()).IsEqualTo(1);
+
+        await Assert.That(world.Completed).IsTrue();
+        await Assert.That(world.Statuses.Last.State).IsEqualTo(ReviewState.Failed);
+        await Assert.That(world.Log.Any(line => line.StartsWith("ERROR: review review1 gave up", StringComparison.Ordinal))).IsTrue();
+        var giveUp = measured.For("owner/setup-fails").Single();
+        await Assert.That(giveUp["cause"]).IsEqualTo("InvalidOperationException");
+        await Assert.That(giveUp["posted"] is false).IsTrue();
+    }
+
+    [Test]
+    public async Task A_give_up_is_counted_with_its_cause()
+    {
+        using var measured = new Measured("tfreview.give_ups");
+        var world = new World { Attempt = ReviewWorker.MaxAttempts + 1, Queued = Job with { Repository = "owner/used-up" } };
+
+        await world.RunAsync();
+
+        var giveUp = measured.For("owner/used-up").Single();
+        await Assert.That(giveUp["cause"]).IsEqualTo("tries_used_up");
+        await Assert.That(giveUp["posted"] is true).IsTrue();
+    }
+
+    // BUG-1: a newer push has had its own review, which a give-up for this commit mustn't replace.
+    [Test]
+    public async Task A_give_up_for_a_commit_no_longer_at_the_head_posts_nothing()
+    {
+        var world = new World { Attempt = ReviewWorker.MaxAttempts + 1 };
+        world.GitHub.Heads.Enqueue(Newer);
+
+        await Assert.That(await world.RunAsync()).IsEqualTo(1);
+
+        await Assert.That(world.GitHub.Comments).IsEmpty();
+        await Assert.That(world.GitHub.CheckRuns).IsEmpty();
+        await Assert.That(world.Completed).IsTrue();
+        await Assert.That(world.Statuses.Last.State).IsEqualTo(ReviewState.Superseded);
+    }
+
+    [Test]
+    public async Task Running_out_of_time_says_so()
+    {
+        var world = new World { Attempt = ReviewWorker.MaxAttempts };
+        world.Engine.Throws = new OperationCanceledException();
+
+        await world.RunAsync();
+
+        await Assert.That(world.GitHub.Comments.Single()).Contains("timed out");
+    }
+
+    // A post that fails comes back as a retry, which mustn't count the review again.
+    [Test]
+    public async Task A_review_whose_post_fails_isnt_counted()
+    {
+        using var measured = new Measured("tfreview.reviews");
+        var world = new World { Queued = Job with { Repository = "owner/post-fails" } };
+        world.GitHub.FailWrites = true;
+
+        await world.RunAsync();
+
+        await Assert.That(measured.For("owner/post-fails")).IsEmpty();
+    }
+
     // GitHub is the thing that's down: there's nowhere to say so, but the queue mustn't keep it forever.
     [Test]
     public async Task The_last_try_still_finishes_when_it_cant_post()
@@ -441,6 +524,9 @@ public class ReviewWorkerTests
 
         public bool Unreadable { get; set; }
 
+        /// <summary>What opening the repo throws, like a setup failure such as reading the App's key.</summary>
+        public Exception? OpenThrows { get; set; }
+
         public int Attempt { get; init; } = 1;
 
         public bool Completed { get; private set; }
@@ -464,8 +550,10 @@ public class ReviewWorkerTests
                 new FakeQueue(this),
                 this.Plans,
                 this.Statuses,
-                (repository, _) => Task.FromResult(new RepositorySession(
-                    new HttpClient(this.GitHub) { BaseAddress = new Uri("https://api.example.test/") }, repository)),
+                (repository, _) => this.OpenThrows is { } failure
+                    ? throw failure
+                    : Task.FromResult(new RepositorySession(
+                        new HttpClient(this.GitHub) { BaseAddress = new Uri("https://api.example.test/") }, repository)),
                 this.Engine.RunAsync,
                 this.Log.Add,
                 new FixedTime(this.Now));
@@ -580,7 +668,7 @@ public class ReviewWorkerTests
             {
                 return path switch
                 {
-                    "/repos/owner/repo/pulls/7" => Json(new JsonObject
+                    _ when path.EndsWith("/pulls/7", StringComparison.Ordinal) => Json(new JsonObject
                     {
                         ["head"] = new JsonObject { ["sha"] = this.Heads.Count > 0 ? this.Heads.Dequeue() : Head },
                         ["base"] = new JsonObject { ["sha"] = Base },
@@ -622,5 +710,41 @@ public class ReviewWorkerTests
         {
             Content = new StringContent(json, Encoding.UTF8, "application/json"),
         };
+    }
+
+    /// <summary>
+    /// What one instrument records while it lives. Tests run in parallel, so each looks only at its own repository's.
+    /// </summary>
+    private sealed class Measured : IDisposable
+    {
+        private readonly MeterListener listener = new();
+        private readonly ConcurrentQueue<Dictionary<string, object?>> measurements = new();
+
+        public Measured(string instrumentName)
+        {
+            this.listener.InstrumentPublished = (instrument, meters) =>
+            {
+                if (instrument.Name == instrumentName)
+                {
+                    meters.EnableMeasurementEvents(instrument);
+                }
+            };
+            this.listener.SetMeasurementEventCallback<long>((_, value, tags, _) =>
+            {
+                var measurement = new Dictionary<string, object?>(StringComparer.Ordinal) { ["value"] = value };
+                foreach (var tag in tags)
+                {
+                    measurement[tag.Key] = tag.Value;
+                }
+
+                this.measurements.Enqueue(measurement);
+            });
+            this.listener.Start();
+        }
+
+        public List<Dictionary<string, object?>> For(string repository) =>
+            [.. this.measurements.Where(measurement => Equals(measurement.GetValueOrDefault("repository"), repository))];
+
+        public void Dispose() => this.listener.Dispose();
     }
 }
