@@ -88,6 +88,11 @@ eval-retrieval report="":
 service-eval *args:
     python3 scripts/service_eval.py {{ args }}
 
+# Merge a PR by fast-forwarding main to its head, after checking its required checks and signatures; works in every repo
+[group('release')]
+merge pr:
+    scripts/ff-merge.sh {{ pr }}
+
 # Draft negative eval cases from findings dismissed on the demo's PRs (D56) into a folder outside the repo; run it outside the Claude sandbox
 [group('dev')]
 feedback-cases out:
