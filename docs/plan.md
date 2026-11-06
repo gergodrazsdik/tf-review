@@ -726,6 +726,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 - [x] The result cache's key includes the model version from `TF_REVIEW_OPENAI_MODEL_VERSION`, so a version changed in place doesn't serve the old model's answers for a week (D53; BUG-9). **You:** set it in `infra/apps.tf` from the deployment's `model.version`
 - [x] Model input is bounded: the suggester searches and calls for at most 15 findings a review, 4 at a time; the orchestrator is sent the 300 riskiest changes by the rules; and over 150 findings the arbiter keeps the rules' result without a call (SEC-5, OPS-13)
 - [x] A hard daily stop on model spend, and the API's rate limit kept in Cosmos so scaling to zero doesn't reset it (D62; SEC-5, OPS-3 in part). **You:** set `TF_REVIEW_DAILY_BUDGET_USD` on the job in `infra/apps.tf` if $5 isn't right
+- [x] Tokens that aren't valid are counted in one log line every 5 minutes at most, rather than a line each, so a flood can't fill the 0.2 GB daily log cap (SEC-7 in part; `/healthz` keeping the API awake is infra's)
 
 ## Evaluation
 

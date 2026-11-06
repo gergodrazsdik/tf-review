@@ -29,6 +29,9 @@ public static partial class ReviewApi
 {
     private const string RefusedPlan = """{"refused":true}""";
 
+    /// <summary>How often refused tokens are counted in the log, rather than a line each (SEC-7).</summary>
+    private static readonly TimeSpan RefusalLogPeriod = TimeSpan.FromMinutes(5);
+
     /// <summary>An hour's count outlives its hour, then expires by itself.</summary>
     private static readonly TimeSpan RateWindowLife = TimeSpan.FromHours(2);
 
@@ -57,6 +60,8 @@ public static partial class ReviewApi
     public static void MapReviews(this WebApplication app, ApiOptions options, GitHubTokens tokens, ServiceStores stores)
     {
         var logger = app.Logger;
+        var refusals = new RefusalLog(
+            count => logger.LogInformation("Refused {Count} token(s) that aren't valid since the last count.", count), RefusalLogPeriod);
         var limiter = PartitionedRateLimiter.Create<string, string>(repository => RateLimitPartition.GetFixedWindowLimiter(
             repository,
             _ => new FixedWindowRateLimiterOptions { PermitLimit = options.ReviewsPerHour, Window = TimeSpan.FromHours(1) }));
@@ -65,7 +70,7 @@ public static partial class ReviewApi
 
         app.MapPost("/reviews", async (HttpContext context) =>
         {
-            var decision = await AuthenticateAsync(context, options, tokens, logger);
+            var decision = await AuthenticateAsync(context, options, tokens, logger, refusals);
             if (decision.Failure is { } failure)
             {
                 return failure;
@@ -94,7 +99,7 @@ public static partial class ReviewApi
 
         app.MapGet("/reviews/{id}", async (string id, HttpContext context) =>
         {
-            var decision = await AuthenticateAsync(context, options, tokens, logger);
+            var decision = await AuthenticateAsync(context, options, tokens, logger, refusals);
             if (decision.Failure is { } failure)
             {
                 return failure;
@@ -159,7 +164,7 @@ public static partial class ReviewApi
     }
 
     private static async Task<(Caller? Caller, IResult? Failure)> AuthenticateAsync(
-        HttpContext context, ApiOptions options, GitHubTokens tokens, ILogger logger)
+        HttpContext context, ApiOptions options, GitHubTokens tokens, ILogger logger, RefusalLog refusals)
     {
         var header = context.Request.Headers.Authorization.ToString();
         if (!header.StartsWith("Bearer ", StringComparison.Ordinal))
@@ -169,7 +174,7 @@ public static partial class ReviewApi
 
         if (await tokens.ValidateAsync(header["Bearer ".Length..]) is not { } claims)
         {
-            logger.LogInformation("Refused a token that isn't valid.");
+            refusals.Refused();
             return (null, Results.Unauthorized());
         }
 
