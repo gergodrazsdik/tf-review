@@ -154,7 +154,18 @@ public class ReviewRunnerCostTests
         var result = await RunSecurity(new FakeProcesses("""{"passed":0,"failed":0,"resource_count":0}"""));
 
         await Assert.That(result.Verdict).IsEqualTo(Verdict.NoFindings);
-        await Assert.That(result.NotReviewed.Single()).IsEqualTo(new NotReviewed(ReviewScope.Security, NotReviewedReason.ScannerFailed));
+        await Assert.That(result.NotReviewed[0]).IsEqualTo(new NotReviewed(ReviewScope.Security, NotReviewedReason.ScannerFailed));
+    }
+
+    // MNT-13: a failed scanner sits beside the security agent's own entry rather than hiding it, here no model to call.
+    [Test]
+    public async Task A_failed_checkov_scan_keeps_the_security_agents_own_entry()
+    {
+        var result = await RunSecurity(new FakeProcesses("""{"passed":0,"failed":0,"resource_count":0}"""));
+
+        await Assert.That(result.NotReviewed.Count).IsEqualTo(2);
+        await Assert.That(result.NotReviewed.All(missing => missing.Scope == ReviewScope.Security)).IsTrue();
+        await Assert.That(result.NotReviewed[1].Reason).IsNotEqualTo(NotReviewedReason.ScannerFailed);
     }
 
     private static Task<ReviewResult> RunSecurity(FakeProcesses checkov)

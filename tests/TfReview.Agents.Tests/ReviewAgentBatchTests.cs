@@ -74,8 +74,23 @@ public class ReviewAgentBatchTests
         var outcome = (AgentReviewed)await new ReviewAgent(chat, AgentProfile.Conventions).ReviewAsync(plan, [Tagging], []);
 
         await Assert.That(chat.Requests.Count).IsEqualTo(ReviewAgent.MaxBatches);
-        await Assert.That(outcome.Skipped).IsEquivalentTo(["azurerm_virtual_network.n8", "azurerm_virtual_network.n9"]);
-        await Assert.That(outcome.SkippedBecause).IsEqualTo(NotReviewedReason.PlanTooLarge);
+        await Assert.That(outcome.Skipped.Single().Resources).IsEquivalentTo(["azurerm_virtual_network.n8", "azurerm_virtual_network.n9"]);
+        await Assert.That(outcome.Skipped.Single().Reason).IsEqualTo(NotReviewedReason.PlanTooLarge);
+    }
+
+    // BUG-8: a failed batch's resources and the cap's leftovers each keep their own reason.
+    [Test]
+    public async Task A_failed_batch_doesnt_relabel_what_the_cap_left()
+    {
+        var addresses = Enumerable.Range(0, 10).Select(index => $"azurerm_virtual_network.n{index}").ToList();
+        var plan = TestPlans.Condensed([.. addresses.Select(Big)]);
+        var chat = new FakeChat(FakeChat.Answer(Empty), FakeChat.Answer("not json"), FakeChat.Answer("not json"));
+
+        var outcome = (AgentReviewed)await new ReviewAgent(chat, AgentProfile.Conventions).ReviewAsync(plan, [Tagging], []);
+
+        await Assert.That(outcome.Skipped.Select(part => part.Reason)).IsEquivalentTo([NotReviewedReason.InvalidOutput, NotReviewedReason.PlanTooLarge]);
+        await Assert.That(outcome.Skipped[0].Resources.Count).IsEqualTo(6);
+        await Assert.That(outcome.Skipped[1].Resources).IsEquivalentTo(["azurerm_virtual_network.n8", "azurerm_virtual_network.n9"]);
     }
 
     // A failed batch costs its own resources and the rest, but not what was already reviewed.
@@ -88,8 +103,8 @@ public class ReviewAgentBatchTests
         var outcome = (AgentReviewed)await new ReviewAgent(chat, AgentProfile.Conventions).ReviewAsync(plan, [Tagging], []);
 
         await Assert.That(outcome.Findings.Single().ResourceAddress).IsEqualTo(Role);
-        await Assert.That(outcome.Skipped).IsEquivalentTo([Storage, Vnet]);
-        await Assert.That(outcome.SkippedBecause).IsEqualTo(NotReviewedReason.InvalidOutput);
+        await Assert.That(outcome.Skipped.Single().Resources).IsEquivalentTo([Storage, Vnet]);
+        await Assert.That(outcome.Skipped.Single().Reason).IsEqualTo(NotReviewedReason.InvalidOutput);
     }
 
     [Test]
@@ -113,8 +128,8 @@ public class ReviewAgentBatchTests
 
         var outcome = (AgentReviewed)await new ReviewAgent(chat, AgentProfile.Conventions).ReviewAsync(plan, [Tagging], []);
 
-        await Assert.That(outcome.Skipped).IsEquivalentTo(["azurerm_storage_account.huge"]);
-        await Assert.That(outcome.SkippedBecause).IsEqualTo(NotReviewedReason.PlanTooLarge);
+        await Assert.That(outcome.Skipped.Single().Resources).IsEquivalentTo(["azurerm_storage_account.huge"]);
+        await Assert.That(outcome.Skipped.Single().Reason).IsEqualTo(NotReviewedReason.PlanTooLarge);
     }
 
     [Test]

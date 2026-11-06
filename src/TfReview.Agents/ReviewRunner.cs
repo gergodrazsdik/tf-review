@@ -190,11 +190,13 @@ public sealed class ReviewRunner(
 
             var findings = Gate(config, suggestions?.Findings ?? arbitration.Findings, scanners.Kept);
 
+            // One scope can have several entries: a failed scanner beside the agent's own, and an agent's failed batches
+            // beside what its cap left out. Each keeps its reason and resources (BUG-8, MNT-13).
             IReadOnlyList<NotReviewed> notReviewed =
             [
                 .. new[] { checkovFailure, costFailure }.OfType<NotReviewed>()
                     .Concat(passes.SelectMany(pass => pass.NotReviewed))
-                    .DistinctBy(missing => missing.Scope)
+                    .DistinctBy(missing => (missing.Scope, missing.Reason, missing.Resources is null))
                     .OrderBy(missing => missing.Scope),
             ];
             var omitted = passes.SelectMany(pass => pass.Omitted).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
@@ -378,7 +380,7 @@ public sealed class ReviewRunner(
             outcome switch
             {
                 AgentFailed failed => [new NotReviewed(profile.Scope, failed.Reason)],
-                AgentReviewed { SkippedBecause: { } reason, Skipped: var skipped } => [new NotReviewed(profile.Scope, reason) { Resources = skipped }],
+                AgentReviewed { Skipped: var skipped } => [.. skipped.Select(part => new NotReviewed(profile.Scope, part.Reason) { Resources = part.Resources })],
                 _ => [],
             },
             [.. referenceCalls, .. outcome.Calls])

@@ -718,6 +718,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 - [x] Dismissals survive every rewrite and count once (D56): hidden lines for findings not shown, counted marks kept on unticked boxes, a key per merged rule, counting after the write, the workflow's fallback carrying ticks over, and at most 50 new counts per rewrite against pasted markers (BUG-2, MNT-4, BUG-7, BUG-23, BUG-25, SEC-15 in part)
 - [x] One review's TPM budget comes from `TF_REVIEW_TOKENS_PER_MINUTE`, so it can be the share of 3 jobs, and defaults to 45K on the gpt-5.4-mini fallback (D54; MNT-11, OPS-5, BUG-10). **You:** set it in `infra/apps.tf`, for example to 30000
 - [x] The suggester keeps a sentence only if it names its term, as D50 says, and a term needs 3 letters or digits (BUG-4, MNT-6)
+- [x] `not_reviewed` keeps one entry per scope and reason: a failed Checkov scan no longer hides the security agent's own entry and its resources, and a failed batch and the cap's leftovers are separate entries (MNT-13, BUG-8)
 
 ## Evaluation
 

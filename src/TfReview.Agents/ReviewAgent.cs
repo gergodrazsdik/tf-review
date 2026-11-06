@@ -21,13 +21,14 @@ public sealed record AgentReviewed(int PromptVersion, IReadOnlyList<AgentCall> C
     public int Retracted { get; init; }
 
     /// <summary>
-    /// What a large plan's batches didn't reach, and why: the batch cap, or a call that failed. Empty when the whole
-    /// slice was reviewed.
+    /// What a large plan's batches didn't reach, by why: a call that failed, and the batch cap, each its own part so one
+    /// reason doesn't relabel the other's resources. Empty when the whole slice was reviewed.
     /// </summary>
-    public IReadOnlyList<string> Skipped { get; init; } = [];
-
-    public NotReviewedReason? SkippedBecause { get; init; }
+    public IReadOnlyList<SkippedPart> Skipped { get; init; } = [];
 }
+
+/// <summary>Resources an agent didn't review, in address order, and why.</summary>
+public sealed record SkippedPart(NotReviewedReason Reason, IReadOnlyList<string> Resources);
 
 /// <summary>The slice wasn't reviewed, and the comment says so instead of guessing.</summary>
 public sealed record AgentFailed(int PromptVersion, IReadOnlyList<AgentCall> Calls, NotReviewedReason Reason)
@@ -229,15 +230,15 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
         var calls = new List<AgentCall>();
         var findings = new List<Finding>();
         var retracted = 0;
-        var skipped = new List<string>();
-        NotReviewedReason? reason = left.Count > 0 ? NotReviewedReason.PlanTooLarge : null;
+        var failed = new List<string>();
+        NotReviewedReason? failure = null;
 
         foreach (var batch in batches)
         {
             // After a failure the rest isn't tried: the TPM limit or an outage would fail it too.
-            if (skipped.Count > 0)
+            if (failure is not null)
             {
-                skipped.AddRange(batch);
+                failed.AddRange(batch);
                 continue;
             }
 
@@ -252,25 +253,30 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
             }
             else
             {
-                skipped.AddRange(batch);
-                reason = result.Failure ?? NotReviewedReason.InvalidOutput;
+                failed.AddRange(batch);
+                failure = result.Failure ?? NotReviewedReason.InvalidOutput;
             }
         }
 
-        skipped.AddRange(left);
-
         // Nothing at all reviewed is the same as one call failing: the whole scope is reported, not each resource.
-        if (skipped.Count == plan.Changes().Count)
+        if (failed.Count + left.Count == plan.Changes().Count)
         {
-            return new AgentFailed(prompt.Version, calls, reason ?? NotReviewedReason.PlanTooLarge);
+            return new AgentFailed(prompt.Version, calls, failure ?? NotReviewedReason.PlanTooLarge);
         }
 
-        return new AgentReviewed(prompt.Version, calls, findings)
+        // What failed and what the cap left out are told apart, so a rate limit isn't blamed for the cap (BUG-8).
+        List<SkippedPart> skipped = [];
+        if (failure is { } reason && failed.Count > 0)
         {
-            Retracted = retracted,
-            Skipped = [.. skipped.Order(StringComparer.Ordinal)],
-            SkippedBecause = skipped.Count > 0 ? reason : null,
-        };
+            skipped.Add(new SkippedPart(reason, [.. failed.Order(StringComparer.Ordinal)]));
+        }
+
+        if (left.Count > 0)
+        {
+            skipped.Add(new SkippedPart(NotReviewedReason.PlanTooLarge, [.. left.Order(StringComparer.Ordinal)]));
+        }
+
+        return new AgentReviewed(prompt.Version, calls, findings) { Retracted = retracted, Skipped = skipped };
     }
 
     private Task<StructuredResult<ParsedFindings>> CallAsync(
