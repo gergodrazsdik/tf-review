@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="TUnit" />
+    <ProjectReference Include="../../src/TfReview.Core/TfReview.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The judge itself, compiled in rather than referencing the eval's executable. -->
+    <Compile Include="../TfReview.Eval/Judge.cs" Link="Judge.cs" />
+    <None Include="../fixtures/cases/*/suggestions.json" LinkBase="cases" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../fixtures/cases/*/expected.json" LinkBase="cases" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

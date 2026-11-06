@@ -1,5 +1,4 @@
 {
-  "held_out": true,
   "findings": [
     {
       "resource_address": "azurerm_mssql_database.ledger",

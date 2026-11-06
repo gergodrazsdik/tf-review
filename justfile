@@ -45,6 +45,7 @@ test:
     dotnet run --project tests/TfReview.Api.Tests --no-build
     dotnet run --project tests/TfReview.Core.Tests --no-build
     dotnet run --project tests/TfReview.Corpus.Tests --no-build
+    dotnet run --project tests/TfReview.Eval.Tests --no-build
     dotnet run --project tests/TfReview.GitHub.Tests --no-build
     TF_STANDARDS_DIR="{{ justfile_directory() }}/../tf-standards" dotnet run --project tests/TfReview.Rag.Tests --no-build
     TF_STANDARDS_DIR="{{ justfile_directory() }}/../tf-standards" dotnet run --project tests/TfReview.Scanners.Tests --no-build
@@ -61,6 +62,12 @@ e2e:
 e2e-live runs="3":
     dotnet build -m:1 tests/TfReview.Eval
     TF_STANDARDS_DIR="{{ justfile_directory() }}/../tf-standards" dotnet run --project tests/TfReview.Eval --no-build -- live --runs {{ runs }}
+
+# Score saved runs' suggestions against the current concept patterns, by default every run in docs/evals/runs; offline and free
+[group('dev')]
+rescore *sources="docs/evals/runs/*.jsonl":
+    dotnet build -m:1 tests/TfReview.Eval
+    dotnet run --project tests/TfReview.Eval --no-build -- rescore {{ sources }}
 
 # Refresh the eval fixtures from the seeded branches' redacted plans; run it outside the Claude sandbox
 [group('dev')]

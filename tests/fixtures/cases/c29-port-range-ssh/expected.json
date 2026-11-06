@@ -1,5 +1,4 @@
 {
-  "held_out": true,
   "findings": [
     {
       "resource_address": "azurerm_network_security_rule.legacy",

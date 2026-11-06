@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using Microsoft.Extensions.AI;
 using TfReview.Agents;
 using TfReview.Core;
+using TfReview.Eval;
 using TfReview.GitHub;
 using TfReview.Rag;
 using TfReview.Scanners;
@@ -37,12 +38,14 @@ var cases = Directory.GetDirectories(CasesDirectory)
     .Where(directory => File.Exists(Path.Combine(directory, "plan.json")))
     .Order(StringComparer.Ordinal)
     .ToArray();
-var standardsDirectory = Environment.GetEnvironmentVariable("TF_STANDARDS_DIR")
+// Rescoring saved runs reads no standards, so only the commands that review need it.
+var standardsDirectory = args is ["rescore", ..] ? string.Empty : Environment.GetEnvironmentVariable("TF_STANDARDS_DIR")
     ?? throw new InvalidOperationException("TF_STANDARDS_DIR isn't set.");
 
 return args switch
 {
     ["replay"] => await Replay(),
+    ["rescore", .. var saved] when saved.Length > 0 => Rescore(saved),
     ["record-scans", .. var names] => await RecordScans(names),
     ["live", "--runs", var runs, .. var options] => await Live(
         int.Parse(runs, CultureInfo.InvariantCulture), Option(options, "--record"), options.Contains("--references"), Option(options, "--suggestions"),
@@ -56,7 +59,7 @@ return args switch
 
 static int Usage()
 {
-    Console.Error.WriteLine("usage: eval replay\n       eval record-scans [case...]\n       eval live --runs <n> [--record <dir>] [--references] [--suggestions <dir>] [--cases <name,...>] [--placement agent|finding] [--show-answers]\n       eval retrieval <labels.yml> [--report <file.md>]");
+    Console.Error.WriteLine("usage: eval replay\n       eval record-scans [case...]\n       eval live --runs <n> [--record <dir>] [--references] [--suggestions <dir>] [--cases <name,...>] [--placement agent|finding] [--show-answers]\n       eval rescore <suggestions dir>...\n       eval retrieval <labels.yml> [--report <file.md>]");
     return 2;
 }
 
@@ -85,7 +88,7 @@ async Task<int> Replay()
 
         var chat = new ReplayChat(answers, profiles);
         var result = await Review(directory, chat);
-        failures += Report(Path.GetFileName(directory), 1, [.. stale, .. chat.Missing, .. await Problems(directory, result), .. contracts.Problems(result)]);
+        failures += Report(Path.GetFileName(directory), 1, [.. stale, .. chat.Missing, .. Problems(directory, result), .. contracts.Problems(result)]);
 
         // Production's default with references: per finding, through the suggester (D50).
         if (TfReview.Eval.ReplayReferences.Load(directory) is { } references)
@@ -95,7 +98,7 @@ async Task<int> Replay()
             failures += Report(
                 $"{Path.GetFileName(directory)} with references",
                 1,
-                [.. stale, .. withChat.Missing, .. await Problems(directory, withReferences), .. contracts.Problems(withReferences), .. references.Problems(result, withReferences)]);
+                [.. stale, .. withChat.Missing, .. Problems(directory, withReferences), .. contracts.Problems(withReferences), .. references.Problems(result, withReferences)]);
         }
     }
 
@@ -176,6 +179,7 @@ async Task<int> Live(int runs, string? recordDirectory, bool withReferences, str
     var cachedTokens = 0L;
     var conceptsFound = 0;
     var conceptsAsked = 0;
+    var tally = new Tally();
     foreach (var directory in selected)
     {
         var name = Path.GetFileName(directory);
@@ -201,7 +205,7 @@ async Task<int> Live(int runs, string? recordDirectory, bool withReferences, str
                         fileOptions) + "\n");
             }
 
-            List<string> problems = [.. await Problems(directory, result), .. contracts.Problems(result)];
+            List<string> problems = [.. Problems(directory, result), .. contracts.Problems(result)];
             failures += Report(name, run, problems);
 
             // For working out why a model answered as it did. Evals only see fixtures, so nothing private reaches the log.
@@ -250,9 +254,12 @@ async Task<int> Live(int runs, string? recordDirectory, bool withReferences, str
             }
         }
 
-        Console.WriteLine(scoring is null ? $"{name}: {passes} of {runs}" : $"{name}: {passes} of {runs}, suggestion concepts {caseFound} of {caseAsked}");
+        var heldOut = ExpectedCase.Load(directory).HeldOut;
+        var label = heldOut ? " (held out)" : string.Empty;
+        Console.WriteLine(scoring is null ? $"{name}{label}: {passes} of {runs}" : $"{name}{label}: {passes} of {runs}, suggestion concepts {caseFound} of {caseAsked}");
         conceptsFound += caseFound;
         conceptsAsked += caseAsked;
+        tally.Add(heldOut, passes, runs, caseFound, caseAsked);
     }
 
     var versions = string.Join(", ", profiles.Select(profile => $"{profile} v{Prompts.Load(profile).Version}"));
@@ -266,6 +273,11 @@ async Task<int> Live(int runs, string? recordDirectory, bool withReferences, str
     if (conceptsAsked > 0)
     {
         Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"Suggestion concepts: {conceptsFound} of {conceptsAsked} ({100.0 * conceptsFound / conceptsAsked:0}%)."));
+    }
+
+    foreach (var line in tally.Lines())
+    {
+        Console.WriteLine(line);
     }
 
     Console.WriteLine(failures == 0 ? $"PASS: {selected.Length} case(s), {runs} run(s) each." : $"FAIL: {failures} failed run(s).");
@@ -294,67 +306,89 @@ async Task<ReviewResult> Review(
         lockFile: references is null ? null : LockFile);
 }
 
-// The whole set has to match: an extra finding is a false positive, and it fails the case like a missed one.
-async Task<List<string>> Problems(string directory, ReviewResult result)
+List<string> Problems(string directory, ReviewResult result) => Judge.Problems(ExpectedCase.Load(directory), result);
+
+// Scores saved suggestions against the current patterns, so a pattern change is measured on every saved run alike.
+// It takes what a live run saved with --suggestions (`<dir>/<case>/run-<n>.json`), or the docs/evals/runs/*.jsonl
+// kept from those (one line per case and run), and reads files only.
+int Rescore(string[] sources)
 {
-    var expected = JsonSerializer.Deserialize<ExpectedCase>(await File.ReadAllTextAsync(Path.Combine(directory, "expected.json")))!;
-    var problems = new List<string>();
-
-    foreach (var missing in result.NotReviewed)
+    foreach (var saved in sources)
     {
-        problems.Add($"not reviewed: {missing.Scope} ({missing.Reason})");
-    }
-
-    var actual = result.Findings
-        .Select(finding => new ExpectedFinding(finding.ResourceAddress, finding.Rule, Name(finding.Agent), finding.Deterministic))
-        .ToList();
-
-    // An arbiter can merge rows about one problem, so a rule it folded into another row still counts as reported.
-    var folded = result.Findings
-        .SelectMany(finding => (finding.RelatedRules ?? []).Select(rule => (finding.ResourceAddress, Rule: rule)))
-        .ToHashSet();
-
-    problems.AddRange(expected.Findings.Except(actual)
-        .Where(finding => !folded.Contains((finding.ResourceAddress, finding.Rule)))
-        .Select(finding => $"missing: {finding}"));
-
-    // With the wording, because a false positive's reasoning is what a prompt fix needs. Evals only see fixtures,
-    // so nothing private reaches these logs.
-    problems.AddRange(result.Findings
-        .Where(finding => !expected.Findings.Contains(new ExpectedFinding(finding.ResourceAddress, finding.Rule, Name(finding.Agent), finding.Deterministic)))
-        .Select(finding => $"unexpected: {finding.ResourceAddress} {finding.Rule} from {Name(finding.Agent)}, deterministic {finding.Deterministic}: {finding.Title}"));
-
-    if (expected.RiskFirst is { } riskFirst && result.RiskOrder?.FirstOrDefault()?.ResourceAddress != riskFirst)
-    {
-        problems.Add($"risk order: expected {riskFirst} first, and got {result.RiskOrder?.FirstOrDefault()?.ResourceAddress ?? "nothing"}");
-    }
-
-    if (expected.FirstFinding is { } firstFinding && result.Findings.FirstOrDefault()?.ResourceAddress != firstFinding)
-    {
-        problems.Add($"expected a finding on {firstFinding} first, and got {result.Findings.FirstOrDefault()?.ResourceAddress ?? "nothing"}");
-    }
-
-    foreach (var finding in result.Findings)
-    {
-        if (!finding.Evidence.Any(item => item.Value is PlanEvidence))
+        if (SavedRuns(saved) is not { } runsByCase)
         {
-            problems.Add($"{finding.ResourceAddress} {finding.Rule}: no plan pointer");
+            Console.Error.WriteLine($"No such directory or .jsonl file: {saved}");
+            return 2;
         }
 
-        // A scanner's own rule ID has no document behind it. Anything citing a standard has to name it.
-        var citesStandard = Regex.IsMatch(finding.Rule, "^(ADR|POL|DES)-[0-9]{3}$");
-        if (citesStandard && !finding.Evidence.Any(item => item.Value is DocEvidence doc && doc.DocId == finding.Rule))
+        var tally = new Tally();
+        var found = 0;
+        var asked = 0;
+        foreach (var directory in cases)
         {
-            problems.Add($"{finding.ResourceAddress} {finding.Rule}: no citation");
+            var name = Path.GetFileName(directory);
+            if (SuggestionScore.Load(directory) is not { } scoring || !runsByCase.TryGetValue(name, out var runs))
+            {
+                continue;
+            }
+
+            var caseFound = 0;
+            var caseAsked = 0;
+            foreach (var findings in runs)
+            {
+                var (f, a, _) = scoring.Score(findings);
+                caseFound += f;
+                caseAsked += a;
+            }
+
+            var heldOut = ExpectedCase.Load(directory).HeldOut;
+            Console.WriteLine($"{saved} {name}{(heldOut ? " (held out)" : string.Empty)}: {caseFound} of {caseAsked}");
+            found += caseFound;
+            asked += caseAsked;
+            tally.Add(heldOut, 0, 0, caseFound, caseAsked);
         }
 
-        if (finding.Agent == Reporter.Cost && finding.MonthlyCostDeltaUsd is not > 0)
+        Console.WriteLine($"{saved}: suggestion concepts {found} of {asked}.");
+        foreach (var line in tally.Lines(withRuns: false))
         {
-            problems.Add($"{finding.ResourceAddress} {finding.Rule}: no cost figure");
+            Console.WriteLine($"{saved}: {line}");
         }
     }
 
-    return problems;
+    return 0;
+}
+
+static Dictionary<string, List<List<ScoredFinding>>>? SavedRuns(string saved)
+{
+    var runs = new Dictionary<string, List<List<ScoredFinding>>>(StringComparer.Ordinal);
+    if (saved.EndsWith(".jsonl", StringComparison.Ordinal) && File.Exists(saved))
+    {
+        foreach (var line in File.ReadLines(saved).Where(line => line.Length > 0))
+        {
+            var run = JsonDocument.Parse(line).RootElement;
+            var name = run.GetProperty("case").GetString()!;
+            runs.TryAdd(name, []);
+            runs[name].Add(run.GetProperty("findings").Deserialize<List<ScoredFinding>>() ?? []);
+        }
+
+        return runs;
+    }
+
+    if (!Directory.Exists(saved))
+    {
+        return null;
+    }
+
+    foreach (var directory in Directory.GetDirectories(saved))
+    {
+        runs[Path.GetFileName(directory)] =
+        [
+            .. Directory.GetFiles(directory, "run-*.json").Order(StringComparer.Ordinal).Select(file =>
+                JsonDocument.Parse(File.ReadAllText(file)).RootElement.GetProperty("findings").Deserialize<List<ScoredFinding>>() ?? []),
+        ];
+    }
+
+    return runs;
 }
 
 static int Report(string name, int run, IReadOnlyList<string> problems)
@@ -367,71 +401,8 @@ static int Report(string name, int run, IReadOnlyList<string> problems)
     return problems.Count == 0 ? 0 : 1;
 }
 
-static string Name(Reporter reporter) => JsonSerializer.Serialize(reporter).Trim('"');
-
 static string Required(string name) => Environment.GetEnvironmentVariable(name)
     ?? throw new InvalidOperationException($"{name} isn't set.");
-
-internal sealed record ExpectedCase([property: JsonPropertyName("findings")] IReadOnlyList<ExpectedFinding> Findings)
-{
-    [JsonPropertyName("risk_first")]
-    public string? RiskFirst { get; init; }
-
-    [JsonPropertyName("first_finding")]
-    public string? FirstFinding { get; init; }
-}
-
-internal sealed record ExpectedFinding(
-    [property: JsonPropertyName("resource_address")] string ResourceAddress,
-    [property: JsonPropertyName("rule")] string Rule,
-    [property: JsonPropertyName("agent")] string Agent,
-    [property: JsonPropertyName("deterministic")] bool Deterministic);
-
-/// <summary>
-/// What a good suggestion for each expected finding should mention, as case-insensitive patterns fixed before any model
-/// saw the case, and widened since only to accept other wording of the same concept, with every saved run rescored
-/// (docs/evals/baseline.md). It measures whether reference material makes suggestions more useful; a finding that's
-/// missing scores nothing for its concepts.
-/// </summary>
-internal sealed record SuggestionScore([property: JsonPropertyName("findings")] IReadOnlyList<SuggestionExpectation> Findings)
-{
-    public static SuggestionScore? Load(string directory)
-    {
-        var path = Path.Combine(directory, "suggestions.json");
-        return File.Exists(path) ? JsonSerializer.Deserialize<SuggestionScore>(File.ReadAllText(path)) : null;
-    }
-
-    public (int Found, int Asked, IReadOnlyList<string> Missed) Score(IEnumerable<Finding> findings)
-    {
-        var found = 0;
-        var asked = 0;
-        var missed = new List<string>();
-        var list = findings.ToList();
-        foreach (var expectation in Findings)
-        {
-            var finding = list.FirstOrDefault(item => item.ResourceAddress == expectation.ResourceAddress && item.Rule == expectation.Rule);
-            foreach (var (name, pattern) in expectation.Concepts)
-            {
-                asked++;
-                if (finding?.Suggestion is { } suggestion && Regex.IsMatch(suggestion, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
-                {
-                    found++;
-                }
-                else
-                {
-                    missed.Add($"{expectation.Rule} {name}");
-                }
-            }
-        }
-
-        return (found, asked, missed);
-    }
-}
-
-internal sealed record SuggestionExpectation(
-    [property: JsonPropertyName("resource_address")] string ResourceAddress,
-    [property: JsonPropertyName("rule")] string Rule,
-    [property: JsonPropertyName("concepts")] IReadOnlyDictionary<string, string> Concepts);
 
 internal sealed record RecordedAnswer(
     [property: JsonPropertyName("prompt_version")] int PromptVersion,
