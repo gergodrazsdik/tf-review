@@ -42,7 +42,14 @@ public class CommentFixtureTests
             DocPaths = new Dictionary<string, string> { ["POL-002"] = "policies/POL-002-network.md" },
         };
 
-        var comment = CommentRenderer.Render(result, null, new HashSet<string> { Dismissals.Key(model) }).ReplaceLineEndings("\n");
+        // Ticks reach a comment from the one it replaces (D56), so tick the model finding's box in a first rendering.
+        var first = CommentRenderer.Render(result, null).ReplaceLineEndings("\n");
+        var ticked = string.Join('\n', first.Split('\n').Select(line =>
+            line.StartsWith("- [ ] ", StringComparison.Ordinal) && line.Contains($"`{model.ResourceAddress}` (`{model.Rule}`)", StringComparison.Ordinal)
+                ? "- [x] " + line["- [ ] ".Length..]
+                : line));
+        await Assert.That(ticked).IsNotEqualTo(first).Because("the model finding has a dismiss box to tick");
+        var comment = CommentRenderer.Rewrite(result, null, ticked, record: true).Body.ReplaceLineEndings("\n");
         var fixture = (await File.ReadAllTextAsync("comments/review.md")).ReplaceLineEndings("\n");
 
         if (comment != fixture)

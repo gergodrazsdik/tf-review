@@ -11,7 +11,7 @@
 
 Wrong? Tick a finding to dismiss it, which helps tune the reviewer:
 
-- [ ] Dismiss `azurerm_network_security_rule.ssh` (`POL-002`) <!-- tf-review:dismiss 09b3bcb6e83c98fe rule=POL-002 -->
+- [ ] Dismiss `azurerm_network_security_rule.ssh` (`POL-002`) <!-- tf-review:dismiss 09b3bcb6e83c98fe also=dde740385bb47e4b rule=POL-002 -->
 - [ ] Dismiss `azurerm_storage_account.logs` (`CKV_AZURE_59`) <!-- tf-review:dismiss 11f5c7caa0da196b rule=CKV_AZURE_59 -->
 - [x] Dismiss `azurerm_storage_account.logs` (`ADR-001`) <!-- tf-review:dismiss d75ff549dfd9a21d rule=ADR-001 recorded -->
 
