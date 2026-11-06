@@ -18,6 +18,9 @@ public sealed class RiskOrchestrator(IChatClient chat, TimeSpan? attemptTimeout 
 {
     public const string Name = "orchestrator";
 
+    /// <summary>Changes the model is asked to order, riskiest by the rules first: about 30 tokens each.</summary>
+    public const int MaxChanges = 300;
+
     private const int Destructive = 0;
     private const int Access = 1;
     private const int Network = 2;
@@ -64,10 +67,13 @@ public sealed class RiskOrchestrator(IChatClient chat, TimeSpan? attemptTimeout 
             return new RiskRanking(ByRules(plan), [], null);
         }
 
+        // Only the riskiest by the rules, so a plan with tens of thousands of changes can't make one huge call (SEC-5).
+        // The rest keep the rules' order after those the model ranked.
+        var sent = ByRules(plan).Take(MaxChanges).Select(item => item.ResourceAddress).ToHashSet(StringComparer.Ordinal);
         var prompt = Prompts.Load(Name);
         var summary = new JsonArray(
         [
-            .. changes.Select(change => (JsonNode)new JsonObject
+            .. changes.Where(change => sent.Contains(change.Address)).Select(change => (JsonNode)new JsonObject
             {
                 ["resource_address"] = change.Address,
                 ["type"] = change.Type,
@@ -88,8 +94,7 @@ public sealed class RiskOrchestrator(IChatClient chat, TimeSpan? attemptTimeout 
             return new RiskRanking(ByRules(plan), result.Calls, prompt.Version);
         }
 
-        var known = changes.Select(change => change.Address).ToHashSet(StringComparer.Ordinal);
-        var wanted = answer.Resources.Where(resource => known.Contains(resource.ResourceAddress)).ToList();
+        var wanted = answer.Resources.Where(resource => sent.Contains(resource.ResourceAddress)).ToList();
         var ranks = wanted
             .Select((resource, index) => (resource.ResourceAddress, index))
             .DistinctBy(rank => rank.ResourceAddress)

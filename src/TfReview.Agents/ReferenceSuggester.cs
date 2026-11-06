@@ -25,7 +25,13 @@ public sealed partial class ReferenceSuggester(IReferenceRetriever retriever, IC
     /// <summary>Per finding, about two excerpts' worth.</summary>
     public const int TokenBudget = 1_500;
 
+    /// <summary>Findings per review that get a search and a model call.</summary>
+    public const int MaxFindings = 15;
+
     private const int Candidates = 4;
+
+    /// <summary>Searches and calls at once, which spares the references container's throughput.</summary>
+    private const int Parallelism = 4;
 
     private const string Schema = """
         {
@@ -56,7 +62,28 @@ public sealed partial class ReferenceSuggester(IReferenceRetriever retriever, IC
         CancellationToken cancellationToken = default)
     {
         var prompt = Prompts.Load(Name);
-        var results = await Task.WhenAll(findings.Select(finding => this.OneAsync(finding, plan, docs, providerVersion, prompt, cancellationToken)));
+
+        // A search and a model call each, so only the first findings, which are the most severe, get one, a few at a time
+        // (SEC-5, OPS-13). The rest keep their suggestion as it is.
+        var eligible = findings.Where(finding => Eligible(finding, plan, docs)).Take(MaxFindings).ToHashSet(ReferenceEqualityComparer.Instance);
+        using var slots = new SemaphoreSlim(Parallelism);
+        var results = await Task.WhenAll(findings.Select(async finding =>
+        {
+            if (!eligible.Contains(finding))
+            {
+                return (Finding: finding, Retrieval: (ReferenceRetrieval?)null, Calls: (IReadOnlyList<AgentCall>)[]);
+            }
+
+            await slots.WaitAsync(cancellationToken);
+            try
+            {
+                return await this.OneAsync(finding, plan, docs, providerVersion, prompt, cancellationToken);
+            }
+            finally
+            {
+                slots.Release();
+            }
+        }));
         return new SuggestionPass(
             [.. results.Select(result => result.Finding)],
             [.. results.Select(result => result.Retrieval).OfType<ReferenceRetrieval>()],
@@ -106,6 +133,12 @@ public sealed partial class ReferenceSuggester(IReferenceRetriever retriever, IC
 
         return addition.Trim();
     }
+
+    // Only a finding citing a team standard, on a resource in the plan, can get a suggestion.
+    private static bool Eligible(Finding finding, CondensedPlan plan, IReadOnlyList<StandardsDoc> docs) =>
+        finding.Agent != Reporter.Scanner
+        && docs.Any(doc => doc.Id == finding.Rule)
+        && plan.TypeOf(finding.ResourceAddress) is not null;
 
     // Case, spaces, dashes and underscores differ between an ARM name, an azurerm name and prose.
     private static string Normalize(string text) => NotLetterOrDigit().Replace(text.ToLowerInvariant(), string.Empty);

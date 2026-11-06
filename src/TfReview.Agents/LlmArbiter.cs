@@ -17,6 +17,9 @@ public sealed partial class LlmArbiter(IChatClient chat, IArbiter? fallback = nu
 {
     public const string Name = "arbiter";
 
+    /// <summary>Above this many rows the model isn't asked, which bounds the call: about 60 tokens a row.</summary>
+    public const int MaxFindings = 150;
+
     private const string Schema = """
         {
           "type": "object",
@@ -46,8 +49,9 @@ public sealed partial class LlmArbiter(IChatClient chat, IArbiter? fallback = nu
     {
         var merged = await fallback.ArbitrateAsync(findings, plan, riskOrder, cancellationToken);
 
-        // With fewer than two there's nothing to merge or order.
-        if (merged.Findings.Count < 2)
+        // With fewer than two there's nothing to merge or order. With very many, a plan made to produce them would make one
+        // huge call, which a retry doubles (SEC-5), and the rules' merge and order already stand on their own.
+        if (merged.Findings.Count < 2 || merged.Findings.Count > MaxFindings)
         {
             return merged;
         }

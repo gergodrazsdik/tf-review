@@ -32,6 +32,24 @@ public class RiskOrchestratorTests
         await Assert.That(order[3].Reason).IsNull();
     }
 
+    // SEC-5: a plan with tens of thousands of changes sends the model only the riskiest, and still orders them all.
+    [Test]
+    public async Task Only_the_riskiest_changes_are_sent_to_the_model()
+    {
+        var many = TestPlans.Condensed([
+            Replaced,
+            .. Enumerable.Range(0, RiskOrchestrator.MaxChanges + 10)
+                .Select(index => TestPlans.Create($"terraform_data.d{index}", "terraform_data", """{"input":"x"}""")),
+        ]);
+        var chat = new FakeChat(FakeChat.Answer("""{"resources":[]}"""));
+
+        var ranking = await new RiskOrchestrator(chat).RankAsync(many);
+
+        await Assert.That(chat.Requests.Single().User).Contains("azurerm_mssql_database.d");
+        await Assert.That(chat.Requests.Single().User.Split("\"resource_address\"").Length - 1).IsEqualTo(RiskOrchestrator.MaxChanges);
+        await Assert.That(ranking.Order.Count).IsEqualTo(RiskOrchestrator.MaxChanges + 11);
+    }
+
     // Plan text can steer the model, and C7 has to stay on top whatever it answers.
     [Test]
     public async Task The_model_cant_bury_a_destructive_change()

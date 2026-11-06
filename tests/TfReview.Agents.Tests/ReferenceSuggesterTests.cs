@@ -106,6 +106,19 @@ public class ReferenceSuggesterTests
         await Assert.That(retriever.Queries.Count).IsEqualTo(1);
     }
 
+    // SEC-5, OPS-13: each finding costs a search and a call, so a review gets a fixed number, the most severe first.
+    [Test]
+    public async Task Only_the_first_findings_get_a_search_and_a_call()
+    {
+        var retriever = new FakeRetriever();
+        var findings = Enumerable.Range(0, ReferenceSuggester.MaxFindings + 5).Select(_ => Finding()).ToList();
+
+        var pass = await new ReferenceSuggester(retriever, new FakeChat()).SuggestAsync(findings, Plan, [Standard], null);
+
+        await Assert.That(retriever.Queries.Count).IsEqualTo(ReferenceSuggester.MaxFindings);
+        await Assert.That(pass.Findings.Count).IsEqualTo(findings.Count);
+    }
+
     [Test]
     public async Task A_sentence_recommending_azure_policy_is_dropped()
     {

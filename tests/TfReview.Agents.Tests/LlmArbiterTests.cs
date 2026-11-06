@@ -181,6 +181,19 @@ public class LlmArbiterTests
         await Assert.That(chat.Requests.Single().User.Split("</findings>").Length).IsEqualTo(2);
     }
 
+    // SEC-5: a plan made to produce thousands of findings can't make one huge arbiter call.
+    [Test]
+    public async Task Too_many_findings_keep_the_rules_result_without_a_call()
+    {
+        var chat = new FakeChat();
+        var findings = Enumerable.Range(0, LlmArbiter.MaxFindings + 1).Select(index => Policy($"azurerm_storage_account.s{index}", "POL-001")).ToList();
+
+        var result = await new LlmArbiter(chat).ArbitrateAsync(findings, Plan);
+
+        await Assert.That(chat.Requests).IsEmpty();
+        await Assert.That(result.Findings.Count).IsEqualTo(findings.Count);
+    }
+
     private static Task<Arbitration> Arbitrate(string answer, params Finding[] findings) =>
         new LlmArbiter(new FakeChat(FakeChat.Answer(answer))).ArbitrateAsync(findings, Plan);
 
