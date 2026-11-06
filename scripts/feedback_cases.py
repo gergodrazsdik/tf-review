@@ -18,12 +18,12 @@ import sys
 import time
 from pathlib import Path
 
+from comment_table import BOT_LOGINS, rows
+from comment_table import dismissed as ticked
+
 DEMO = "gergodrazsdik/tf-review-demo"
-APP = "tf-review-gergodrazsdik[bot]"
 MARKER = "<!-- tf-review -->"
-TICKED = re.compile(r"^- \[[xX]\] Dismiss `(?P<address>[^`]*)` \(`(?P<rule>[^`]*)`\) <!-- tf-review:dismiss [0-9a-f]{16}\b.*-->\s*$", re.MULTILINE)
 COMMIT = re.compile(r"for commit `(?P<commit>[0-9a-f]{7,40})`")
-ROW = re.compile(r"^\| (?P<severity>[^|]+) \| `(?P<address>[^`]*)` \| (?P<rules>[^|]+) \| `(?P<title>[^`]*)` \|[^|]*\| (?P<source>[^|]+) \|\s*$", re.MULTILINE)
 GUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 
 
@@ -50,12 +50,6 @@ def gh(*arguments):
 
 def api(path):
     return json.loads(gh("api", "--paginate", "--slurp", f"repos/{DEMO}/{path}"))
-
-
-def first_rule(cell):
-    """The row's own rule: a link's text, or the first code span."""
-    match = re.search(r"\[([^\]]+)\]|`([^`]+)`", cell)
-    return (match.group(1) or match.group(2)) if match else cell.strip()
 
 
 def plan_for(commit, target):
@@ -89,10 +83,10 @@ def main():
         number = pull["number"]
         comments = [comment for page in api(f"issues/{number}/comments?per_page=100") for comment in page]
         review = next((comment["body"] for comment in comments
-                       if comment["user"]["login"] == APP and comment["body"].startswith(MARKER)), None)
+                       if comment["user"]["login"] in BOT_LOGINS and comment["body"].startswith(MARKER)), None)
         if review is None:
             continue
-        dismissed = [match.groupdict() for match in TICKED.finditer(review)]
+        dismissed = ticked(review)
         if not dismissed:
             continue
 
@@ -101,10 +95,10 @@ def main():
         commit = next((c["sha"] for c in commits if short and c["sha"].startswith(short.group("commit"))), None)
         gone = {(item["address"], item["rule"]) for item in dismissed}
         kept = [
-            {"address": row["address"], "rule": first_rule(row["rules"]), "severity": row["severity"].strip(),
-             "title": row["title"], "source": row["source"].strip()}
-            for row in (match.groupdict() for match in ROW.finditer(review))
-            if (row["address"], first_rule(row["rules"])) not in gone
+            {"address": row["address"], "rule": row["rule"], "severity": row["severity"], "title": row["title"],
+             "source": row["source"]}
+            for row in rows(review)
+            if (row["address"], row["rule"]) not in gone
         ]
 
         target = options.out / f"pr-{number}"

@@ -7,17 +7,17 @@ docs/evals/baseline.md), and a single one needs reading rather than reverting. R
 
 import argparse
 import json
-import re
 import subprocess
 import sys
 import time
 from pathlib import Path
 
+from comment_table import not_reviewed, rows
+
 DEMO = "gergodrazsdik/tf-review-demo"
 APP = "tf-review-gergodrazsdik"
 MARKER = "<!-- tf-review -->"
 CASES = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "cases"
-SEVERITIES = ("high", "medium", "low")
 POLL_SECONDS = 15
 
 
@@ -56,17 +56,11 @@ def comment(pull):
 
 
 def parse_findings(body):
-    """The (resource, rule) each row stands for. A row the arbiter merged names its other rules after "also"."""
+    """The (resource, rule) each row stands for, including any rules the arbiter folded into a row."""
     findings = set()
-    for line in body.splitlines():
-        cells = [cell.strip() for cell in line.split("|")]
-        if len(cells) < 4 or cells[1] not in SEVERITIES:
-            continue
-        resource = cells[2].strip("`")
-        main, _, also = cells[3].partition(", also ")
-        rule = re.match(r"\[?`?([A-Za-z0-9_-]+)", main)
-        findings.add((resource, rule.group(1) if rule else main))
-        findings.update((resource, other) for other in re.findall(r"`([A-Za-z0-9_-]+)`", also))
+    for row in rows(body):
+        findings.add((row["address"], row["rule"]))
+        findings.update((row["address"], other) for other in row["also"])
     return findings
 
 
@@ -78,15 +72,15 @@ def judge(pull, body):
         return [f"the comment isn't for commit {sha[:7]}"]
 
     expected_path = CASES / case / "expected.json"
+    if not expected_path.is_file():
+        return [f"there's no fixture for {case} in {CASES}"]
     expected = json.loads(expected_path.read_text(encoding="utf-8"))
     wanted = {(item["resource_address"], item["rule"]) for item in expected["findings"]}
     posted = parse_findings(body)
 
     problems = [f"missing: {resource} {rule}" for resource, rule in sorted(wanted - posted)]
     problems += [f"unexpected: {resource} {rule}" for resource, rule in sorted(posted - wanted)]
-    gaps = re.search(r"^Not reviewed: .*$", body, re.MULTILINE)
-    if gaps:
-        problems.append(gaps.group(0))
+    problems += not_reviewed(body)
     return problems
 
 

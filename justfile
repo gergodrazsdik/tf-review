@@ -1,5 +1,6 @@
 # uv run, not uvx: uvx writes to ~/.local/share/uv/tools, which is read-only in the Claude sandbox
 check_jsonschema := "uv run --no-project --with check-jsonschema==0.39.0 check-jsonschema"
+ruff := "uv run --no-project --with ruff==0.17.3 ruff"
 
 # List the recipes
 default:
@@ -25,6 +26,8 @@ lint: contracts
     pinact run --check
     shellcheck scripts/*.sh
     python3 scripts/check_plugin_hooks.py
+    python3 -m unittest discover --start-directory scripts --pattern "test_*.py"
+    {{ ruff }} check scripts plugin
     gitleaks git --no-banner
 
 # Run the checks that start provider or ruleset plugins, which can't run in the Claude sandbox; CI runs this too

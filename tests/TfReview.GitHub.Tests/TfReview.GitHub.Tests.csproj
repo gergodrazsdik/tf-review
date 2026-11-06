@@ -6,4 +6,7 @@
     <PackageReference Include="TUnit" />
     <ProjectReference Include="../../src/TfReview.GitHub/TfReview.GitHub.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="../fixtures/comments/review.md" Link="comments/review.md" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
