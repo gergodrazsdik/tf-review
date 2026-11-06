@@ -5,7 +5,7 @@
       "rule": "POL-004",
       "concepts": {
         "backup": "back(ed)? ?up|bacpac|export|point-in-time|restore|long-term retention|migrat",
-        "in_place": "administrator_login|revert|keep the (original|existing|current)|in place",
+        "in_place": "administrator_login|revert|keep the (original|existing|current)|in place|retain the (original|existing|current)|avoid (the |a |this )?replacement",
         "guard": "prevent_destroy|lifecycle"
       }
     }

@@ -212,4 +212,20 @@ Concepts missed, out of each case's concepts over five runs:
 | Sol, second | 155 of 155 | 102 of 210 | 94% | About $0.30, about $0.39 |
 | Sol, third | 155 of 155 | 106 of 210 | 90% | About $0.35, about $0.50 |
 
-The same cases moved each time: C20, C21, C23, C29 and C30 better, C25 and C27 worse. All of them are the security agent's, so a model per agent wouldn't separate them. **gpt-6.1-sol became every role's model on 2026-11-05**, at about 1.1 to 1.5 times mini's cost; mini stays deployed as the fallback, and luna was removed. Sol's weaker POL-004 suggestions on replacing a data store (C25, C27) are a prompt task.
+The same cases moved each time: C20, C21, C23, C29 and C30 better, C25 and C27 worse. All of them are the security agent's, so a model per agent wouldn't separate them. **gpt-6.1-sol became every role's model on 2026-11-05**, at about 1.1 to 1.5 times mini's cost; mini stays deployed as the fallback, and luna was removed. Sol's weaker POL-004 suggestions on replacing a data store (C25, C27) turned out to be the patterns: see below.
+
+## C20, C25 and C27 rescored: 2026-11-06
+
+Sol's apparent weakness on replacing a data store (C25, C27) was in the patterns, not the suggestions. Its answers kept saying to keep the resource, as "retain the existing name", "avoid replacement" or "revise the plan to avoid replacement", which the `in_place` patterns didn't accept: they took "keep the existing" and "in place". The three POL-004 cases' `in_place` now also accept `retain the (original|existing|current)` and `avoid (the |a |this )?replacement`. That's a change made after reading answers, so it stays to the same concept, and every saved run was rescored alike:
+
+| Run | Concepts before | After | `in_place` found, C25 and C27, of 5 each |
+| --- | --- | --- | --- |
+| gpt-5.4-mini | 92 of 210 | 92 | 4 and 3, unchanged |
+| gpt-6.1-sol, three runs | 103, 102, 106 | 112, 111, 113 | 5 and 5 each time, from 0 to 3 |
+| gpt-6-luna | 81 | 81 | 0 and 0 |
+
+Mini's and luna's scores don't move, so the wider pattern doesn't favour the model it was read from. What sol still misses there, C25's soft delete and C27's replica, isn't in POL-004: it's what per-finding references add, and these runs have none.
+
+## The near misses on gpt-6.1-sol: 2026-11-06
+
+C9, C13, C14 and C18 each failed now and then on gpt-5.4-mini, and C18 once on gpt-6-luna: a missed environment value, private SSH reported, a cost within ADR-003's limits reported, and a valid storage account name read as breaking ADR-001. On sol, ten more runs of each passed 40 of 40, which with its three full runs makes 25 of 25 each, for about $0.09. They stay in the suite as near misses; 25 runs can't rule out a rare miss.

@@ -374,8 +374,9 @@ internal sealed record ExpectedFinding(
 
 /// <summary>
 /// What a good suggestion for each expected finding should mention, as case-insensitive patterns fixed before any model
-/// saw the case. It measures whether reference material makes suggestions more useful; a finding that's missing scores
-/// nothing for its concepts.
+/// saw the case, and widened since only to accept other wording of the same concept, with every saved run rescored
+/// (docs/evals/baseline.md). It measures whether reference material makes suggestions more useful; a finding that's
+/// missing scores nothing for its concepts.
 /// </summary>
 internal sealed record SuggestionScore([property: JsonPropertyName("findings")] IReadOnlyList<SuggestionExpectation> Findings)
 {
