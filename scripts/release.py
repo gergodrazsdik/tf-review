@@ -109,7 +109,7 @@ def wait_for_release(tag):
     print(f"Waiting for the release run of {tag}...")
     for _ in range(90):
         runs = json.loads(run("gh", "run", "list", "-R", REPO, "--workflow", "release.yml", "--branch", tag,
-                              "--limit", "1", "--json", "status,conclusion,url"))
+                              "--limit", "1", "--json", "status,conclusion,url", attempts=5))
         if runs and runs[0]["status"] == "completed":
             if runs[0]["conclusion"] != "success":
                 sys.exit(f"The release of {tag} didn't pass: {runs[0]['url']}")
@@ -120,12 +120,12 @@ def wait_for_release(tag):
 
 def verified_digest(tag):
     """The digest of the image release.yml pushed for this tag, after checking its signature names that tag."""
-    digest = run("crane", "digest", f"{IMAGE}:{tag}")
+    digest = run("crane", "digest", f"{IMAGE}:{tag}", attempts=5)
     reference = f"{IMAGE}@{digest}"
     identity = f"https://github.com/{REPO}/.github/workflows/release.yml@refs/tags/{tag}"
     run("cosign", "verify", "--output", "text",
         "--certificate-oidc-issuer", "https://token.actions.githubusercontent.com",
-        "--certificate-identity", identity, reference)
+        "--certificate-identity", identity, reference, attempts=5)
     return reference
 
 
