@@ -126,6 +126,10 @@ public enum NotReviewedReason
 
     [JsonStringEnumMemberName("plan_too_large")]
     PlanTooLarge,
+
+    /// <summary>The service's daily model budget was spent, so the model wasn't called (D62).</summary>
+    [JsonStringEnumMemberName("budget_reached")]
+    BudgetReached,
 }
 
 public sealed record Finding(

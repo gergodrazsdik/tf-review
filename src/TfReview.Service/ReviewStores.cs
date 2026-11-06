@@ -50,6 +50,19 @@ public interface IReviewQueue
     Task<ReceivedJob?> ReceiveAsync(TimeSpan visibility, CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// Counts that outlive a replica or a job: the API's rate limit per repo and hour, and the worker's daily model spend.
+/// Each counter is a document in a partition, and expires on its own.
+/// </summary>
+public interface ICounterStore
+{
+    /// <summary>The counter's value, or 0 when it doesn't exist.</summary>
+    Task<double> ReadAsync(string partition, string id, CancellationToken cancellationToken = default);
+
+    /// <summary>Adds to the counter, creating it with this lifetime, and returns the new value.</summary>
+    Task<double> AddAsync(string partition, string id, double amount, TimeSpan timeToLive, CancellationToken cancellationToken = default);
+}
+
 public interface IReviewStatusStore
 {
     /// <summary>Looks in one repo's partition only, so a caller can't read another repo's review by its ID.</summary>

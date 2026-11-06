@@ -51,6 +51,10 @@ public static class WorkerHost
             Required("TF_REVIEW_GITHUB_APP_CLIENT_ID"),
             (await Secrets().GetSecretAsync(AppKeySecret, cancellationToken: cancellationToken)).Value.Value);
 
+        var budget = stores.Counters is { } counters
+            ? new DailyBudget(counters, DailyBudget.LimitFrom(Environment.GetEnvironmentVariable(DailyBudget.Variable)))
+            : null;
+
         ReviewRunner? runner = null;
         async Task<ReviewRunner> RunnerAsync(CancellationToken cancellationToken)
         {
@@ -65,10 +69,17 @@ public static class WorkerHost
                 new DefaultAzureCredential(),
                 new Microsoft.Azure.Cosmos.CosmosClientOptions { ApplicationName = "tf-review", ConnectionMode = Microsoft.Azure.Cosmos.ConnectionMode.Gateway });
 
+            // Each call's estimated cost goes to the daily budget (D62), measured on the model, under the cache.
+            var model = ReviewModel.FromEnvironment();
+            if (model is not null && budget is not null)
+            {
+                model = model with { Chat = new SpendMeter(model.Chat, model.Deployment, budget.Spend) };
+            }
+
             return runner = new ReviewRunner(
                 new GitHubTarballSource(standardsHttp),
                 new ConftestRunner(new ProcessRunner()),
-                ReviewModel.FromEnvironment(),
+                model,
                 log: Console.WriteLine,
                 infracost: await InfracostAsync(Secrets(), cancellationToken),
                 checkov: new CheckovRunner(new ProcessRunner()),
@@ -84,7 +95,8 @@ public static class WorkerHost
             async (repository, cancellationToken) => await (await AppAsync(cancellationToken)).OpenAsync(repository, GitHubApi, cancellationToken),
             async (plan, config, lockFile, commit, repositoryId, cancellationToken) =>
                 await (await RunnerAsync(cancellationToken)).RunAsync(plan, config, commit, cancellationToken, lockFile, repositoryId),
-            Console.WriteLine);
+            Console.WriteLine,
+            budget: budget);
 
         return await worker.RunOnceAsync(deadline.Token);
     }

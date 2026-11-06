@@ -25,7 +25,8 @@ public sealed class ReviewWorker(
     RepositoryOpener open,
     ReviewEngine engine,
     Action<string> log,
-    TimeProvider? time = null)
+    TimeProvider? time = null,
+    IModelBudget? budget = null)
 {
     /// <summary>Longer than a job may run, so a message only comes back when the job really has gone.</summary>
     public static readonly TimeSpan Visibility = TimeSpan.FromMinutes(20);
@@ -123,9 +124,29 @@ public sealed class ReviewWorker(
             ? await session.ReadFileAsync($"{directory.TrimEnd('/')}/.terraform.lock.hcl", pullRequest.Base, cancellationToken)
             : null;
         var plan = await plans.ReadAsync(job.ReviewId, cancellationToken);
-        var result = plan is null
-            ? ReviewResult.Failed(job.Commit, ReviewScope.Plan, NotReviewedReason.Unavailable)
-            : await engine(plan, config, lockFile, job.Commit, job.RepositoryId, cancellationToken);
+        ReviewResult result;
+        if (plan is null)
+        {
+            result = ReviewResult.Failed(job.Commit, ReviewScope.Plan, NotReviewedReason.Unavailable);
+        }
+        else if (await this.BudgetReachedAsync(cancellationToken))
+        {
+            // The day's model spend is used up (D62), so nothing is reviewed, and the PR is told why.
+            log($"Review {job.ReviewId}: the daily model budget is reached.");
+            result = ReviewResult.Failed(job.Commit, ReviewScope.Plan, NotReviewedReason.BudgetReached);
+        }
+        else
+        {
+            try
+            {
+                result = await engine(plan, config, lockFile, job.Commit, job.RepositoryId, cancellationToken);
+            }
+            finally
+            {
+                // Whatever happened, what the calls cost counts.
+                await this.RecordSpendAsync(job);
+            }
+        }
 
         if ((await session.ReadPullRequestAsync(job.PullRequest, cancellationToken)).Head != job.Commit)
         {
@@ -207,6 +228,39 @@ public sealed class ReviewWorker(
         }
 
         await session.PostCheckRunAsync(result, cancellationToken);
+    }
+
+    // A budget store that fails doesn't stop reviews: the Azure budget's alerts are still there behind it.
+    private async Task<bool> BudgetReachedAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return budget is not null && await budget.ReachedAsync(cancellationToken);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            log($"Couldn't read the daily model budget, so the review goes ahead: {e.GetType().Name}.");
+            return false;
+        }
+    }
+
+    // Its own time, because the review's may have run out.
+    private async Task RecordSpendAsync(ReviewJob job)
+    {
+        if (budget is null)
+        {
+            return;
+        }
+
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            await budget.RecordAsync(timeout.Token);
+        }
+        catch (Exception e)
+        {
+            log($"Couldn't record review {job.ReviewId}'s model spend: {e.GetType().Name}.");
+        }
     }
 
     private static PlanCounts? Counts(string? plan) =>

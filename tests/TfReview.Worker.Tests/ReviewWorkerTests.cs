@@ -390,6 +390,41 @@ public class ReviewWorkerTests
         await Assert.That(measured.For("owner/post-fails")).IsEmpty();
     }
 
+    // D62: past the day's limit the model isn't called, and the PR is told why.
+    [Test]
+    public async Task A_spent_daily_budget_says_not_reviewed_without_a_review()
+    {
+        var world = new World { Budget = new FakeBudget { Reached = true } };
+
+        await Assert.That(await world.RunAsync()).IsEqualTo(0);
+
+        await Assert.That(world.Engine.Calls).IsEqualTo(0);
+        await Assert.That(world.GitHub.Comments.Single()).Contains("the daily model budget was reached");
+        await Assert.That(world.Statuses.Last.Verdict).IsEqualTo("not_reviewed");
+    }
+
+    [Test]
+    public async Task A_reviews_spend_is_recorded_even_when_it_fails()
+    {
+        var world = new World { Budget = new FakeBudget() };
+        world.Engine.Throws = new InvalidOperationException("failed");
+
+        await world.RunAsync();
+
+        await Assert.That(world.Budget!.Recorded).IsEqualTo(1);
+    }
+
+    // The Azure budget's alerts are still behind it, and a store outage mustn't stop every review.
+    [Test]
+    public async Task A_budget_that_cant_be_read_lets_the_review_go_ahead()
+    {
+        var world = new World { Budget = new FakeBudget { Fails = true } };
+
+        await Assert.That(await world.RunAsync()).IsEqualTo(0);
+
+        await Assert.That(world.Engine.Calls).IsEqualTo(1);
+    }
+
     // GitHub is the thing that's down: there's nowhere to say so, but the queue mustn't keep it forever.
     [Test]
     public async Task The_last_try_still_finishes_when_it_cant_post()
@@ -570,6 +605,8 @@ public class ReviewWorkerTests
 
         public FakeEngine Engine { get; } = new();
 
+        public FakeBudget? Budget { get; init; }
+
         public List<string> Log { get; } = [];
 
         public ReviewStatus StatusOf(ReviewState state, DateTimeOffset at) =>
@@ -587,11 +624,30 @@ public class ReviewWorkerTests
                         new HttpClient(this.GitHub) { BaseAddress = new Uri("https://api.example.test/") }, repository)),
                 this.Engine.RunAsync,
                 this.Log.Add,
-                new FixedTime(this.Now));
+                new FixedTime(this.Now),
+                this.Budget);
             return worker.RunOnceAsync();
         }
 
         public void Complete() => this.Completed = true;
+    }
+
+    private sealed class FakeBudget : IModelBudget
+    {
+        public bool Reached { get; init; }
+
+        public bool Fails { get; init; }
+
+        public int Recorded { get; private set; }
+
+        public Task<bool> ReachedAsync(CancellationToken cancellationToken) =>
+            this.Fails ? throw new InvalidOperationException("The store is down.") : Task.FromResult(this.Reached);
+
+        public Task RecordAsync(CancellationToken cancellationToken)
+        {
+            this.Recorded++;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FixedTime(DateTimeOffset now) : TimeProvider

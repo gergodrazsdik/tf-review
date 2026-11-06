@@ -29,6 +29,9 @@ public static partial class ReviewApi
 {
     private const string RefusedPlan = """{"refused":true}""";
 
+    /// <summary>An hour's count outlives its hour, then expires by itself.</summary>
+    private static readonly TimeSpan RateWindowLife = TimeSpan.FromHours(2);
+
     private static readonly JsonSerializerOptions RequestOptions = new()
     {
         RespectRequiredConstructorParameters = true,
@@ -69,8 +72,7 @@ public static partial class ReviewApi
             }
 
             var caller = decision.Caller!;
-            using var lease = limiter.AttemptAcquire(caller.RepositoryId);
-            if (!lease.IsAcquired)
+            if (!await WithinRateAsync(caller, options, stores, limiter, logger, context.RequestAborted))
             {
                 logger.LogWarning("Rate limited repository {Repository}.", caller.RepositoryId);
                 return Results.StatusCode(StatusCodes.Status429TooManyRequests);
@@ -115,6 +117,35 @@ public static partial class ReviewApi
                 return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
             }
         });
+    }
+
+    /// <summary>
+    /// The per-repo limit, counted in the store by repo and hour, so a replica scaling to zero doesn't reset it (SEC-5).
+    /// If the store fails, this replica's own count stands in, which is what it was before.
+    /// </summary>
+    private static async Task<bool> WithinRateAsync(
+        Caller caller,
+        ApiOptions options,
+        ServiceStores stores,
+        PartitionedRateLimiter<string> limiter,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        if (stores.Counters is { } counters)
+        {
+            try
+            {
+                var hour = DateTimeOffset.UtcNow.ToString("yyyyMMddHH", System.Globalization.CultureInfo.InvariantCulture);
+                return await counters.AddAsync(caller.RepositoryId, $"rate-{hour}", 1, RateWindowLife, cancellationToken) <= options.ReviewsPerHour;
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                logger.LogWarning("Couldn't count a review against the rate limit, so this replica counts it: {Type}.", e.GetType().Name);
+            }
+        }
+
+        using var lease = limiter.AttemptAcquire(caller.RepositoryId);
+        return lease.IsAcquired;
     }
 
     private static HashSet<string> List(string name) =>

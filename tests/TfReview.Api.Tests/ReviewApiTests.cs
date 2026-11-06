@@ -323,6 +323,38 @@ public class ReviewApiTests
         await Assert.That(otherRepo.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
     }
 
+    // SEC-5: the API scales to zero, and a new replica mustn't start the hour's count again.
+    [Test]
+    public async Task The_rate_limit_outlives_a_replica()
+    {
+        var counters = new MemoryCounters();
+        var options = new ApiOptions(Allowed, ReleasedCommits) { ReviewsPerHour = 1 };
+
+        await using (var first = await Api.StartAsync(options, counters))
+        {
+            using var accepted = await first.SubmitAsync(Token(GoodClaims()));
+            await Assert.That(accepted.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
+        }
+
+        await using var second = await Api.StartAsync(options, counters);
+        using var limited = await second.SubmitAsync(Token(GoodClaims()));
+
+        await Assert.That(limited.StatusCode).IsEqualTo(HttpStatusCode.TooManyRequests);
+    }
+
+    // A store that fails mustn't refuse every review: the replica's own count stands in.
+    [Test]
+    public async Task A_failing_rate_count_falls_back_to_the_replicas_own()
+    {
+        await using var api = await Api.StartAsync(new ApiOptions(Allowed, ReleasedCommits) { ReviewsPerHour = 1 }, new MemoryCounters { Fail = true });
+
+        using var first = await api.SubmitAsync(Token(GoodClaims()));
+        using var limited = await api.SubmitAsync(Token(GoodClaims()));
+
+        await Assert.That(first.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
+        await Assert.That(limited.StatusCode).IsEqualTo(HttpStatusCode.TooManyRequests);
+    }
+
     [Test]
     public async Task A_refused_caller_doesnt_use_up_a_repos_rate_limit()
     {
@@ -478,6 +510,36 @@ public class ReviewApiTests
         });
     }
 
+    private sealed class MemoryCounters : ICounterStore
+    {
+        private readonly Dictionary<(string, string), double> values = [];
+
+        public bool Fail { get; init; }
+
+        public Task<double> ReadAsync(string partition, string id, CancellationToken cancellationToken = default)
+        {
+            lock (this.values)
+            {
+                return Task.FromResult(this.values.GetValueOrDefault((partition, id)));
+            }
+        }
+
+        public Task<double> AddAsync(string partition, string id, double amount, TimeSpan timeToLive, CancellationToken cancellationToken = default)
+        {
+            if (this.Fail)
+            {
+                throw new InvalidOperationException("The store is down.");
+            }
+
+            lock (this.values)
+            {
+                var value = this.values.GetValueOrDefault((partition, id)) + amount;
+                this.values[(partition, id)] = value;
+                return Task.FromResult(value);
+            }
+        }
+    }
+
     private sealed class Api : IAsyncDisposable
     {
         private readonly WebApplication app;
@@ -499,7 +561,7 @@ public class ReviewApiTests
 
         public FakeStatuses Statuses { get; }
 
-        public static async Task<Api> StartAsync(ApiOptions? options = null)
+        public static async Task<Api> StartAsync(ApiOptions? options = null, ICounterStore? counters = null)
         {
             var builder = WebApplication.CreateBuilder();
             builder.WebHost.UseTestServer();
@@ -510,7 +572,7 @@ public class ReviewApiTests
             var statuses = new FakeStatuses();
             var tokens = new GitHubTokens(GitHubTokens.Parameters(
                 ApiOptions.Audience, GitHubTokens.Issuer, parameters => parameters.IssuerSigningKey = Key));
-            app.MapReviews(options ?? new ApiOptions(Allowed, ReleasedCommits), tokens, new ServiceStores(plans, queue, statuses));
+            app.MapReviews(options ?? new ApiOptions(Allowed, ReleasedCommits), tokens, new ServiceStores(plans, queue, statuses) { Counters = counters });
 
             await app.StartAsync();
             return new Api(app, plans, queue, statuses);

@@ -348,6 +348,7 @@ public static partial class CommentRenderer
         NotReviewedReason.StandardsUnavailable => "the standards couldn't be fetched",
         NotReviewedReason.ScannerFailed => "a scanner failed to run",
         NotReviewedReason.PlanTooLarge => "the plan is too large",
+        NotReviewedReason.BudgetReached => "the daily model budget was reached",
         _ => throw new ArgumentOutOfRangeException(nameof(reason)),
     };
 

@@ -18,6 +18,9 @@ public sealed record ServiceStores(IPlanStore Plans, IReviewQueue Queue, IReview
     private const string Database = "tfreview";
     private const string ReviewsContainer = "reviews";
 
+    /// <summary>Durable counters, in the reviews container beside the statuses, or null for none (counted in memory).</summary>
+    public ICounterStore? Counters { get; init; }
+
     public static ServiceStores FromEnvironment()
     {
         var credential = new DefaultAzureCredential();
@@ -29,10 +32,14 @@ public sealed record ServiceStores(IPlanStore Plans, IReviewQueue Queue, IReview
             credential,
             new CosmosClientOptions { ApplicationName = "tf-review", ConnectionMode = ConnectionMode.Gateway });
 
+        var reviews = cosmos.GetContainer(Database, ReviewsContainer);
         return new ServiceStores(
             new BlobPlanStore(new BlobContainerClient(new Uri($"https://{account}.blob.core.windows.net/{PlansContainer}"), credential)),
             new StorageReviewQueue(new QueueClient(new Uri($"https://{account}.queue.core.windows.net/{QueueName}"), credential)),
-            new CosmosStatusStore(cosmos.GetContainer(Database, ReviewsContainer)));
+            new CosmosStatusStore(reviews))
+        {
+            Counters = new CosmosCounterStore(reviews),
+        };
     }
 
     private static string Required(string name) => Environment.GetEnvironmentVariable(name) is { Length: > 0 } value
@@ -139,5 +146,60 @@ internal sealed class CosmosStatusStore(Container container) : IReviewStatusStor
         using var content = new MemoryStream(Encoding.UTF8.GetBytes(document.ToJsonString()));
         using var response = await container.UpsertItemStreamAsync(content, new PartitionKey(status.RepositoryId), cancellationToken: cancellationToken);
         response.EnsureSuccessStatusCode();
+    }
+}
+
+/// <summary>
+/// Counters as documents in the reviews container, each with its own TTL, which the container's default of -1 allows.
+/// Two writers at once are kept apart by the document's ETag: the loser reads again and retries.
+/// </summary>
+internal sealed class CosmosCounterStore(Container container) : ICounterStore
+{
+    private const int MaxTries = 5;
+
+    public async Task<double> ReadAsync(string partition, string id, CancellationToken cancellationToken = default) =>
+        (await this.ReadDocumentAsync(partition, id, cancellationToken)).Value;
+
+    public async Task<double> AddAsync(string partition, string id, double amount, TimeSpan timeToLive, CancellationToken cancellationToken = default)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            var (value, etag) = await this.ReadDocumentAsync(partition, id, cancellationToken);
+            var document = new JsonObject
+            {
+                ["id"] = id,
+                ["repository"] = partition,
+                ["kind"] = "counter",
+                ["value"] = value + amount,
+                ["ttl"] = (int)timeToLive.TotalSeconds,
+            };
+
+            using var content = new MemoryStream(Encoding.UTF8.GetBytes(document.ToJsonString()));
+            using var response = etag is null
+                ? await container.CreateItemStreamAsync(content, new PartitionKey(partition), cancellationToken: cancellationToken)
+                : await container.ReplaceItemStreamAsync(
+                    content, id, new PartitionKey(partition), new ItemRequestOptions { IfMatchEtag = etag }, cancellationToken);
+
+            if (response.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed && attempt < MaxTries)
+            {
+                continue;
+            }
+
+            response.EnsureSuccessStatusCode();
+            return value + amount;
+        }
+    }
+
+    private async Task<(double Value, string? ETag)> ReadDocumentAsync(string partition, string id, CancellationToken cancellationToken)
+    {
+        using var response = await container.ReadItemStreamAsync(id, new PartitionKey(partition), cancellationToken: cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return (0, null);
+        }
+
+        response.EnsureSuccessStatusCode();
+        var document = await JsonNode.ParseAsync(response.Content, cancellationToken: cancellationToken);
+        return (document?["kind"]?.GetValue<string>() == "counter" ? document["value"]?.GetValue<double>() ?? 0 : 0, response.Headers.ETag);
     }
 }
