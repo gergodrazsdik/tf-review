@@ -10,3 +10,17 @@ ignore:
       name: github.com/go-jose/go-jose/v4
       version: v4.1.4
       location: /opt/infracost/plugins/infracost-parser-terraform-plan
+  # brotli and klauspost/compress: denial of service when decompressing a crafted stream (excessive allocation,
+  # a panic). Same plugin, same reasoning as go-jose: it only reads uncompressed plan JSON from our own redactor,
+  # in a job with a deadline, and 0.0.37 was still the newest version on 2026-11-06, so it can't be patched here.
+  # brotli's is on CISA's known-exploited list, which makes the review date below a hard one.
+  - vulnerability: GO-2026-6888
+    package:
+      name: github.com/andybalholm/brotli
+      version: v1.2.0
+      location: /opt/infracost/plugins/infracost-parser-terraform-plan
+  - vulnerability: GO-2026-6865
+    package:
+      name: github.com/klauspost/compress
+      version: v1.18.7
+      location: /opt/infracost/plugins/infracost-parser-terraform-plan
