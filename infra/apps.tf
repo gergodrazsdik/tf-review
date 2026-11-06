@@ -7,9 +7,9 @@ variable "allowed_repository_ids" {
 }
 
 locals {
-  # image-v0.0.16. A release that changes the service updates this, and the workflow only needs the same one when
+  # image-v0.0.18. A release that changes the service updates this, and the workflow only needs the same one when
   # its own commands change.
-  service_image = "ghcr.io/gergodrazsdik/tf-review@sha256:ab6a0af4d8b6b3ddc0210ba6193cd6ffd26b6198d52f82d7b24013af9047e304"
+  service_image = "ghcr.io/gergodrazsdik/tf-review@sha256:e9459b4157f1272b45c9118d114f63ac9dac27cf6f7102ea826f145e117a3d7f"
 
   # The commits callers may pin the reusable workflow to (D45).
   released_commits = [
