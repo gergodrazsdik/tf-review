@@ -1,0 +1,15 @@
+{
+  "name": "tf-review",
+  "description": "tf-review's Claude Code plugin: the OpenTofu guardrails its PR reviews enforce, for repos it reviews.",
+  "owner": {
+    "name": "Gergő Drazsdik",
+    "url": "https://github.com/gergodrazsdik"
+  },
+  "plugins": [
+    {
+      "name": "tf-review-opentofu",
+      "source": "./plugin",
+      "description": "The OpenTofu conventions tf-review enforces, and hooks that block applies and state changes and check formatting."
+    }
+  ]
+}

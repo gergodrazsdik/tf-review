@@ -1,0 +1,14 @@
+{
+  "name": "tf-review-opentofu",
+  "displayName": "tf-review OpenTofu guardrails",
+  "version": "0.1.0",
+  "description": "The OpenTofu conventions tf-review enforces on PRs, as a skill that reads your repo's pinned standards, and hooks that block applies and state changes and check formatting.",
+  "author": {
+    "name": "Gergő Drazsdik",
+    "url": "https://github.com/gergodrazsdik"
+  },
+  "homepage": "https://github.com/gergodrazsdik/tf-review",
+  "repository": "https://github.com/gergodrazsdik/tf-review",
+  "license": "Apache-2.0",
+  "keywords": ["opentofu", "terraform", "azure", "review", "guardrails"]
+}
