@@ -387,7 +387,8 @@ One storage account holds every repo's state, created once by a bootstrap projec
 | Apply | `repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:prod` | Write on the target scope, gated by environment approval |
 | Evals (`tf-review` only, from M3) | `repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:review` | Cognitive Services OpenAI User on the Foundry resource group, and from M3 reading the `tfreview` database for the live evals with references (D21, D24). Until M3 each repo had one for its review job |
 | Reviewer submit (M3) | No Azure identity: the API checks the GitHub OIDC token itself (D45) | Call the review API only |
-| Service (M3) | None: a managed identity on the service's container apps | LLM, queue, blobs, reading secrets and, from `infra/`, Cosmos, all in `tf-review`'s resource group |
+| Service (M3) | None: a managed identity on the review job | LLM, queue, blobs, reading secrets and, from `infra/`, Cosmos, all in `tf-review`'s resource group |
+| API | None: a managed identity on the API's container app | Writing plan blobs, sending queue messages and, from `infra/`, the `reviews` container that holds statuses. No secrets, model or corpus, so a bug in the public request path can't reach the App's key |
 | Index (M3) | `repo:<owner>@<owner-id>/tf-review@<repo-id>:environment:corpus`, which only `main` can use, after your approval | Embeddings and writing the `tfreview` database, both from bootstrap, because `infra/`'s plan identity can't read the state resource group (D44) |
 
 **Reviewer infrastructure** (`tf-review/infra`; Foundry from M1, the rest from M3)

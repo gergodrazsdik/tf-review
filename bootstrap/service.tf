@@ -30,6 +30,25 @@ resource "azurerm_role_assignment" "service" {
   principal_type       = "ServicePrincipal"
 }
 
+# The API's own identity. It takes reviews in: it writes the plan blob, queues the message and, from infra/, keeps the
+# review's status in Cosmos. It reaches no secrets, model or corpus, so a bug in the public request path can't reach
+# the GitHub App's key (review finding SEC-6).
+resource "azurerm_user_assigned_identity" "api" {
+  name                = "id-${local.foundry_repo}-api-prod"
+  resource_group_name = azurerm_resource_group.target[local.foundry_repo].name
+  location            = azurerm_resource_group.target[local.foundry_repo].location
+  tags                = merge(local.common_tags, { project = local.foundry_repo })
+}
+
+resource "azurerm_role_assignment" "api" {
+  for_each = toset(["Storage Blob Data Contributor", "Storage Queue Data Message Sender"])
+
+  scope                = local.service_scope
+  role_definition_name = each.value
+  principal_id         = azurerm_user_assigned_identity.api.principal_id
+  principal_type       = "ServicePrincipal"
+}
+
 # `just secrets-sync` writes the service's secrets as the person running bootstrap.
 resource "azurerm_role_assignment" "deployer_service_secrets" {
   scope                = local.service_scope

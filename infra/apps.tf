@@ -30,11 +30,21 @@ locals {
     name  = "AZURE_CLIENT_ID"
     value = sensitive(data.azurerm_user_assigned_identity.service.client_id)
   }
+  api_client_id = {
+    name  = "AZURE_CLIENT_ID"
+    value = sensitive(data.azurerm_user_assigned_identity.api.client_id)
+  }
 }
 
 # Bootstrap creates this, because the apply identity can't assign roles (D24).
 data "azurerm_user_assigned_identity" "service" {
   name                = "id-tf-review-service-prod"
+  resource_group_name = data.azurerm_resource_group.target.name
+}
+
+# The API's own identity, from bootstrap: storage for plans and the queue, and below, the reviews container (SEC-6).
+data "azurerm_user_assigned_identity" "api" {
+  name                = "id-tf-review-api-prod"
   resource_group_name = data.azurerm_resource_group.target.name
 }
 
@@ -45,6 +55,15 @@ resource "azurerm_cosmosdb_sql_role_assignment" "service" {
   role_definition_id  = "${azapi_resource.cosmos.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
   principal_id        = sensitive(data.azurerm_user_assigned_identity.service.principal_id)
   scope               = azapi_resource.cosmos.id
+}
+
+# Only the container holding review statuses, which the API writes when it takes a review in.
+resource "azurerm_cosmosdb_sql_role_assignment" "api" {
+  resource_group_name = data.azurerm_resource_group.target.name
+  account_name        = azapi_resource.cosmos.name
+  role_definition_id  = "${azapi_resource.cosmos.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
+  principal_id        = sensitive(data.azurerm_user_assigned_identity.api.principal_id)
+  scope               = "${azapi_resource.cosmos.id}/dbs/${azurerm_cosmosdb_sql_database.service.name}/colls/${azurerm_cosmosdb_sql_container.reviews.name}"
 }
 
 # The apps use azapi, because azurerm lists an app's secrets on every read, which the plan identity can't do and
@@ -59,7 +78,7 @@ resource "azapi_resource" "api" {
 
   identity {
     type         = "UserAssigned"
-    identity_ids = [data.azurerm_user_assigned_identity.service.id]
+    identity_ids = [data.azurerm_user_assigned_identity.api.id]
   }
 
   body = {
@@ -86,7 +105,7 @@ resource "azapi_resource" "api" {
               TF_REVIEW_ALLOWED_REPOSITORY_IDS = var.allowed_repository_ids
               TF_REVIEW_RELEASED_COMMITS       = join(",", local.released_commits)
             }) : { name = name, value = value }],
-            [local.service_client_id],
+            [local.api_client_id],
           )
         }]
       }
