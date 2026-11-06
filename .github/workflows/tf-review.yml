@@ -22,7 +22,7 @@ on:
         type: string
         default: .tf-review.yml
       image:
-        description: Review image by digest. Only tf-review's signed release and dev packages are accepted.
+        description: Review image by digest. Only tf-review's signed releases are accepted.
         type: string
         default: ghcr.io/gergodrazsdik/tf-review@sha256:de4023f14f5a9ffeea73597644a24fdf51ec3d5ba5b8bebe82cb41f75b0f7e7b
       api-url:
@@ -84,18 +84,18 @@ jobs:
       - &verify-image
         name: Verify the image
         run: |
+          # Only a release signs: release.yml at a protected image-v* tag (D60).
           case $IMAGE in
-            ghcr.io/gergodrazsdik/tf-review@sha256:*) workflow='release\.yml@refs/tags/image-v.*' ;;
-            ghcr.io/gergodrazsdik/tf-review-dev@sha256:*) workflow='dev-image\.yml@refs/heads/.*' ;;
+            ghcr.io/gergodrazsdik/tf-review@sha256:*) ;;
             *)
-              echo "The image must be tf-review or tf-review-dev, by digest." >&2
+              echo "The image must be tf-review, by digest." >&2
               exit 1
               ;;
           esac
           workflows='^https://github\.com/gergodrazsdik/tf-review/\.github/workflows'
           cosign verify --output text \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-            --certificate-identity-regexp "$workflows/$workflow\$" \
+            --certificate-identity-regexp "$workflows/release\.yml@refs/tags/image-v[0-9]+\.[0-9]+\.[0-9]+\$" \
             "$IMAGE" >/dev/null
           docker pull --quiet "$IMAGE"
       - name: Read the tool version from the base commit

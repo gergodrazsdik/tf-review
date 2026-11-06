@@ -81,7 +81,7 @@ All 49 decisions are settled as of 2026-11-02; D19–D29 came from the M1 design
 | D20 | M1 arbiter | Rule-based behind `IArbiter` (severity sort, verdict); LLM arbiter in M2, limited by D36 | With one agent there's nothing to arbitrate, and it halves the LLM calls |
 | D21 | LLM credentials | Two jobs: the plan job runs PR code and uploads only a redacted plan; the review job runs no PR code and uses its own identity, federated on `environment:review` | `tofu plan` runs code a PR controls, which could otherwise mint the LLM credentials; this doesn't stop someone who can edit the workflow |
 | D22 | Evidence pointers | Address-keyed: `/resource_changes/<escaped address>/...`, composed by code and checked against `resource_address` | Array indexes shift with slices and no-op drops, and would break M4's cached findings |
-| D23 | Image pinning | Two tags: `image-v*` builds and signs, a PR pins the digest on `main`, `v*` publishes the workflow; dev images are a separate signed package passed through an `image` input | A tag's workflow can't contain its own image digest; `main` always holds a valid one |
+| D23 | Image pinning | Two tags: `image-v*` builds and signs, a PR pins the digest on `main`, `v*` publishes the workflow. A separate signed dev image was retired unused on 2026-11-06: release candidates did its job, and its identity (`dev-image.yml` on any branch) let anyone with write access sign an image callers accept (SEC-3) | A tag's workflow can't contain its own image digest; `main` always holds a valid one |
 | D24 | Reviewer infra | `tf-review` joins bootstrap's `repos` map, CI applies `infra/` behind `prod` approval, and bootstrap grants the LLM role at resource group scope | The apply identity's Contributor can't assign roles; a new repo stays one map entry |
 | D25 | Redaction policy | Tofu's sensitive marks plus an attribute-name denylist, with marked values swept wherever else they appear; GUIDs in changes are replaced too, but not in addresses; malformed input refuses the review; other values pass | The model keeps its context; unmarked secrets under ordinary names remain a known risk. Resource IDs hold the subscription ID, which D30 keeps out of public logs, and the plan artifact and comments are public too; addresses have to stay unique |
 | D26 | Corpus metadata | `topics` enum in corpus frontmatter; agents declare the topics they retrieve | The schema can't express "naming, tags" today, so POL-001 would reach the conventions agent |
@@ -258,7 +258,6 @@ tf-review/
     tf-review.yml     # on: workflow_call
     ci.yml            # lint, test, e2e
     release.yml       # image build, scan, sign, push on image-v* tags
-    dev-image.yml     # signed tf-review-dev image, on dispatch
     infra.yml         # plan infra/ on PR, apply on main behind prod
 ```
 
@@ -557,7 +556,7 @@ Work runs in this order, so unknowns surface first and a real comment lands befo
 *3. Walking skeleton: first real comment*
 
 - [x] `tfreview` stub that posts counts only, no plan content; `Containerfile` with conftest and `just image`
-- [x] `release.yml` and `dev-image.yml`; PR CI builds and smoke-tests the image without pushing. **You:** tag `image-v0.0.2` (`image-v0.0.1` stopped at the Grype gate), make the package public once. `dev-image.yml` hasn't run yet
+- [x] `release.yml` and `dev-image.yml`; PR CI builds and smoke-tests the image without pushing. **You:** tag `image-v0.0.2` (`image-v0.0.1` stopped at the Grype gate), make the package public once. `dev-image.yml` never ran, and was retired on 2026-11-06 (D23)
 - [x] Reusable workflow v0 with both jobs, inline with no composite action (a called workflow's `./` resolves to the caller). **You:** tag `v0.0.1`
 - [x] Demo: `plan.yml` becomes the caller, losing the raw plan comment and `--edit-last`, which would overwrite the sticky comment; add `.tf-review.yml`. **You:** re-apply the ruleset, because the required `plan` context likely gets renamed and would otherwise block every PR
 
