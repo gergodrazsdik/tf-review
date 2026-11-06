@@ -6,7 +6,7 @@ Nov 1, 2026 · @Drazsdik Gergő
 
 Build a multi-agent, RAG-backed review board that comments on OpenTofu (later also Terraform) pull requests, reusable by any repo through one reusable GitHub workflow, at roughly $5–30/month on Azure. Deterministic tools find issues; LLM agents explain them, rank them and tie them to the team's own standards. One container image runs the whole review: in the GitHub runner during M1–M2, in Azure Container Apps from M3.
 
-Status: v1, every decision taken (see the Decision log); M0's to M3's gates have passed, M4 is underway, and gpt-6.1-sol reviews since 2026-11-05. This document now lives in `tf-review/docs/plan.md` and is maintained there.
+Status: v1, every decision taken (see the Decision log); M0's to M4's gates have passed, and gpt-6.1-sol reviews since 2026-11-05. This document now lives in `tf-review/docs/plan.md` and is maintained there.
 
 **Goals**
 
@@ -696,10 +696,11 @@ Work runs in this order, so the unknowns surface before anything depends on them
 - [x] Opt-in blocking on deterministic high findings (D55): released in `image-v0.0.18`, and proved on demo #48 with the demo opted in for the proof: a failed check with the POL-002 row marked blocking. The demo went back to advisory in #49
 - [x] Self-review on `tf-review` with the advisory exception. First: `PLAN_VARIABLES` (D52) and `tf-review`'s own `.tf-review.yml`, always advisory. Bootstrap applied 2026-11-04. `infra.yml`'s plan job now calls the released workflow (`v0.0.12`), so every PR to `infra/` is reviewed by the service, advisory. Proved on #100, its own PR: 19 resources planned with `PLAN_VARIABLES`, No findings
 - [x] Claude Code plugin with the conventions skill and hooks (D57). Tagged `plugin-v0.1.0`; the demo template enables it (demo #51), and a demo session loaded the skill and answered from the standards at the pinned commit
-- [ ] Gate: a second repo onboarded with one bootstrap map entry and the template. `tf-review-demo2`, created from the template on 2026-11-06 with the repo settings from Setup and the `main` ruleset. Onboarding: this map entry, your `bootstrap-plan`/`bootstrap-apply` (the fine-grained token needs secrets access on the new repo), `infra.yml` run by hand from `main` so the API's allowlist takes the new repo ID (it's deployed by `infra/`'s apply, which bootstrap can't trigger), and the App installed on the repo. The template's `infra/` names the demo's own resource group and resources, so the new repo's first PR renames them; that's the one change it needs
+- [x] Gate: a second repo onboarded with one bootstrap map entry and the template. **Passed 2026-11-06**: `tf-review-demo2`, created from the template with the repo settings from Setup and the `main` ruleset, onboarded by #119's one `repos` entry, and its first PR (demo2 #1) planned with its own identity and reviewed by the service: No findings, 5 creates. Onboarding is: the map entry, your `bootstrap-plan`/`bootstrap-apply` (the fine-grained token needs secrets access on the new repo), `gh workflow run infra.yml` and its `prod` approval so the API's allowlist takes the new repo ID, and the App installed on the repo. The re-run is needed even when an infra apply is already waiting: the one #119's merge started had read the old allowlist variable when its run was created. The template's `infra/` names the demo's own resource group and resources, so the new repo's first PR renames them
 
 **Backlog after v1**
 
+- The template's `infra/` derives its names, resource group and `project` tag from one `workload` value, so a repo made from it changes one line, not five (learned onboarding `tf-review-demo2`)
 - A shared dashboard of the reviewer's metrics and resource usage, as an Azure Workbook in `infra/`: cost and tokens per agent, findings, what wasn't reviewed, job runs and Cosmos and storage use
 - Terraform Cloud / HCP-hosted plans as an input
 - AWS and Google pricing (add their Infracost plugins to the image)
