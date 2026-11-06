@@ -10,6 +10,9 @@ on:
   push:
     branches: [main]
     paths: *infra-paths
+  # To deploy what bootstrap changed, such as the allowlist after a repo is onboarded (D40). The prod environment
+  # only takes main, and still waits for your approval.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -37,7 +40,7 @@ jobs:
     secrets: inherit
 
   apply:
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     environment: prod
     concurrency:

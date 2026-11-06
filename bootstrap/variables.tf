@@ -45,5 +45,8 @@ variable "repos" {
     "tf-review-demo" = {
       target_resource_group = "rg-tf-review-demo-prod"
     }
+    "tf-review-demo2" = {
+      target_resource_group = "rg-tf-review-demo2-prod"
+    }
   }
 }
