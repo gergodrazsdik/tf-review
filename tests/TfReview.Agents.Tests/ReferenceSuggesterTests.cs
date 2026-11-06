@@ -44,6 +44,27 @@ public class ReferenceSuggesterTests
         await Assert.That(ReferenceSuggester.Accept(Answer(term, id, same), [Bastion], "source_address_prefix", "Restrict it.")).IsNull();
     }
 
+    // BUG-4: D50 keeps a sentence only if it names the term the excerpt was checked for.
+    [Test]
+    public async Task A_sentence_that_doesnt_name_its_term_is_dropped()
+    {
+        var answer = new ReferenceSuggester.WireOutput("Enable boot diagnostics on the VM.", "REF-bastion", "Azure Bastion", true);
+
+        await Assert.That(ReferenceSuggester.Accept(answer, [Bastion], "source_address_prefix", null)).IsNull();
+    }
+
+    // BUG-4: punctuation normalises to nothing, which every text contains.
+    [Test]
+    [Arguments("---")]
+    [Arguments("a-b")]
+    [Arguments("  !!  ")]
+    public async Task A_term_with_too_few_letters_or_digits_is_dropped(string term)
+    {
+        var answer = new ReferenceSuggester.WireOutput($"Do something unrelated {term}.", "REF-bastion", term, true);
+
+        await Assert.That(ReferenceSuggester.Accept(answer, [Bastion], "source_address_prefix", null)).IsNull();
+    }
+
     // As v6 did with allowBlobPublicAccess for allow_nested_items_to_be_public: the same fix under another name.
     [Test]
     public async Task The_findings_own_attribute_or_a_term_the_suggestion_has_is_dropped()

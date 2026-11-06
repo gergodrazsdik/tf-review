@@ -717,6 +717,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 - [x] The worker sets itself up after it takes a message: the App's key, the Infracost token and the clients. A Key Vault, secret or setting fault fails a try of that message and ends in "not reviewed" after 3, instead of crashing every execution while the message waits a week. A missing Infracost token costs only the cost scope. Without the App the give-up still marks the review failed, finishes the message and logs `ERROR`. Every give-up counts in `tfreview.give_ups` (`repository`, `cause`, `posted`), for an alert, and a give-up for a commit that's no longer the head posts nothing (OPS-1, MNT-12, BUG-1, MNT-3)
 - [x] Dismissals survive every rewrite and count once (D56): hidden lines for findings not shown, counted marks kept on unticked boxes, a key per merged rule, counting after the write, the workflow's fallback carrying ticks over, and at most 50 new counts per rewrite against pasted markers (BUG-2, MNT-4, BUG-7, BUG-23, BUG-25, SEC-15 in part)
 - [x] One review's TPM budget comes from `TF_REVIEW_TOKENS_PER_MINUTE`, so it can be the share of 3 jobs, and defaults to 45K on the gpt-5.4-mini fallback (D54; MNT-11, OPS-5, BUG-10). **You:** set it in `infra/apps.tf`, for example to 30000
+- [x] The suggester keeps a sentence only if it names its term, as D50 says, and a term needs 3 letters or digits (BUG-4, MNT-6)
 
 ## Evaluation
 

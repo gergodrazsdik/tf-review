@@ -86,14 +86,17 @@ public sealed partial class ReferenceSuggester(IReferenceRetriever retriever, IC
     {
         if (answer is not { SameProblem: true, Addition: { } addition, ReferenceId: { } id, Term: { } term }
             || addition.Trim().Length == 0
-            || term.Trim().Length < 3
             || offered.FirstOrDefault(doc => doc.Id == id) is not { } doc)
         {
             return null;
         }
 
+        // Measured after normalising, so a term of punctuation alone, which matches anything, can't pass (BUG-4). The
+        // sentence itself has to name it, or the check would be of a term the model never used.
         var key = Normalize(term);
-        if (!Normalize(doc.Text).Contains(key, StringComparison.Ordinal)
+        if (key.Length < 3
+            || !Normalize(addition).Contains(key, StringComparison.Ordinal)
+            || !Normalize(doc.Text).Contains(key, StringComparison.Ordinal)
             || (attribute is not null && Normalize(attribute) == key)
             || (suggestion is not null && Normalize(suggestion).Contains(key, StringComparison.Ordinal))
             || Governance().IsMatch(addition))
