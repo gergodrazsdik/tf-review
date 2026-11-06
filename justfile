@@ -24,6 +24,7 @@ lint: contracts
     actionlint
     pinact run --check
     shellcheck scripts/*.sh
+    python3 scripts/check_plugin_hooks.py
     gitleaks git --no-banner
 
 # Run the checks that start provider or ruleset plugins, which can't run in the Claude sandbox; CI runs this too
