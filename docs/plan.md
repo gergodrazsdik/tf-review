@@ -707,7 +707,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 - Terraform Cloud / HCP-hosted plans as an input
 - AWS and Google pricing (add their Infracost plugins to the image)
 - Fix suggestions as GitHub suggested changes
-- [ ] OpenTofu state encryption with a key held in Key Vault (D59). Rollout: (1) bootstrap makes the vault and keys (**you:** `bootstrap-plan`/`bootstrap-apply`, twice if the first can't create the keys yet); (2) one PR per state adds the `encryption` block with a `fallback` to unencrypted, and its apply on merge rewrites the state encrypted; (3) a PR per state removes the fallback and sets `enforced = true`. Then decide about the plaintext state versions blob versioning still keeps
+- [x] OpenTofu state encryption with a key held in Key Vault (D59). Done 2026-11-06: bootstrap made the vault and keys (#122); tf-review #124, demo #53 and demo2 #2 added the `encryption` block, and their applies rewrote each state encrypted (the blobs hold only `encrypted_data`, `encryption_version`, `meta`, `lineage` and `serial`); this change removes the fallback and sets `enforced = true`. The key provider reads `use_oidc` only from its block, not from `ARM_USE_OIDC`, so the block sets it; a laptop falls through to the Azure CLI. Left to decide: the plaintext state versions that blob versioning still keeps
 - Self-hosted Infracost pricing, which also switches off its telemetry, before any client repo is onboarded
 
 ## Evaluation

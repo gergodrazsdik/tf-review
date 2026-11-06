@@ -16,8 +16,7 @@ terraform {
   backend "azurerm" {}
 
   # State encryption (D59): a data key wrapped by this repo's RSA key in the state vault, which only its plan and
-  # apply identities can use. The fallback reads the state written before encryption; the first apply rewrites it
-  # encrypted, and a later change removes the fallback and enforces encryption.
+  # apply identities can use. The state was rewritten encrypted on 2026-11-06.
   encryption {
     key_provider "azure_vault" "state" {
       vault_uri      = "https://kv-tf-review-state-prod.vault.azure.net"
@@ -33,14 +32,10 @@ terraform {
       keys = key_provider.azure_vault.state
     }
 
-    method "unencrypted" "migrate" {}
-
+    # Enforced, so OpenTofu refuses to write this state unencrypted.
     state {
-      method = method.aes_gcm.state
-
-      fallback {
-        method = method.unencrypted.migrate
-      }
+      method   = method.aes_gcm.state
+      enforced = true
     }
   }
 }
