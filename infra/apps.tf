@@ -17,6 +17,11 @@ locals {
   # its own commands change.
   service_image = "ghcr.io/gergodrazsdik/tf-review@sha256:6667239cf99688b6192b640eb6378df46a565da8a03e39d699017b065e0e3ba2"
 
+  # Reviews that run at once, and each one's share of the deployment's tokens a minute: 90% of it, split between them,
+  # so together they stay under the rate limit (D54). Two at once leaves each 45K, enough for a large plan's batches.
+  review_job_executions    = 2
+  review_tokens_per_minute = floor(azurerm_cognitive_deployment.gpt_6_1_sol.sku[0].capacity * 1000 * 0.9 / local.review_job_executions)
+
   # The commits callers may pin the reusable workflow to (D45).
   released_commits = [
     for line in split("\n", file("${path.module}/released-commits.txt")) : trimspace(line)
@@ -158,7 +163,7 @@ resource "azapi_resource" "review_job" {
           replicaCompletionCount = 1
           scale = {
             minExecutions   = 0
-            maxExecutions   = 3
+            maxExecutions   = local.review_job_executions
             pollingInterval = 30
             rules = [{
               name     = "reviews-queue"
@@ -186,6 +191,10 @@ resource "azapi_resource" "review_job" {
               TF_REVIEW_OPENAI_ENDPOINT      = "https://${azurerm_cognitive_account.foundry.custom_subdomain_name}.openai.azure.com/openai/v1/"
               TF_REVIEW_OPENAI_DEPLOYMENT    = azurerm_cognitive_deployment.gpt_6_1_sol.name
               TF_REVIEW_EMBEDDING_DEPLOYMENT = azurerm_cognitive_deployment.text_embedding_3_small.name
+              # Part of the result cache's key, so a new model version doesn't get the old one's answers (D53).
+              TF_REVIEW_OPENAI_MODEL_VERSION = azurerm_cognitive_deployment.gpt_6_1_sol.model[0].version
+              TF_REVIEW_TOKENS_PER_MINUTE    = tostring(local.review_tokens_per_minute)
+              TF_REVIEW_DAILY_BUDGET_USD     = "5"
             }) : { name = name, value = value }],
             [
               local.service_client_id,

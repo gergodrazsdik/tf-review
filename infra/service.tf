@@ -51,7 +51,19 @@ resource "azurerm_storage_container" "plans" {
   }
 }
 
-# Redacted plans only need to last until the review is done, with some days to look into a failure.
+# Each review's result as posted, so a bad review can be reconstructed after its comment changed (OPS-19).
+resource "azurerm_storage_container" "results" {
+  name                  = "results"
+  storage_account_id    = azurerm_storage_account.service.id
+  container_access_type = "private"
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+# Redacted plans only need to last until the review is done, with some days to look into a failure. Results last
+# longer, to look into a review someone questions later.
 resource "azurerm_storage_management_policy" "plans" {
   storage_account_id = azurerm_storage_account.service.id
 
@@ -67,6 +79,22 @@ resource "azurerm_storage_management_policy" "plans" {
     actions {
       base_blob {
         delete_after_days_since_creation_greater_than = 7
+      }
+    }
+  }
+
+  rule {
+    name    = "delete-old-results"
+    enabled = true
+
+    filters {
+      prefix_match = ["results/"]
+      blob_types   = ["blockBlob"]
+    }
+
+    actions {
+      base_blob {
+        delete_after_days_since_creation_greater_than = 90
       }
     }
   }
