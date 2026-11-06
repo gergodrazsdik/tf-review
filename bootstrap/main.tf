@@ -44,11 +44,21 @@ resource "azurerm_storage_account" "state" {
   }
 }
 
+# The lock also stops role assignments under the account from being deleted, so changing or removing a state role
+# needs it lifted first: `az lock delete --name state-cannot-delete --resource-group rg-tf-review-state-prod
+# --resource sttfreviewstateprod --resource-type Microsoft.Storage/storageAccounts`. The next apply makes it again,
+# after the role changes, which is what depends_on orders.
 resource "azurerm_management_lock" "state" {
   name       = "state-cannot-delete"
   scope      = azurerm_storage_account.state.id
   lock_level = "CanNotDelete"
   notes      = "Holds the state of every onboarded repo."
+
+  depends_on = [
+    azurerm_role_assignment.plan_state,
+    azurerm_role_assignment.apply_state,
+    azurerm_role_assignment.deployer_state,
+  ]
 }
 
 resource "azurerm_storage_container" "bootstrap" {
