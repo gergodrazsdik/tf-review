@@ -226,7 +226,7 @@ Containerfile
 ```
 
 - **SDK and language**: `global.json` pins `11.0.100-rc.3.26522.148` with `allowPrerelease` until GA; C# 15 is the `net11.0` default, so no `LangVersion` override
-- **C# 15 usage**: unions and `closed` records for internal models such as `Evidence` and agent outcomes; the JSON contracts don't change. `Evidence` uses `JsonUnionTypeStructuralClassifier`, because the default classifier can't tell two object cases apart. The schema generated from a union is looser than `finding.schema.json`, so findings are still validated against the contract
+- **C# 15 usage**: unions and `closed` records for internal models such as `Evidence` and agent outcomes; the JSON contracts don't change. `Evidence` uses `JsonUnionTypeStructuralClassifier`, because the default classifier can't tell two object cases apart. The schema generated from a union is looser than `finding.schema.json`, so the evals validate every result they produce, findings included, against `review-result.schema.json` and `finding.schema.json` (replay in CI, and live runs); the service itself doesn't validate at run time
 - **Auth**: `DefaultAzureCredential` everywhere: `az login` locally, OIDC in CI, managed identity in Azure; key auth disabled on Foundry and Cosmos
 - **LLM client**: `OpenAIClient` with `BearerTokenPolicy` (scope `https://ai.azure.com/.default`) on the resource's `/openai/v1/` endpoint, exposed as `IChatClient`; no `Azure.AI.OpenAI` package. That constructor is experimental, so `OPENAI001` is suppressed for it
 - **Config**: `appsettings.json` and environment for the service; `.tf-review.yml` per repo for enabled agents, thresholds, gate mode and the `tf-standards` commit, read from the PR's base commit (D27)

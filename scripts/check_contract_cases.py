@@ -30,8 +30,56 @@ scanner_finding = changed(
     finding, agent="scanner", deterministic=True, evidence=[plan], rule="CKV_AZURE_1"
 )
 
+# The YAML examples as JSON, which validates the same and needs no YAML parser here.
+config = {
+    "version": 1,
+    "tool_version": "1.13.2",
+    "standards": {"repository": "gergodrazsdik/tf-standards", "commit": "0123456789abcdef0123456789abcdef01234567"},
+    "agents": ["conventions"],
+    "references": True,
+    "gate": {"mode": "advisory"},
+}
+frontmatter = {
+    "id": "POL-001",
+    "type": "policy",
+    "status": "accepted",
+    "applies_to": ["azurerm_storage_account"],
+    "topics": ["security"],
+    "severity": "high",
+    "rego": "POL-001-storage.rego",
+}
+
+
+def without(base, field):
+    return {k: v for k, v in base.items() if k != field}
+
+
 cases = [
     # name, schema, document, should it pass
+    ("example config", "tf-review-config", config, True),
+    ("config with no standards", "tf-review-config", without(config, "standards"), False),
+    ("config at version 2", "tf-review-config", changed(config, version=2), False),
+    ("config with an unknown agent", "tf-review-config", changed(config, agents=["conventions", "style"]), False),
+    ("config naming an agent twice", "tf-review-config", changed(config, agents=["cost", "cost"]), False),
+    ("config with an unknown field", "tf-review-config", changed(config, reviewers=["a"]), False),
+    ("config with standards at a branch", "tf-review-config", changed(config, standards={"repository": "a/b", "commit": "main"}), False),
+    ("config with a short commit", "tf-review-config", changed(config, standards={"repository": "a/b", "commit": "0123456"}), False),
+    ("config with a repository URL", "tf-review-config", changed(config, standards={"repository": "https://github.com/a/b", "commit": "0" * 40}), False),
+    ("config with a gate that isn't advisory or blocking", "tf-review-config", changed(config, gate={"mode": "strict"}), False),
+    ("config with references as a string", "tf-review-config", changed(config, references="yes"), False),
+    ("config with a tool version range", "tf-review-config", changed(config, tool_version="~> 1.13"), False),
+    ("example frontmatter", "corpus-frontmatter", frontmatter, True),
+    ("frontmatter with a lowercase ID", "corpus-frontmatter", changed(frontmatter, id="pol-001"), False),
+    ("frontmatter with a two-digit ID", "corpus-frontmatter", changed(frontmatter, id="POL-01"), False),
+    ("frontmatter with an unknown status", "corpus-frontmatter", changed(frontmatter, status="draft"), False),
+    ("superseded with no successor", "corpus-frontmatter", changed(frontmatter, status="superseded"), False),
+    ("superseded with a successor", "corpus-frontmatter", changed(frontmatter, status="superseded", superseded_by="POL-009"), True),
+    ("accepted with a successor", "corpus-frontmatter", changed(frontmatter, superseded_by="POL-009"), False),
+    ("frontmatter applying to nothing", "corpus-frontmatter", changed(frontmatter, applies_to=[]), False),
+    ("frontmatter with an unknown topic", "corpus-frontmatter", changed(frontmatter, topics=["style"]), False),
+    ("frontmatter with no severity", "corpus-frontmatter", without(frontmatter, "severity"), False),
+    ("frontmatter with an unknown field", "corpus-frontmatter", changed(frontmatter, owner="team-a"), False),
+    ("frontmatter with rego that isn't a .rego file", "corpus-frontmatter", changed(frontmatter, rego="POL-001.py"), False),
     ("example finding", "finding", finding, True),
     ("example reference chunk", "reference-chunk", chunk, True),
     ("result with references", "review-result", changed(result, references={"corpus_version": "0123456789abcdef", "provider_docs_missing": False, "attributions": ["HashiCorp, MPL-2.0"]}), True),

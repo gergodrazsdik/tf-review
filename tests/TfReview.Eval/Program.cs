@@ -29,6 +29,9 @@ string[] profiles = [AgentProfile.Conventions.Name, AgentProfile.Security.Name, 
 // Relaxed escaping keeps recorded answers readable in a diff. These files are never rendered as HTML.
 JsonSerializerOptions fileOptions = new() { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
+// Every result, replayed or live, has to match the contract other repos read.
+var contracts = new TfReview.Eval.Contracts("docs/contracts");
+
 // Only directories with a plan, so a stray one such as a tool's own can't fail the run.
 var cases = Directory.GetDirectories(CasesDirectory)
     .Where(directory => File.Exists(Path.Combine(directory, "plan.json")))
@@ -81,7 +84,7 @@ async Task<int> Replay()
         }
 
         var result = await Review(directory, new ReplayChat(answers, profiles));
-        failures += Report(Path.GetFileName(directory), 1, [.. stale, .. await Problems(directory, result)]);
+        failures += Report(Path.GetFileName(directory), 1, [.. stale, .. await Problems(directory, result), .. contracts.Problems(result)]);
     }
 
     Console.WriteLine(failures == 0 ? $"PASS: {cases.Length} case(s) replayed." : $"FAIL: {failures} case(s).");
@@ -186,7 +189,7 @@ async Task<int> Live(int runs, string? recordDirectory, bool withReferences, str
                         fileOptions) + "\n");
             }
 
-            var problems = await Problems(directory, result);
+            List<string> problems = [.. await Problems(directory, result), .. contracts.Problems(result)];
             failures += Report(name, run, problems);
 
             // For working out why a model answered as it did. Evals only see fixtures, so nothing private reaches the log.
