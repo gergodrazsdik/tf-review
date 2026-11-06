@@ -4,6 +4,12 @@
 variable "allowed_repository_ids" {
   description = "Repos the API serves, as comma-separated IDs. Bootstrap's repos map sets the Actions variable this comes from (D40)."
   type        = string
+
+  # An unset Actions variable arrives as an empty string, and the API would then refuse every repo.
+  validation {
+    condition     = can(regex("^[0-9]+(,[0-9]+)*$", var.allowed_repository_ids))
+    error_message = "allowed_repository_ids must be comma-separated repository IDs; is TF_REVIEW_ALLOWED_REPOSITORY_IDS set?"
+  }
 }
 
 locals {
@@ -114,6 +120,12 @@ resource "azapi_resource" "api" {
 
   lifecycle {
     prevent_destroy = true
+
+    # The API refuses every caller whose workflow commit isn't released, so an empty list would refuse them all.
+    precondition {
+      condition     = length(local.released_commits) > 0 && alltrue([for commit in local.released_commits : can(regex("^[0-9a-f]{40}$", commit))])
+      error_message = "infra/released-commits.txt must hold at least one full commit SHA, one per line."
+    }
   }
 }
 
