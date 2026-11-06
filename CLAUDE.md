@@ -18,7 +18,7 @@ Multi-agent, RAG-backed reviewer for OpenTofu pull requests. The plan, decisions
 
 - This repo owns the contracts in `docs/contracts/`. `tf-review-demo` and `tf-standards` depend on them, so a breaking change means a new version and changes in those repos.
 - `tf-standards` keeps a copy of `corpus-frontmatter.schema.json`: change both together.
-- `scripts/install-ci-tools.sh` is identical in all three repos. Keep its pins the same as `docs/plan.md` and the setup doc.
+- `scripts/install-ci-tools.sh` is identical in all three repos (`just lint` checks the copies when the repos sit side by side). Keep its pins the same as `docs/plan.md` and the setup doc.
 - `infra/` plans as a Reader, so resources whose azurerm read lists keys or secrets (Cosmos accounts, Container Apps and jobs) use azapi (D46). The first plan of a new resource can't show this: only one with state can.
 - No `azurerm_client_config` data source in `infra/`: its printed ID holds the Azure IDs in base64, and Actions logs here are public (D30).
 - PRs merge by fast-forward (`just merge <pr>`, which the user runs), so each commit lands as written: make every commit in a PR one focused, signed change with its own message, and branch from current `main`. Third-party actions are pinned to full SHAs with `pinact`.
