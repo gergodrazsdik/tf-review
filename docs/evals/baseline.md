@@ -225,3 +225,7 @@ Sol's apparent weakness on replacing a data store (C25, C27) was in the patterns
 | gpt-6-luna | 81 | 81 | 0 and 0 |
 
 Mini's and luna's scores don't move, so the wider pattern doesn't favour the model it was read from. What sol still misses there, C25's soft delete and C27's replica, isn't in POL-004: it's what per-finding references add, and these runs have none.
+
+## The near misses on gpt-6.1-sol: 2026-11-06
+
+C9, C13, C14 and C18 each failed now and then on gpt-5.4-mini, and C18 once on gpt-6-luna: a missed environment value, private SSH reported, a cost within ADR-003's limits reported, and a valid storage account name read as breaking ADR-001. On sol, ten more runs of each passed 40 of 40, which with its three full runs makes 25 of 25 each, for about $0.09. They stay in the suite as near misses; 25 runs can't rule out a rare miss.
