@@ -1,0 +1,4 @@
+{
+  "prompt_version": 1,
+  "text": "{\"addition\":\"Geo-redundant backup can only be set when a server is created, which is why this plan replaces it.\",\"reference_id\":\"REF-00000000000000000000000000000c27\",\"term\":\"Geo-Redundant backup\",\"same_problem\":true}"
+}

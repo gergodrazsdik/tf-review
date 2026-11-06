@@ -24,7 +24,7 @@ const string Config = $"""
     agents: [conventions, security, cost]
     """;
 
-string[] profiles = [AgentProfile.Conventions.Name, AgentProfile.Security.Name, AgentProfile.Cost.Name, RiskOrchestrator.Name, LlmArbiter.Name];
+string[] profiles = [AgentProfile.Conventions.Name, AgentProfile.Security.Name, AgentProfile.Cost.Name, RiskOrchestrator.Name, LlmArbiter.Name, ReferenceSuggester.Name];
 
 // Relaxed escaping keeps recorded answers readable in a diff. These files are never rendered as HTML.
 JsonSerializerOptions fileOptions = new() { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
@@ -83,11 +83,23 @@ async Task<int> Replay()
             }
         }
 
-        var result = await Review(directory, new ReplayChat(answers, profiles));
-        failures += Report(Path.GetFileName(directory), 1, [.. stale, .. await Problems(directory, result), .. contracts.Problems(result)]);
+        var chat = new ReplayChat(answers, profiles);
+        var result = await Review(directory, chat);
+        failures += Report(Path.GetFileName(directory), 1, [.. stale, .. chat.Missing, .. await Problems(directory, result), .. contracts.Problems(result)]);
+
+        // Production's default with references: per finding, through the suggester (D50).
+        if (TfReview.Eval.ReplayReferences.Load(directory) is { } references)
+        {
+            var withChat = new ReplayChat(answers, profiles);
+            var withReferences = await Review(directory, withChat, references: references);
+            failures += Report(
+                $"{Path.GetFileName(directory)} with references",
+                1,
+                [.. stale, .. withChat.Missing, .. await Problems(directory, withReferences), .. contracts.Problems(withReferences), .. references.Problems(result, withReferences)]);
+        }
     }
 
-    Console.WriteLine(failures == 0 ? $"PASS: {cases.Length} case(s) replayed." : $"FAIL: {failures} case(s).");
+    Console.WriteLine(failures == 0 ? $"PASS: {cases.Length} case(s) replayed." : $"FAIL: {failures} replay(s).");
     return failures == 0 ? 0 : 1;
 }
 
@@ -480,12 +492,21 @@ internal static class AgentOf
 /// <summary>Gives each agent its recorded answer, for runs that mustn't reach the model. No answer is a failure.</summary>
 internal sealed class ReplayChat(IReadOnlyDictionary<string, string> answers, IEnumerable<string> profiles) : IChatClient
 {
+    private readonly System.Collections.Concurrent.ConcurrentQueue<string> missing = new();
+
+    /// <summary>
+    /// Requests that had no recorded answer. The orchestrator and the arbiter fall back to rules, and the suggester to
+    /// adding nothing, when a call throws, so the case would still pass: the replay reports these as failures instead.
+    /// </summary>
+    public IReadOnlyList<string> Missing => [.. missing.Distinct(StringComparer.Ordinal)];
+
     public Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
     {
         var agent = AgentOf.Request(options, profiles);
         if (agent is null || !answers.TryGetValue(agent, out var text))
         {
+            missing.Enqueue($"no recorded answer for {agent ?? "a request from an unknown role"}");
             throw new InvalidOperationException($"There's no recorded answer for {agent ?? "this request"}.");
         }
 

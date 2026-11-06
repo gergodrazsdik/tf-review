@@ -1,0 +1,17 @@
+{
+  "corpus_version": "0123456789abcdef",
+  "docs": [
+    {
+      "id": "REF-000000000000000000000000000000c4",
+      "source": "azure-policy",
+      "title": "Allowed virtual machine size SKUs",
+      "heading": "Policy definition",
+      "text": "This policy enables you to specify a set of virtual machine size SKUs that your organization can deploy.",
+      "source_url": "https://github.com/Azure/azure-policy/blob/0123456789abcdef0123456789abcdef01234567/built-in-policies/policyDefinitions/Compute/VMSkusAllowed_Deny.json",
+      "license": "MIT",
+      "attribution": "Microsoft, Azure Policy built-in definitions, MIT",
+      "applies_to": ["azurerm_linux_virtual_machine"]
+    }
+  ],
+  "addition": null
+}

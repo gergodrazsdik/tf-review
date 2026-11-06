@@ -325,7 +325,7 @@ gh repo edit gergodrazsdik/tf-standards --template
 | `just plan <dir>` | `tf-review`, `tf-review-demo` | `tofu init`, `plan -out`, `show -json`, then canonicalize and redact |
 | `just cost <plan.json>` | `tf-review` | `infracost scan <plan.json> --json` with the token read from pass for that run only and `SSH_AUTH_SOCK` unset |
 | `just review <plan.json>` | `tf-review` | Runs the reviewer console app locally on one plan |
-| `just e2e` | `tf-review` | Replays recorded model responses over the committed fixtures and asserts the expected findings; offline, no Azure and no token spend, so the Claude Code Stop hook can run it |
+| `just e2e` | `tf-review` | Replays recorded model responses over the committed fixtures and asserts the expected findings. A role without a recorded answer fails its case rather than falling back to rules, every result is checked against the contracts, and cases with a `references.json` replay again with references per finding through the suggester, the production default; offline, no Azure and no token spend, so the Claude Code Stop hook can run it |
 | `just e2e-live` | `tf-review` | Runs the committed fixtures against the real model N times and asserts on the review result; manual, and the `e2e-live` workflow runs it on PRs that change the agent, its prompts or the fixtures |
 | `just fixtures` | `tf-review` | Takes the redacted plan each seeded branch's review already made, replaces every GUID with zeros, and writes it to `tests/fixtures/cases/`, so no raw plan reaches a laptop and no Azure login is needed |
 | `just record-scans` | `tf-review` | Saves what real Checkov and Infracost say about each eval case, so `just e2e` and CI need neither; reads the token from pass, so you run it |

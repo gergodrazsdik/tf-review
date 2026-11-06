@@ -1,0 +1,17 @@
+{
+  "corpus_version": "0123456789abcdef",
+  "docs": [
+    {
+      "id": "REF-00000000000000000000000000000c27",
+      "source": "azurerm-docs",
+      "title": "azurerm_postgresql_flexible_server",
+      "heading": "Arguments Reference",
+      "text": "* `geo_redundant_backup_enabled` - (Optional) Is Geo-Redundant backup enabled on the PostgreSQL Flexible Server. Defaults to `false`. Changing this forces a new PostgreSQL Flexible Server to be created.",
+      "source_url": "https://github.com/hashicorp/terraform-provider-azurerm/blob/0123456789abcdef0123456789abcdef01234567/website/docs/r/postgresql_flexible_server.html.markdown",
+      "license": "MPL-2.0",
+      "attribution": "HashiCorp, Terraform AzureRM provider documentation, MPL-2.0",
+      "applies_to": ["azurerm_postgresql_flexible_server"]
+    }
+  ],
+  "addition": "Geo-redundant backup can only be set when a server is created, which is why this plan replaces it."
+}

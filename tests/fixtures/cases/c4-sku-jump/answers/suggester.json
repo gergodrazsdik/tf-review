@@ -1,0 +1,4 @@
+{
+  "prompt_version": 1,
+  "text": "{\"addition\":\"Use Azure Policy to allow only the virtual machine size SKUs your organization approves.\",\"reference_id\":\"REF-000000000000000000000000000000c4\",\"term\":\"virtual machine size SKUs\",\"same_problem\":true}"
+}
