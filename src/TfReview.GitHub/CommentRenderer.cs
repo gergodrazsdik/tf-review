@@ -21,6 +21,15 @@ public static partial class CommentRenderer
     private const int MaxRiskItems = 5;
     private const int MaxTextLength = 300;
 
+    /// <summary>
+    /// Below GitHub's limit of 65,536 characters for a comment, which otherwise refuses it, and the whole review then
+    /// ends as "not reviewed" (SEC-11). Rows are left out until the comment fits, and it says so.
+    /// </summary>
+    public const int MaxLength = 60_000;
+
+    /// <summary>How many rows a comment too long for GitHub drops at a time.</summary>
+    private const int RowStep = 5;
+
     /// <summary>A comment with nothing carried over from an earlier one.</summary>
     public static string Render(ReviewResult result, PlanCounts? counts) => Rewrite(result, counts, null, record: false).Body;
 
@@ -35,7 +44,20 @@ public static partial class CommentRenderer
     /// <param name="record">Whether this rewrite counts new ticks.</param>
     public static RenderedComment Rewrite(ReviewResult result, PlanCounts? counts, string? previous, bool record)
     {
-        var shown = result.Findings.Take(MaxRows).ToList();
+        var rows = Math.Min(MaxRows, result.Findings.Count);
+        var rendered = Build(result, counts, previous, record, rows, trimmed: false);
+        while (rendered.Body.Length > MaxLength && rows > 0)
+        {
+            rows = Math.Max(0, rows - RowStep);
+            rendered = Build(result, counts, previous, record, rows, trimmed: true);
+        }
+
+        return rendered;
+    }
+
+    private static RenderedComment Build(ReviewResult result, PlanCounts? counts, string? previous, bool record, int rows, bool trimmed)
+    {
+        var shown = result.Findings.Take(rows).ToList();
         var dismissals = Dismissals.Plan(shown, previous, record, MaxRows);
         var comment = new StringBuilder()
             .AppendLine(Marker)
@@ -57,9 +79,11 @@ public static partial class CommentRenderer
 
         if (result.Findings.Count > 0)
         {
-            comment.AppendLine();
-            AppendFindings(comment, result);
-            AppendDismissals(comment, shown, dismissals);
+            AppendFindings(comment, result, shown, trimmed);
+            if (shown.Count > 0)
+            {
+                AppendDismissals(comment, shown, dismissals);
+            }
         }
 
         foreach (var missing in result.NotReviewed)
@@ -119,21 +143,30 @@ public static partial class CommentRenderer
         return addresses.Count > Shown ? $"{listed} and {addresses.Count - Shown} more" : listed;
     }
 
-    public static string Code(string text)
+    public static string Code(string text) => Code(text, inTable: false);
+
+    /// <summary>The same, for a table cell, where a pipe would end the cell unless it's escaped.</summary>
+    public static string Code(string text, bool inTable)
     {
         var builder = new StringBuilder(Math.Min(text.Length, MaxTextLength));
-        foreach (var rune in text.EnumerateRunes())
+        var runes = text.EnumerateRunes();
+        while (runes.MoveNext())
         {
             // Control and format characters can break out of a table row or disguise text.
-            var category = Rune.GetUnicodeCategory(rune);
+            var category = Rune.GetUnicodeCategory(runes.Current);
             builder.Append(category is UnicodeCategory.Control or UnicodeCategory.Format
                 or UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator
                 ? new Rune(' ')
-                : rune);
+                : runes.Current);
 
+            // Only when something was really cut (MNT-28).
             if (builder.Length >= MaxTextLength)
             {
-                builder.Append('…');
+                if (runes.MoveNext())
+                {
+                    builder.Append('…');
+                }
+
                 break;
             }
         }
@@ -144,10 +177,10 @@ public static partial class CommentRenderer
             return "` `";
         }
 
-        // The fence has to be longer than any run of backticks inside, and a pipe still ends a table cell.
+        // The fence has to be longer than any run of backticks inside. Outside a table "\|" would show its backslash.
         var fence = new string('`', LongestRun(clean, '`') + 1);
         var padded = clean.StartsWith('`') || clean.EndsWith('`') ? $" {clean} " : clean;
-        return $"{fence}{padded.Replace("|", "\\|", StringComparison.Ordinal)}{fence}";
+        return $"{fence}{(inTable ? padded.Replace("|", "\\|", StringComparison.Ordinal) : padded)}{fence}";
     }
 
     // Only what has a reason: most changes are routine, and a full list would bury the few that aren't.
@@ -198,21 +231,27 @@ public static partial class CommentRenderer
         }
     }
 
-    private static void AppendFindings(StringBuilder comment, ReviewResult result)
+    private static void AppendFindings(StringBuilder comment, ReviewResult result, IReadOnlyList<Finding> shown, bool trimmed)
     {
-        var findings = result.Findings;
-        comment.AppendLine("| Severity | Resource | Rule | Finding | Suggestion | Source |");
-        comment.AppendLine("| --- | --- | --- | --- | --- | --- |");
-        foreach (var finding in findings.Take(MaxRows))
+        if (shown.Count > 0)
         {
-            var suggestion = finding.Suggestion is null ? string.Empty : Code(finding.Suggestion);
-            comment.AppendLine(
-                $"| {Name(finding.Severity)}{(finding.Blocking ? ", **blocking**" : string.Empty)} | {Code(finding.ResourceAddress)} | {Rules(finding, result)} | {Code(finding.Title)} | {suggestion} | {Source(finding)} |");
+            comment.AppendLine();
+            comment.AppendLine("| Severity | Resource | Rule | Finding | Suggestion | Source |");
+            comment.AppendLine("| --- | --- | --- | --- | --- | --- |");
+            foreach (var finding in shown)
+            {
+                var suggestion = finding.Suggestion is null ? string.Empty : Code(finding.Suggestion, inTable: true);
+                comment.AppendLine(
+                    $"| {Name(finding.Severity)}{(finding.Blocking ? ", **blocking**" : string.Empty)} | {Code(finding.ResourceAddress, inTable: true)} | {Rules(finding, result)} | {Code(finding.Title, inTable: true)} | {suggestion} | {Source(finding)} |");
+            }
         }
 
-        if (findings.Count > MaxRows)
+        var hidden = result.Findings.Count - shown.Count;
+        if (hidden > 0)
         {
-            comment.AppendLine().AppendLine($"{findings.Count - MaxRows} more finding(s) aren't shown.");
+            comment.AppendLine().AppendLine(trimmed
+                ? $"{hidden} more finding(s) aren't shown, to keep this comment under GitHub's size limit."
+                : $"{hidden} more finding(s) aren't shown.");
         }
     }
 
@@ -230,14 +269,14 @@ public static partial class CommentRenderer
             return $"[{finding.Rule}](https://github.com/{repository}/blob/{commit}/{path})";
         }
 
-        return Code(finding.Rule);
+        return Code(finding.Rule, inTable: true);
     }
 
     private static string Rules(Finding finding, ReviewResult result)
     {
         var rule = Rule(finding, result);
         return finding.RelatedRules is { Count: > 0 } related
-            ? $"{rule}, also {string.Join(", ", related.Select(Code))}"
+            ? $"{rule}, also {string.Join(", ", related.Select(other => Code(other, inTable: true)))}"
             : rule;
     }
 

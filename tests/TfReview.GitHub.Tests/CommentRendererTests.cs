@@ -316,7 +316,51 @@ public class CommentRendererTests
     [Test]
     public async Task Cant_end_a_table_cell_with_a_pipe()
     {
-        await Assert.That(CommentRenderer.Code("a|b")).IsEqualTo("`a\\|b`");
+        await Assert.That(CommentRenderer.Code("a|b", inTable: true)).IsEqualTo("`a\\|b`");
+    }
+
+    // BUG-22: outside a table GFM shows the backslash, so x["a|b"] would read as x["a\|b"].
+    [Test]
+    public async Task Leaves_a_pipe_alone_outside_a_table()
+    {
+        await Assert.That(CommentRenderer.Code("a|b")).IsEqualTo("`a|b`");
+    }
+
+    [Test]
+    public async Task Escapes_a_pipe_in_the_findings_table_but_not_in_the_dismiss_list()
+    {
+        var finding = Finding("x") with { ResourceAddress = "x[\"a|b\"]" };
+
+        var comment = CommentRenderer.Render(Result(Verdict.Findings, finding), Counts);
+
+        await Assert.That(comment).Contains("| `x[\"a\\|b\"]` |");
+        await Assert.That(comment).Contains("Dismiss `x[\"a|b\"]`");
+    }
+
+    // MNT-28: nothing was cut, so there's no ellipsis.
+    [Test]
+    public async Task Text_of_exactly_the_limit_gets_no_ellipsis()
+    {
+        await Assert.That(CommentRenderer.Code(new string('a', 300))).DoesNotContain("…");
+    }
+
+    // SEC-11: GitHub refuses a comment over 65,536 characters, which used to end the review as "not reviewed".
+    [Test]
+    public async Task A_comment_too_long_for_github_drops_rows_and_says_so()
+    {
+        var findings = Enumerable.Range(0, 60)
+            .Select(index => Finding(new string('t', 400)) with
+            {
+                ResourceAddress = $"module.m[\"{index}{new string('k', 400)}\"].azurerm_storage_account.a",
+                Suggestion = new string('s', 400),
+            })
+            .ToArray();
+
+        var comment = CommentRenderer.Render(Result(Verdict.Findings, findings), Counts);
+
+        await Assert.That(comment.Length).IsLessThanOrEqualTo(CommentRenderer.MaxLength);
+        await Assert.That(comment).Contains("to keep this comment under GitHub's size limit.");
+        await Assert.That(comment).Contains("**60 finding(s)**");
     }
 
     [Test]

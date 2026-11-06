@@ -51,7 +51,7 @@ public static class StepSummary
         summary.AppendLine()
             .AppendLine("| Model | Calls | Input tokens | Cached | Output tokens | Estimated cost | Model time |")
             .AppendLine("| --- | --- | --- | --- | --- | --- | --- |")
-            .AppendLine(CultureInfo.InvariantCulture, $"| {CommentRenderer.Code(usage.Model ?? "unknown")} | {usage.Calls ?? 0} | {usage.InputTokens} | {usage.CachedInputTokens ?? 0} | {usage.OutputTokens} | {cost} | {(usage.LatencyMs ?? 0) / 1000m:0.0} s |");
+            .AppendLine(CultureInfo.InvariantCulture, $"| {CommentRenderer.Code(usage.Model ?? "unknown", inTable: true)} | {usage.Calls ?? 0} | {usage.InputTokens} | {usage.CachedInputTokens ?? 0} | {usage.OutputTokens} | {cost} | {(usage.LatencyMs ?? 0) / 1000m:0.0} s |");
     }
 
     private static string VerdictName(Verdict verdict) => verdict switch

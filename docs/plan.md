@@ -720,6 +720,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 - [x] The suggester keeps a sentence only if it names its term, as D50 says, and a term needs 3 letters or digits (BUG-4, MNT-6)
 - [x] `not_reviewed` keeps one entry per scope and reason: a failed Checkov scan no longer hides the security agent's own entry and its resources, and a failed batch and the cap's leftovers are separate entries (MNT-13, BUG-8)
 - [x] A review has its own time inside the job's deadline (D54): agents stop starting batches and calls after 9 minutes, running calls are cut at 12, the arbiter and orchestrator fall back to their rules and the suggester adds nothing, so a slow model gives a partial result instead of a retried and then failed review (BUG-5, OPS-13)
+- [x] The comment stays under 60,000 characters, below GitHub's 65,536, by dropping rows with a note, rather than failing to post and ending as "not reviewed"; a pipe is escaped only in table cells, and only cut text gets an ellipsis (SEC-11, BUG-18, BUG-22, MNT-28)
 
 ## Evaluation
 
