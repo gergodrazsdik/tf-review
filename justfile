@@ -88,6 +88,11 @@ eval-retrieval report="":
 service-eval *args:
     python3 scripts/service_eval.py {{ args }}
 
+# A release's bookkeeping: status, pin, trust, tag, repin, seeds (scripts/release.py --help); run it outside the Claude sandbox
+[group('release')]
+release *args:
+    python3 scripts/release.py {{ args }}
+
 # Merge a PR by fast-forwarding main to its head, after checking its required checks and signatures; works in every repo
 [group('release')]
 merge pr:
