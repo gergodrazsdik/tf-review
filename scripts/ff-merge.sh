@@ -9,7 +9,28 @@ set -euo pipefail
 
 pr=${1:?usage: ff-merge.sh <pr-number>}
 
-read -r head base state < <(gh pr view "$pr" --json headRefOid,baseRefName,state \
+# Runs gh, retrying when GitHub's API times out or drops the connection, which happens from here now and then. Other
+# failures, such as a failed or pending check, come back at once with gh's exit status.
+gh_retry() {
+  local attempt err status
+  err=$(mktemp)
+  for attempt in 1 2 3 4 5; do
+    status=0
+    gh "$@" 2>"$err" || status=$?
+    if [[ $status -eq 0 ]] || ! grep -qiE 'timeout|connection (reset|refused)|EOF' "$err"; then
+      cat "$err" >&2
+      rm -f "$err"
+      return "$status"
+    fi
+    echo "GitHub didn't answer (try $attempt of 5); retrying." >&2
+    sleep 5
+  done
+  cat "$err" >&2
+  rm -f "$err"
+  return "$status"
+}
+
+read -r head base state < <(gh_retry pr view "$pr" --json headRefOid,baseRefName,state \
   --jq '"\(.headRefOid) \(.baseRefName) \(.state)"')
 if [[ $state != OPEN || $base != main ]]; then
   echo "PR #$pr is $state against $base; only open PRs against main can be merged here." >&2
@@ -17,7 +38,7 @@ if [[ $state != OPEN || $base != main ]]; then
 fi
 
 # Exit 8 means checks are still running.
-gh pr checks "$pr" --required
+gh_retry pr checks "$pr" --required
 
 git fetch --quiet origin main "$head"
 if ! git merge-base --is-ancestor origin/main "$head"; then
