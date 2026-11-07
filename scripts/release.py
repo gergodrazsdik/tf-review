@@ -56,11 +56,11 @@ USES = re.compile(r"(tf-review/\.github/workflows/tf-review\.yml@)([0-9a-f]{40})
 DIGEST = re.compile(rf"{re.escape(IMAGE)}@sha256:[0-9a-f]{{64}}")
 
 
-def run(*arguments, capture=True, attempts=1):
+def run(*arguments, capture=True, attempts=1, stdin=None):
     """Runs a command and exits on failure. Reads retry, because GitHub's API times out from here now and then."""
     error = ""
     for attempt in range(attempts):
-        done = subprocess.run(arguments, capture_output=capture, text=True, check=False)
+        done = subprocess.run(arguments, capture_output=capture, text=True, check=False, input=stdin)
         if done.returncode == 0:
             return done.stdout.strip() if capture else ""
         error = (done.stderr or "").strip()
@@ -128,6 +128,27 @@ def standards_commit(commit):
 def caller_file(repo, path, ref="main"):
     content = gh_api(f"repos/{repo}/contents/{path}?ref={ref}")
     return base64.b64decode(content["content"]).decode(), content["sha"]
+
+
+def commit_on_branch(repo, branch, path, content, message):
+    """Commits one file to a branch through GraphQL's createCommitOnBranch, which GitHub signs.
+
+    The REST contents API, used with a personal token, makes unsigned commits that the main ruleset refuses.
+    """
+    head = gh_api(f"repos/{repo}/git/ref/heads/{branch}")["object"]["sha"]
+    mutation = ("mutation($input: CreateCommitOnBranchInput!) "
+                "{ createCommitOnBranch(input: $input) { commit { oid } } }")
+    payload = {"query": mutation, "variables": {"input": {
+        "branch": {"repositoryNameWithOwner": repo, "branchName": branch},
+        "message": {"headline": message},
+        "fileChanges": {"additions": [{"path": path, "contents": base64.b64encode(content.encode()).decode()}]},
+        "expectedHeadOid": head,
+    }}}
+    out = json.loads(run("gh", "api", "graphql", "--input", "-", stdin=json.dumps(payload)))
+    oid = out["data"]["createCommitOnBranch"]["commit"]["oid"]
+    verification = gh_api(f"repos/{repo}/commits/{oid}")["commit"]["verification"]
+    if not verification["verified"]:
+        sys.exit(f"{repo}'s commit {oid[:7]} isn't signed ({verification['reason']}); the ruleset would refuse it.")
 
 
 def branch_exists(repo, branch):
@@ -247,7 +268,13 @@ def repin(options):
     for repo in CALLERS:
         # A run that stopped half way (GitHub's API times out from here now and then) left the branch, so a rerun
         # carries on from it: each file is compared with the branch's copy, and only what's missing is written.
-        if not branch_exists(repo, branch):
+        if branch_exists(repo, branch):
+            ahead = gh_api(f"repos/{repo}/compare/main...{branch}")["commits"]
+            unsigned = [item["sha"][:7] for item in ahead if not item["commit"]["verification"]["verified"]]
+            if unsigned:
+                sys.exit(f"{repo}'s {branch} holds unsigned commits ({', '.join(unsigned)}), which the ruleset refuses. "
+                         f"Close its PR with --delete-branch, then run this again.")
+        else:
             base = gh_api(f"repos/{repo}/git/ref/heads/main")["object"]["sha"]
             gh_api(f"repos/{repo}/git/refs", f"ref=refs/heads/{branch}", f"sha={base}", method="POST")
         # Each change is its own commit on the PR's branch: the workflow pin, then the standards pin.
@@ -259,11 +286,8 @@ def repin(options):
             updated = STANDARDS_PIN.sub(rf"\g<1>{standards}", text, count=1)
             if updated != text:
                 changes.append((CALLER_CONFIG, updated, sha, f"Review against tf-standards at {standards[:7]}"))
-        for path, content, blob, message in changes:
-            # Commits made through the API are signed by GitHub, which the main ruleset requires.
-            gh_api(f"repos/{repo}/contents/{path}", f"message={message}",
-                   f"content={base64.b64encode(content.encode()).decode()}", f"sha={blob}",
-                   f"branch={branch}", method="PUT")
+        for path, content, _, message in changes:
+            commit_on_branch(repo, branch, path, content, message)
         ahead = gh_api(f"repos/{repo}/compare/main...{branch}")["ahead_by"]
         if not ahead:
             print(f"{repo} already pins {name}" + (f" and tf-standards {standards[:7]}." if standards else "."))
