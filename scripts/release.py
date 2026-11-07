@@ -125,9 +125,14 @@ def standards_commit(commit):
     return gh_api(f"repos/{STANDARDS}/commits/{commit or 'main'}")["sha"]
 
 
-def caller_file(repo, path):
-    content = gh_api(f"repos/{repo}/contents/{path}")
+def caller_file(repo, path, ref="main"):
+    content = gh_api(f"repos/{repo}/contents/{path}?ref={ref}")
     return base64.b64decode(content["content"]).decode(), content["sha"]
+
+
+def branch_exists(repo, branch):
+    done = subprocess.run(["gh", "api", f"repos/{repo}/git/ref/heads/{branch}"], capture_output=True, check=False)
+    return done.returncode == 0
 
 
 def wait_for_release(tag):
@@ -238,29 +243,36 @@ def repin(options):
     if commit not in released_commits():
         sys.exit(f"{name} ({commit[:7]}) isn't in infra/released-commits.txt, so callers would be refused.")
     standards = standards_commit(options.standards) if options.standards else None
+    branch = f"pin-reviewer-{name}"
     for repo in CALLERS:
+        # A run that stopped half way (GitHub's API times out from here now and then) left the branch, so a rerun
+        # carries on from it: each file is compared with the branch's copy, and only what's missing is written.
+        if not branch_exists(repo, branch):
+            base = gh_api(f"repos/{repo}/git/ref/heads/main")["object"]["sha"]
+            gh_api(f"repos/{repo}/git/refs", f"ref=refs/heads/{branch}", f"sha={base}", method="POST")
         # Each change is its own commit on the PR's branch: the workflow pin, then the standards pin.
-        changes = []
-        text, sha = caller_file(repo, CALLER_WORKFLOW)
+        text, sha = caller_file(repo, CALLER_WORKFLOW, branch)
         updated = USES.sub(rf"\g<1>{commit}\g<3>{name}", text)
-        if updated != text:
-            changes.append((CALLER_WORKFLOW, updated, sha, f"Pin the reviewer to {name}"))
+        changes = [(CALLER_WORKFLOW, updated, sha, f"Pin the reviewer to {name}")] if updated != text else []
         if standards:
-            text, sha = caller_file(repo, CALLER_CONFIG)
+            text, sha = caller_file(repo, CALLER_CONFIG, branch)
             updated = STANDARDS_PIN.sub(rf"\g<1>{standards}", text, count=1)
             if updated != text:
                 changes.append((CALLER_CONFIG, updated, sha, f"Review against tf-standards at {standards[:7]}"))
-        if not changes:
-            print(f"{repo} already pins {name}" + (f" and tf-standards {standards[:7]}." if standards else "."))
-            continue
-        base = gh_api(f"repos/{repo}/git/ref/heads/main")["object"]["sha"]
-        branch = f"pin-reviewer-{name}"
-        gh_api(f"repos/{repo}/git/refs", f"ref=refs/heads/{branch}", f"sha={base}", method="POST")
         for path, content, blob, message in changes:
             # Commits made through the API are signed by GitHub, which the main ruleset requires.
             gh_api(f"repos/{repo}/contents/{path}", f"message={message}",
                    f"content={base64.b64encode(content.encode()).decode()}", f"sha={blob}",
                    f"branch={branch}", method="PUT")
+        ahead = gh_api(f"repos/{repo}/compare/main...{branch}")["ahead_by"]
+        if not ahead:
+            print(f"{repo} already pins {name}" + (f" and tf-standards {standards[:7]}." if standards else "."))
+            gh_api(f"repos/{repo}/git/refs/heads/{branch}", method="DELETE")
+            continue
+        existing = json.loads(run("gh", "pr", "list", "-R", repo, "--head", branch, "--json", "url", attempts=5))
+        if existing:
+            print(existing[0]["url"])
+            continue
         body = f"Moves the reusable workflow to `{name}` (`{commit}`), which tf-review released (D45)."
         if standards:
             body += f" Reviews against tf-standards at `{standards}`."
