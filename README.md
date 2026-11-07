@@ -25,7 +25,7 @@ Enable it for everyone working on a repo in its checked-in `.claude/settings.jso
 {
   "extraKnownMarketplaces": {
     "tf-review": {
-      "source": { "source": "github", "repo": "gergodrazsdik/tf-review", "ref": "plugin-v0.1.0" }
+      "source": { "source": "github", "repo": "gergodrazsdik/tf-review", "ref": "plugin-v0.1.1" }
     }
   },
   "enabledPlugins": { "tf-review-opentofu@tf-review": true }
