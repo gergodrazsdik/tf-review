@@ -8,10 +8,11 @@ commits and a test before callers move. This script only does the steps in betwe
   pin TAG           after `image-v*` passes: verify its signature, then open a PR pinning its digest in infra/
                     (with --workflow, in the reusable workflow too)
   trust             after the pin merges: open a PR adding main's commit to infra/released-commits.txt, and
-                    retiring released commits no caller pins any more
+                    retiring released commits no caller pins any more (tf-review's own infra.yml counts as one)
   tag VERSION       after trust is applied and tested: tag vVERSION at the newest released commit, signed
   repin VERSION     open a PR in each caller repo moving it to vVERSION; with --standards COMMIT, its
-                    .tf-review.yml moves to that tf-standards commit in the same PR
+                    .tf-review.yml moves to that tf-standards commit in the same PR. A PR here moves
+                    tf-review's own infra review to vVERSION too
   standards [COMMIT]  open a PR moving tf-review's own standards pins (its .tf-review.yml, CI and evals) to a
                     tf-standards commit, main's by default
   seeds             merge the demo's main into each seed branch, so GitHub keeps running their workflows
@@ -36,6 +37,8 @@ DEMO = f"{OWNER}/tf-review-demo"
 CALLERS = (DEMO, f"{OWNER}/tf-review-demo2")
 CALLER_WORKFLOW = ".github/workflows/plan.yml"
 CALLER_CONFIG = ".tf-review.yml"
+# tf-review reviews its own infra/ through the released workflow too, so its pin counts as a caller's.
+OWN_CALLER_WORKFLOW = ".github/workflows/infra.yml"
 STANDARDS = f"{OWNER}/tf-standards"
 # The standards commit a .tf-review.yml reviews against.
 STANDARDS_PIN = re.compile(r"(?m)^(\s+commit: )([0-9a-f]{40})")
@@ -97,13 +100,16 @@ def released_commits():
 
 
 def caller_pins():
-    """(repo, commit, version) each caller's main pins the reusable workflow to."""
+    """(repo, commit, version) each caller's main pins the reusable workflow to, tf-review's own infra review included,
+    so trust never retires a commit tf-review itself still uses."""
     pins = []
     for repo in CALLERS:
         content = gh_api(f"repos/{repo}/contents/{CALLER_WORKFLOW}")
         text = base64.b64decode(content["content"]).decode()
         match = USES.search(text)
         pins.append((repo, match.group(2) if match else None, match.group(4) if match else None))
+    match = USES.search(git("show", f"origin/main:{OWN_CALLER_WORKFLOW}"))
+    pins.append((f"{REPO} (infra)", match.group(2) if match else None, match.group(4) if match else None))
     return pins
 
 
@@ -304,6 +310,21 @@ def repin(options):
         url = run("gh", "pr", "create", "-R", repo, "--head", branch, "--title", title,
                   "--body", body + " Opened by `scripts/release.py repin`.")
         print(url)
+    # tf-review's own infra review moves too, or a later trust would have to keep the old commit for it.
+    require_clean_main()
+    own = ROOT / OWN_CALLER_WORKFLOW
+    text = own.read_text()
+    updated = USES.sub(rf"\g<1>{commit}\g<3>{name}", text)
+    if updated == text:
+        print(f"{REPO}'s infra review already pins {name}.")
+    elif branch_exists(REPO, f"release/{branch}"):
+        print(f"{REPO}'s release/{branch} already exists; its PR moves the infra review.")
+    else:
+        own.write_text(updated)
+        git("add", str(own))
+        open_pr(f"release/{branch}", f"Review tf-review's own infra with the workflow at {name}",
+                f"Moves `{OWN_CALLER_WORKFLOW}`'s review to `{name}` (`{commit}`), like the callers. "
+                f"Opened by `scripts/release.py repin`.")
     print("After the demo's PR merges: scripts/release.py seeds")
 
 
