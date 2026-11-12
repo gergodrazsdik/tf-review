@@ -13,9 +13,9 @@ variable "allowed_repository_ids" {
 }
 
 locals {
-  # image-v0.0.20. A release that changes the service updates this, and the workflow only needs the same one when
+  # image-v0.0.21. A release that changes the service updates this, and the workflow only needs the same one when
   # its own commands change.
-  service_image = "ghcr.io/gergodrazsdik/tf-review@sha256:cfcef4270eb62d391298ee03fb832f8b591bd4da03076515a483c67eaa552a36"
+  service_image = "ghcr.io/gergodrazsdik/tf-review@sha256:10b6e33910d47a5faf777a64a9561f28028bd40a553b13f7609467fb439a75c2"
 
   # Reviews that run at once, and each one's share of the deployment's tokens a minute: 90% of it, split between them,
   # so together they stay under the rate limit (D54). Two at once leaves each 45K, enough for a large plan's batches.
