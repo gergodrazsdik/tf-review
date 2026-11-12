@@ -36,7 +36,7 @@ Installed and verified on 2026-11-01 (setup doc step 41): OpenTofu 1.13.2, conft
 | TFLint + azurerm ruleset | Provider-aware lint in the pre-commit hook | Release binary, SLSA attestation; ruleset fetched by `tflint --init` | M0, optional |
 | tofu-ls | OpenTofu language server for Neovim and the `dg-lsp` plugin Source build at a pinned tag (`go mod download` + `go build`, because `go install` rejects its `replace` directive), checked against Go's checksum database | Optional |
 
-Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET SDK 11 (RC3 until GA) with TUnit templates, `podman`, `actionlint`, `pinact`, `yamllint`/`yamlfmt`, `shellcheck`, `hadolint`, `gitleaks`, `cosign`/`syft`/`grype`, `jq`/`yq`, `ijhttp`, Claude Code. Terraform stays installed for the D1 Terraform input in M2.
+Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET SDK 11 with TUnit templates, `podman`, `actionlint`, `pinact`, `yamllint`/`yamlfmt`, `shellcheck`, `hadolint`, `gitleaks`, `cosign`/`syft`/`grype`, `jq`/`yq`, `ijhttp`, Claude Code. Terraform stays installed for the D1 Terraform input in M2.
 
 **Accounts and one-off setup**
 
@@ -44,7 +44,7 @@ Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET S
 - [x] Delete the resource group the Foundry portal auto-created in Sweden Central
 - [x] Get Data Zone Standard quota for gpt-6.1-sol and gpt-6-luna: granted with Tier 1, 100K TPM each, seen 2026-11-05; this doesn't block M2, which can start on gpt-5.4-mini. A request on 2026-11-01 was declined for lack of resources. The same day Microsoft emailed that the subscription moved to Tier 1, which can take 3–4 days to activate, and Microsoft's Tier 1 table lists 100K TPM for both models. Re-check from 2026-11-05. If the decline was about regional capacity rather than the tier, Tier 1 may not change it. Available today: gpt-5.4-mini, Mistral-Large-3 and text-embedding-3-small
 - [ ] Before gpt-5.4-mini retires (2027-09-21): move to a newer small model through the eval suite
-- [ ] After .NET 11 GA (scheduled 2026-11-10): install the GA SDK through `update-sources`, pin `global.json` to `11.0.100` without `allowPrerelease`, and re-pin the base image digest
+- [x] After .NET 11 GA (released 2026-11-10): install the GA SDK through `update-sources`, pin `global.json` to `11.0.100` without `allowPrerelease`, and re-pin the base image digest
 - [ ] After a conftest release that fixes the go1.27.1, x/net, go-jose and klauspost/compress findings (v0.71.1 and `main` don't, checked 2026-11-01; compress added 2026-11-06): go back to the release binary in the `Containerfile`, which also ends the difference described under "Policy tests pass but enforcement differs"
 - [ ] After an Infracost CLI release that fixes the x/net findings its v2.18.3 binary has: go back to the release binary in the `Containerfile` instead of the source build reported as `2.18.3-patched`
 - [ ] By 2027-02-01, or at any Infracost update: review the `.grype.yaml` exception for `infracost-parser-terraform-plan`, and remove it once a plugin version ships go-jose 4.1.6 or later
@@ -226,7 +226,7 @@ prompts/               versioned agent prompts
 Containerfile
 ```
 
-- **SDK and language**: `global.json` pins `11.0.100-rc.3.26522.148` with `allowPrerelease` until GA; C# 15 is the `net11.0` default, so no `LangVersion` override
+- **SDK and language**: `global.json` pins `11.0.100` (GA, rolling forward to later feature bands); C# 15 is the `net11.0` default, so no `LangVersion` override
 - **C# 15 usage**: unions and `closed` records for internal models such as `Evidence` and agent outcomes; the JSON contracts don't change. `Evidence` uses `JsonUnionTypeStructuralClassifier`, because the default classifier can't tell two object cases apart. The schema generated from a union is looser than `finding.schema.json`, so the evals validate every result they produce, findings included, against `review-result.schema.json` and `finding.schema.json` (replay in CI, and live runs); the service itself doesn't validate at run time
 - **Auth**: `DefaultAzureCredential` everywhere: `az login` locally, OIDC in CI, managed identity in Azure; key auth disabled on Foundry and Cosmos
 - **LLM client**: `OpenAIClient` with `BearerTokenPolicy` (scope `https://ai.azure.com/.default`) on the resource's `/openai/v1/` endpoint, exposed as `IChatClient`; no `Azure.AI.OpenAI` package. That constructor is experimental, so `OPENAI001` is suppressed for it
@@ -798,7 +798,7 @@ Expected spend is about $5–30/month at roughly 100 PRs, almost all of it LLM t
 | Infracost v2 telemetry cannot be disabled | Every scan sends command, flags, install ID, org, repo URL and branch; fine for these public repos, but for client repos either accept it, use self-hosted pricing mode, or drop the cost agent |
 | Infracost free-tier run limit | The free tier reportedly counts pricing runs (about 1,000 a month). Infracost runs on every review: the result cache (D53) saves model calls, not pricing runs |
 | Policy tests pass but enforcement differs | Rego unit tests run in `conftest verify`, the same OPA build that enforces them; tofu, conftest and Checkov pinned to the same versions locally and in CI. Standalone `opa` runs only `opa fmt` and `opa check` and can be ahead of conftest's bundled OPA (1.22.0 vs 1.21.1 on 2026-11-01). For now the image's conftest is a source build of the same version with patched Go and dependencies, while `tf-standards` CI tests with the release binary; both bundle OPA 1.21.1, and all 21 policy tests pass on the image's build |
-| .NET 11 is an STS release, and M1 starts on an RC | GA is scheduled for 2026-11-10; SDK and base image are pinned and moved together after GA; move to the next LTS before support ends |
+| .NET 11 is an STS release | M1 started on RC3; GA (2026-11-10) replaced it on 2026-11-12. SDK and base image are pinned and moved together; move to the next LTS before support ends |
 | Dependencies not built for .NET 11 | Agent Framework, Microsoft.Extensions.AI, Azure.Identity, TUnit and others ship no `net11.0` assets yet and run from their `net10.0` builds. A spike with a stub chat client and the live smoke test both passed on 2026-11-01, the latter with real gpt-5.4-mini calls on the RC3 SDK; re-run `llm-smoke.yml` after the GA re-pin and for each new model |
 | Unmarked secret reaches the model or a public comment | D25 only catches marked values and denylisted names, so a secret under an ordinary name passes. Comments render only code-controlled fields and escaped text; tighten the policy if a real miss appears, accepting new prompts and goldens. A GUID in a resource address, such as a `for_each` key, stays visible |
 | Branch push equals the plan identity | PR code in the plan job can mint its token and read its repo's state, secrets included, because the plan needs them. It can't write state: the identity has Blob Data Reader only, since a forged state would make the next apply destroy what it names (review finding SEC-1). D21 keeps LLM credentials away from it. Fork PRs are skipped; repos document who has write access |

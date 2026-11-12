@@ -1,5 +1,5 @@
 # Moving to .NET 11 GA means re-pinning both .NET digests (see docs/plan.md).
-FROM mcr.microsoft.com/dotnet/sdk:11.0-resolute@sha256:3a9175b6c54b2f076817af1360f691c9994447b192faa48a1a1f112a516844c7 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0-resolute@sha256:65f3c7c6a25a239ab3e6719f2896147e7b68242ff2d8818dd70498bde6ef8bea AS build
 WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props ./
 COPY src/ src/
@@ -48,7 +48,7 @@ COPY tools/checkov/ ./
 ENV UV_PYTHON_INSTALL_DIR=/opt/checkov/python UV_PROJECT_ENVIRONMENT=/opt/checkov/venv UV_LINK_MODE=copy
 RUN uv sync --frozen --no-install-project --managed-python --python 3.13
 
-FROM mcr.microsoft.com/dotnet/aspnet:11.0-resolute@sha256:de8d70c2b944fb4d6e2cbc14c8de808d1ebce348ea5b84b224efd64cd63398f2
+FROM mcr.microsoft.com/dotnet/aspnet:11.0-resolute@sha256:bc0d6653979efba491ab3d6f589d691f96c309c3c3ef81325efa6978e7b7f242
 ENV DOTNET_EnableDiagnostics=0 \
     INFRACOST_CLI_PLUGIN_DIR=/opt/infracost/plugins \
     INFRACOST_SKIP_UPDATE_CHECK=true \
