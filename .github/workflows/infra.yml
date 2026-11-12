@@ -35,7 +35,7 @@ jobs:
   # variables from PLAN_VARIABLES (D52). It skips fork PRs itself, and stays advisory (.tf-review.yml).
   plan:
     if: github.event_name == 'pull_request'
-    uses: gergodrazsdik/tf-review/.github/workflows/tf-review.yml@d337f39c31040467a2e5a07226f373e34cb714ce # v0.0.13
+    uses: gergodrazsdik/tf-review/.github/workflows/tf-review.yml@a25f3bd9cf7d41492c6bcd9e148a3262f0c1ca4c # v0.0.14
     permissions:
       contents: read
       id-token: write
