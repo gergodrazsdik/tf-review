@@ -44,9 +44,14 @@ jobs:
 
   # Plans main with the plan identity, so the approval below comes after a plan you can read in this job's log, and
   # the apply does exactly that plan. The plan file is encrypted with the state key (D59), so its artifact is too.
+  # It shares the apply's group, so a merge made while an earlier apply waits for approval plans after that apply
+  # wrote the state; planning before it made the plan stale (2026-11-12). A newer run's plan replaces a waiting one.
   plan-main:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
+    concurrency:
+      group: tfstate-infra
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
