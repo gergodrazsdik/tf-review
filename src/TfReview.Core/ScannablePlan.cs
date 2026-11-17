@@ -22,7 +22,7 @@ public sealed class ScannablePlan
     private const string NoOp = "no-op";
 
     // Checkov quietly ignores a plan without this, and exits 0. Its value doesn't matter to either scanner.
-    private const string ToolVersion = "1.13.2";
+    private const string ToolVersion = "1.13.9";
 
     private static readonly string[] IdentityFields = ["address", "mode", "type", "name", "index", "provider_name"];
 

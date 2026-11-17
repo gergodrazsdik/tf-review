@@ -33,7 +33,7 @@ scanner_finding = changed(
 # The YAML examples as JSON, which validates the same and needs no YAML parser here.
 config = {
     "version": 1,
-    "tool_version": "1.13.2",
+    "tool_version": "1.13.9",
     "standards": {"repository": "gergodrazsdik/tf-standards", "commit": "0123456789abcdef0123456789abcdef01234567"},
     "agents": ["conventions"],
     "references": True,
