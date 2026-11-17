@@ -31,7 +31,7 @@ RUN git init --quiet \
     && go build -trimpath -ldflags "-s -w -X github.com/infracost/cli/version.Version=2.19.1-patched" -o /out/infracost .
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 RUN for pin in \
-      "infracost-parser-terraform-plan 0.0.37 61a7c6363a04bc8270265b80c36fc4c87e18d6758bee564ad9116734012cbd8e" \
+      "infracost-parser-terraform-plan 0.0.41 09cc8577d810f22e28e8897ea643f19318ba0838318d84684683492da99b9fd4" \
       "infracost-provider-azure 0.0.27 9b40cc689b52c1668fbb8bb650214f7ca26fbb6a4681bd733b4943ae1cedbc94"; do \
       read -r name version sum <<<"$pin"; \
       curl -fsSL -o data.tar.gz "https://releases.infracost.io/$name/linux/amd64/v$version/data.tar.gz"; \
