@@ -719,7 +719,7 @@ Work runs in this order, so the unknowns surface before anything depends on them
 - [x] Workflow: `v0.0.13` at `d337f39` (released in #132), proved on draft demo #56 (POL-002 on an open SSH rule, the comment's new dismiss markers), and repinned in demo #58 and demo2 #6 with `just release repin`
 - [x] Standards: every repo reviews against tf-standards `0f31069` (tf-standards #7), moved with `just release standards` (#133) and `repin --standards`
 - [x] Plugin: `plugin-v0.1.1`, repinned in tf-review #136, demo #59 and demo2 #7
-- [ ] The plaintext state versions blob versioning kept from before D59: still 217, 104 and 7 on 2026-11-07, before bootstrap's lifecycle rule (#126, set 2026-11-06 19:28 UTC) first ran. Check from 2026-11-08 that they're gone; the manual delete failed with `OperationNotAllowedOnAutomaticSnapshot`, so if the rule can't delete them either, find out why
+- [x] The plaintext state versions blob versioning kept from before D59: 217, 104 and 7 on 2026-11-07, before bootstrap's lifecycle rule (#126, set 2026-11-06 19:28 UTC) first ran. The rule deleted them where the manual delete had failed with `OperationNotAllowedOnAutomaticSnapshot`: on 2026-11-17 no container had a previous version of `infra.tfstate` from before 2026-11-07. Soft delete keeps them restorable for 30 days after the rule's run, so they're purged for good by mid-December
 
 **Service fixes from the 2026-11-06 review** (`docs/reviews/2026-11-06/findings.md`)
 
