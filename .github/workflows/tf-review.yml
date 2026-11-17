@@ -24,7 +24,7 @@ on:
       image:
         description: Review image by digest. Only tf-review's signed releases are accepted.
         type: string
-        default: ghcr.io/gergodrazsdik/tf-review@sha256:10b6e33910d47a5faf777a64a9561f28028bd40a553b13f7609467fb439a75c2
+        default: ghcr.io/gergodrazsdik/tf-review@sha256:600c197c915015e7e651d1a05fd6979799e06e61614ef9b0bdd672073d61c512
       api-url:
         description: The review service.
         type: string
