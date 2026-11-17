@@ -12,9 +12,13 @@ public class ModelPricesTests
         // A million of each: 2M input of which 1M cached, and 1M output.
         var cost = ModelPrices.Estimate(model, 2_000_000, 1_000_000, 1_000_000);
 
-        await Assert.That(cost).IsEqualTo(decimal.Parse(input, System.Globalization.CultureInfo.InvariantCulture)
-            + decimal.Parse(cached, System.Globalization.CultureInfo.InvariantCulture)
-            + decimal.Parse(output, System.Globalization.CultureInfo.InvariantCulture));
+        await Assert
+            .That(cost)
+            .IsEqualTo(
+                decimal.Parse(input, System.Globalization.CultureInfo.InvariantCulture)
+                    + decimal.Parse(cached, System.Globalization.CultureInfo.InvariantCulture)
+                    + decimal.Parse(output, System.Globalization.CultureInfo.InvariantCulture)
+            );
     }
 
     [Test]

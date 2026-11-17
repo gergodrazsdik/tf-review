@@ -54,7 +54,8 @@ public class IndexerTests
         var failing = new FakeEmbedder { FailAfter = 1 };
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new Indexer(store, failing, _ => { }, batchSize: 1).RunAsync(Chunks("x", "y", "z"), New));
+            new Indexer(store, failing, _ => { }, batchSize: 1).RunAsync(Chunks("x", "y", "z"), New)
+        );
 
         await Assert.That(store.Active).IsEqualTo(Old);
         await Assert.That(store.Versions.ContainsKey(Old)).IsTrue();
@@ -66,7 +67,8 @@ public class IndexerTests
         var store = new FakeStore { DropWrites = 1 };
 
         await Assert.ThrowsAsync<IndexIncompleteException>(() =>
-            new Indexer(store, new FakeEmbedder(), _ => { }).RunAsync(Chunks("a", "b"), New));
+            new Indexer(store, new FakeEmbedder(), _ => { }).RunAsync(Chunks("a", "b"), New)
+        );
 
         await Assert.That(store.Active).IsNull();
     }
@@ -76,7 +78,11 @@ public class IndexerTests
     {
         var store = new FakeStore();
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new Indexer(store, new FakeEmbedder { FailAfter = 1 }, _ => { }, batchSize: 1).RunAsync(Chunks("x", "y"), New));
+            new Indexer(store, new FakeEmbedder { FailAfter = 1 }, _ => { }, batchSize: 1).RunAsync(
+                Chunks("x", "y"),
+                New
+            )
+        );
         var embedder = new FakeEmbedder();
 
         var outcome = await new Indexer(store, embedder, _ => { }, batchSize: 1).RunAsync(Chunks("x", "y"), New);
@@ -136,23 +142,27 @@ public class IndexerTests
     }
 
     private static List<ReferenceChunk> Chunks(params string[] texts) =>
-    [
-        .. texts.Select((text, index) => new ReferenceChunk(
-            $"REF-{index:x32}",
-            New,
-            "azurerm-docs",
-            "a/b",
-            new string('0', 40),
-            $"docs/{index}.md",
-            "https://github.com/a/b/blob/0/docs",
-            "MPL-2.0",
-            "Someone",
-            "Title",
-            string.Empty,
-            [],
-            text,
-            ("hash-" + text).PadRight(64, '0'))),
-    ];
+        [
+            .. texts.Select(
+                (text, index) =>
+                    new ReferenceChunk(
+                        $"REF-{index:x32}",
+                        New,
+                        "azurerm-docs",
+                        "a/b",
+                        new string('0', 40),
+                        $"docs/{index}.md",
+                        "https://github.com/a/b/blob/0/docs",
+                        "MPL-2.0",
+                        "Someone",
+                        "Title",
+                        string.Empty,
+                        [],
+                        text,
+                        ("hash-" + text).PadRight(64, '0')
+                    )
+            ),
+        ];
 
     private sealed class FakeEmbedder : IEmbedder
     {
@@ -160,7 +170,10 @@ public class IndexerTests
 
         public int? FailAfter { get; init; }
 
-        public Task<IReadOnlyList<float[]>> EmbedAsync(IReadOnlyList<string> texts, CancellationToken cancellationToken = default)
+        public Task<IReadOnlyList<float[]>> EmbedAsync(
+            IReadOnlyList<string> texts,
+            CancellationToken cancellationToken = default
+        )
         {
             if (this.FailAfter is { } limit && this.Texts.Count >= limit)
             {
@@ -182,15 +195,26 @@ public class IndexerTests
 
         public int DropWrites { get; set; }
 
-        public Task<string?> ReadActiveVersionAsync(CancellationToken cancellationToken = default) => Task.FromResult(this.Active);
+        public Task<string?> ReadActiveVersionAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(this.Active);
 
-        public Task<IReadOnlyDictionary<string, float[]>> ReadEmbeddingsAsync(string version, CancellationToken cancellationToken = default) =>
+        public Task<IReadOnlyDictionary<string, float[]>> ReadEmbeddingsAsync(
+            string version,
+            CancellationToken cancellationToken = default
+        ) =>
             Task.FromResult<IReadOnlyDictionary<string, float[]>>(
                 this.Versions.TryGetValue(version, out var chunks)
-                    ? chunks.Values.DistinctBy(stored => stored.Chunk.ContentHash).ToDictionary(stored => stored.Chunk.ContentHash, stored => stored.Embedding)
-                    : []);
+                    ? chunks
+                        .Values.DistinctBy(stored => stored.Chunk.ContentHash)
+                        .ToDictionary(stored => stored.Chunk.ContentHash, stored => stored.Embedding)
+                    : []
+            );
 
-        public Task UpsertAsync(string version, IReadOnlyList<StoredChunk> chunks, CancellationToken cancellationToken = default)
+        public Task UpsertAsync(
+            string version,
+            IReadOnlyList<StoredChunk> chunks,
+            CancellationToken cancellationToken = default
+        )
         {
             var stored = this.Versions.TryGetValue(version, out var existing) ? existing : this.Versions[version] = [];
             foreach (var chunk in chunks)

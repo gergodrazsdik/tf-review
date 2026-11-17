@@ -47,7 +47,10 @@ public sealed class DailyBudget(ICounterStore counters, decimal limitUsd, TimePr
 
     /// <summary>The limit from the variable, or the default when it's unset or not a positive number.</summary>
     public static decimal LimitFrom(string? value) =>
-        decimal.TryParse(value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var limit) && limit > 0 ? limit : DefaultUsd;
+        decimal.TryParse(value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var limit)
+        && limit > 0
+            ? limit
+            : DefaultUsd;
 
     /// <summary>Notes one call's estimated cost, which <see cref="RecordAsync"/> adds to the day's total.</summary>
     public void Spend(decimal usd)

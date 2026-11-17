@@ -13,16 +13,23 @@ namespace TfReview.Eval;
 /// </summary>
 internal sealed class ReplayReferences(ReplayReferences.Fixture fixture) : IReferenceRetriever
 {
-    private static readonly JsonSerializerOptions Options = new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
+    private static readonly JsonSerializerOptions Options = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+    };
 
     public static ReplayReferences? Load(string directory)
     {
         var path = Path.Combine(directory, "references.json");
-        return File.Exists(path) ? new ReplayReferences(JsonSerializer.Deserialize<Fixture>(File.ReadAllText(path), Options)!) : null;
+        return File.Exists(path)
+            ? new ReplayReferences(JsonSerializer.Deserialize<Fixture>(File.ReadAllText(path), Options)!)
+            : null;
     }
 
-    public Task<ReferenceRetrieval> RetrieveAsync(ReferenceQuery query, CancellationToken cancellationToken = default) =>
-        Task.FromResult(new ReferenceRetrieval(fixture.Docs, fixture.CorpusVersion, false));
+    public Task<ReferenceRetrieval> RetrieveAsync(
+        ReferenceQuery query,
+        CancellationToken cancellationToken = default
+    ) => Task.FromResult(new ReferenceRetrieval(fixture.Docs, fixture.CorpusVersion, false));
 
     /// <summary>
     /// What's wrong with a replay with references, beside the usual checks: the findings have to be the same as without
@@ -36,7 +43,9 @@ internal sealed class ReplayReferences(ReplayReferences.Fixture fixture) : IRefe
             problems.Add("the result doesn't say references were used");
         }
 
-        var before = without.Findings.Select(finding => (finding.ResourceAddress, finding.Rule, finding.Title)).ToList();
+        var before = without
+            .Findings.Select(finding => (finding.ResourceAddress, finding.Rule, finding.Title))
+            .ToList();
         var after = with.Findings.Select(finding => (finding.ResourceAddress, finding.Rule, finding.Title)).ToList();
         if (!before.SequenceEqual(after))
         {
@@ -44,17 +53,27 @@ internal sealed class ReplayReferences(ReplayReferences.Fixture fixture) : IRefe
             return problems;
         }
 
-        var added = without.Findings.Zip(with.Findings)
+        var added = without
+            .Findings.Zip(with.Findings)
             .Where(pair => pair.First.Suggestion != pair.Second.Suggestion)
             .Select(pair => (pair.Second.ResourceAddress, pair.Second.Rule, pair.Second.Suggestion))
             .ToList();
         if (fixture.Addition is null)
         {
-            problems.AddRange(added.Select(item => $"{item.ResourceAddress} {item.Rule}: an addition code should have rejected: {item.Suggestion}"));
+            problems.AddRange(
+                added.Select(item =>
+                    $"{item.ResourceAddress} {item.Rule}: an addition code should have rejected: {item.Suggestion}"
+                )
+            );
         }
-        else if (added is not [var only] || only.Suggestion?.EndsWith(" " + fixture.Addition, StringComparison.Ordinal) != true)
+        else if (
+            added is not [var only]
+            || only.Suggestion?.EndsWith(" " + fixture.Addition, StringComparison.Ordinal) != true
+        )
         {
-            problems.Add($"expected one suggestion to gain \"{fixture.Addition}\", and got {added.Count} changed: {string.Join(" / ", added.Select(item => item.Suggestion))}");
+            problems.Add(
+                $"expected one suggestion to gain \"{fixture.Addition}\", and got {added.Count} changed: {string.Join(" / ", added.Select(item => item.Suggestion))}"
+            );
         }
 
         return problems;
@@ -63,5 +82,6 @@ internal sealed class ReplayReferences(ReplayReferences.Fixture fixture) : IRefe
     internal sealed record Fixture(
         [property: JsonPropertyName("corpus_version")] string CorpusVersion,
         [property: JsonPropertyName("docs")] IReadOnlyList<ReferenceDoc> Docs,
-        [property: JsonPropertyName("addition")] string? Addition);
+        [property: JsonPropertyName("addition")] string? Addition
+    );
 }

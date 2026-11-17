@@ -10,7 +10,13 @@ namespace TfReview.Worker;
 /// Production's is <c>ReviewRunner</c>.
 /// </summary>
 public delegate Task<ReviewResult> ReviewEngine(
-    string plan, string? config, string? lockFile, string commit, string repositoryId, CancellationToken cancellationToken);
+    string plan,
+    string? config,
+    string? lockFile,
+    string commit,
+    string repositoryId,
+    CancellationToken cancellationToken
+);
 
 /// <summary>Opens a repo through the GitHub App, with a token for that repo alone.</summary>
 public delegate Task<RepositorySession> RepositoryOpener(string repository, CancellationToken cancellationToken);
@@ -28,7 +34,8 @@ public sealed class ReviewWorker(
     Action<string> log,
     TimeProvider? time = null,
     IModelBudget? budget = null,
-    IResultStore? results = null)
+    IResultStore? results = null
+)
 {
     /// <summary>Longer than a job may run, so a message only comes back when the job really has gone.</summary>
     public static readonly TimeSpan Visibility = TimeSpan.FromMinutes(20);
@@ -84,7 +91,8 @@ public sealed class ReviewWorker(
             log($"Review {job.ReviewId} failed on try {message.DequeueCount}: {e.GetType().Name}.");
             if (message.DequeueCount >= MaxAttempts)
             {
-                var reason = e is OperationCanceledException ? NotReviewedReason.Timeout : NotReviewedReason.Unavailable;
+                var reason =
+                    e is OperationCanceledException ? NotReviewedReason.Timeout : NotReviewedReason.Unavailable;
                 await this.GiveUpAsync(job, message, reason, e.GetType().Name);
             }
 
@@ -183,7 +191,13 @@ public sealed class ReviewWorker(
             }
             else
             {
-                await PostAsync(session, job, ReviewResult.Failed(job.Commit, ReviewScope.Plan, reason), null, cancellationToken);
+                await PostAsync(
+                    session,
+                    job,
+                    ReviewResult.Failed(job.Commit, ReviewScope.Plan, reason),
+                    null,
+                    cancellationToken
+                );
                 posted = true;
             }
         }
@@ -211,7 +225,12 @@ public sealed class ReviewWorker(
     }
 
     private static async Task PostAsync(
-        RepositorySession session, ReviewJob job, ReviewResult result, PlanCounts? counts, CancellationToken cancellationToken)
+        RepositorySession session,
+        ReviewJob job,
+        ReviewResult result,
+        PlanCounts? counts,
+        CancellationToken cancellationToken
+    )
     {
         // Ticks on the comment being replaced all carry over, and new ones are marked as counted in it (D56). They're
         // counted once it's written, so a write that fails and is retried can't count them twice.
@@ -224,7 +243,8 @@ public sealed class ReviewWorker(
                 counted = comment.CountedDismissals;
                 return comment.Body;
             },
-            cancellationToken);
+            cancellationToken
+        );
 
         foreach (var rule in counted)
         {
@@ -244,7 +264,12 @@ public sealed class ReviewWorker(
 
         try
         {
-            await results.SaveAsync(job.RepositoryId, job.ReviewId, JsonSerializer.Serialize(result), cancellationToken);
+            await results.SaveAsync(
+                job.RepositoryId,
+                job.ReviewId,
+                JsonSerializer.Serialize(result),
+                cancellationToken
+            );
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
@@ -296,14 +321,17 @@ public sealed class ReviewWorker(
     }
 
     private static PlanCounts? Counts(string? plan) =>
-        plan is not null && new PlanRedactor().Redact(plan) is Redacted redacted ? PlanCounts.From(redacted.Plan) : null;
+        plan is not null && new PlanRedactor().Redact(plan) is Redacted redacted
+            ? PlanCounts.From(redacted.Plan)
+            : null;
 
-    private static string VerdictName(ReviewResult result) => result.Verdict switch
-    {
-        Verdict.NoFindings => "no_findings",
-        Verdict.Findings => "findings",
-        _ => "not_reviewed",
-    };
+    private static string VerdictName(ReviewResult result) =>
+        result.Verdict switch
+        {
+            Verdict.NoFindings => "no_findings",
+            Verdict.Findings => "findings",
+            _ => "not_reviewed",
+        };
 
     private ReviewStatus Status(ReviewJob job, ReviewState state) =>
         new(job.ReviewId, job.RepositoryId, job.Repository, job.PullRequest, job.Commit, state, this.time.GetUtcNow());

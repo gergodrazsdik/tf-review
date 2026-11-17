@@ -38,7 +38,8 @@ public class ReviewRunnerTests
         await Assert.That(result.Commit).IsEqualTo(Commit);
         await Assert.That(result.StandardsCommit).IsEqualTo(StandardsCommit);
         await Assert.That(result.Findings.Single().Rule).IsEqualTo("ADR-002");
-        await Assert.That(result.Findings.Single().Evidence[0].Value)
+        await Assert
+            .That(result.Findings.Single().Evidence[0].Value)
             .IsEqualTo(new PlanEvidence("/resource_changes/a.b/change/after/tags"));
     }
 
@@ -48,7 +49,9 @@ public class ReviewRunnerTests
         var result = await Run(Plan, Config, NoViolations);
 
         await Assert.That(result.Verdict).IsEqualTo(Verdict.NoFindings);
-        await Assert.That(result.NotReviewed.Single()).IsEqualTo(new NotReviewed(ReviewScope.Conventions, NotReviewedReason.Unavailable));
+        await Assert
+            .That(result.NotReviewed.Single())
+            .IsEqualTo(new NotReviewed(ReviewScope.Conventions, NotReviewedReason.Unavailable));
     }
 
     [Test]
@@ -60,7 +63,10 @@ public class ReviewRunnerTests
             {"msg":"high","metadata":{"details":{"address":"a.z","doc_id":"POL-001","severity":"high"}}}]}]
             """;
 
-        var plan = TestPlans.Json(TestPlans.Create("a.a", "a", """{"name":"x"}"""), TestPlans.Create("a.z", "a", """{"name":"y"}"""));
+        var plan = TestPlans.Json(
+            TestPlans.Create("a.a", "a", """{"name":"x"}"""),
+            TestPlans.Create("a.z", "a", """{"name":"y"}""")
+        );
 
         var result = await Run(plan, Config, Output);
 
@@ -132,7 +138,11 @@ public class ReviewRunnerTests
     public async Task Fetches_the_commit_the_config_names()
     {
         var source = new RecordingSource();
-        await new ReviewRunner(source, new ConftestRunner(new FakeProcesses(NoViolations))).RunAsync(Plan, Config, Commit);
+        await new ReviewRunner(source, new ConftestRunner(new FakeProcesses(NoViolations))).RunAsync(
+            Plan,
+            Config,
+            Commit
+        );
 
         await Assert.That(source.Requested!.Repository).IsEqualTo("owner/standards");
         await Assert.That(source.Requested!.Commit).IsEqualTo(StandardsCommit);
@@ -142,7 +152,11 @@ public class ReviewRunnerTests
     public async Task Cleans_up_the_standards_it_fetched()
     {
         var source = new RecordingSource();
-        await new ReviewRunner(source, new ConftestRunner(new FakeProcesses(NoViolations))).RunAsync(Plan, Config, Commit);
+        await new ReviewRunner(source, new ConftestRunner(new FakeProcesses(NoViolations))).RunAsync(
+            Plan,
+            Config,
+            Commit
+        );
 
         await Assert.That(Directory.Exists(source.Directory)).IsFalse();
     }
@@ -159,7 +173,11 @@ public class ReviewRunnerTests
 
         public string? Directory { get; private set; }
 
-        public Task FetchAsync(TfReviewConfig config, string targetDirectory, CancellationToken cancellationToken = default)
+        public Task FetchAsync(
+            TfReviewConfig config,
+            string targetDirectory,
+            CancellationToken cancellationToken = default
+        )
         {
             Requested = config;
             Directory = targetDirectory;
@@ -169,7 +187,10 @@ public class ReviewRunnerTests
 
     private sealed class FailingSource : IStandardsSource
     {
-        public Task FetchAsync(TfReviewConfig config, string targetDirectory, CancellationToken cancellationToken = default) =>
-            throw new StandardsFetchException("Downloading the standards failed.");
+        public Task FetchAsync(
+            TfReviewConfig config,
+            string targetDirectory,
+            CancellationToken cancellationToken = default
+        ) => throw new StandardsFetchException("Downloading the standards failed.");
     }
 }

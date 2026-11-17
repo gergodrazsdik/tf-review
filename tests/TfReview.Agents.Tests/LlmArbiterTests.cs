@@ -10,7 +10,8 @@ public class LlmArbiterTests
 
     private static readonly CondensedPlan Plan = TestPlans.Condensed(
         TestPlans.Create(Storage, "azurerm_storage_account", """{"name":"a"}"""),
-        TestPlans.Create(Other, "azurerm_virtual_network", """{"name":"b"}"""));
+        TestPlans.Create(Other, "azurerm_virtual_network", """{"name":"b"}""")
+    );
 
     [Test]
     public async Task Merges_what_the_model_says_is_one_problem_under_the_row_citing_a_standard()
@@ -19,7 +20,8 @@ public class LlmArbiterTests
         var result = await Arbitrate(
             """{"groups":[{"finding_ids":["F1","F2"]}],"order":[]}""",
             Policy(Storage, "POL-001"),
-            Scanner(Storage, "CKV_AZURE_190"));
+            Scanner(Storage, "CKV_AZURE_190")
+        );
 
         var row = result.Findings.Single();
         await Assert.That(row.Rule).IsEqualTo("POL-001");
@@ -30,7 +32,11 @@ public class LlmArbiterTests
     [Test]
     public async Task A_merged_row_keeps_everyones_evidence_and_the_highest_severity()
     {
-        var low = Policy(Storage, "POL-001") with { Severity = Severity.Low, Evidence = [new PlanEvidence("/resource_changes/x/a"), new DocEvidence("POL-001")] };
+        var low = Policy(Storage, "POL-001") with
+        {
+            Severity = Severity.Low,
+            Evidence = [new PlanEvidence("/resource_changes/x/a"), new DocEvidence("POL-001")],
+        };
         var high = Scanner(Storage, "CKV_AZURE_190") with { Evidence = [new PlanEvidence("/resource_changes/x/b")] };
 
         var result = await Arbitrate("""{"groups":[{"finding_ids":["F1","F2"]}],"order":[]}""", low, high);
@@ -47,7 +53,8 @@ public class LlmArbiterTests
         var result = await Arbitrate(
             """{"groups":[{"finding_ids":["F1","F2"]}],"order":[]}""",
             Policy(Storage, "POL-001"),
-            Policy(Other, "ADR-001"));
+            Policy(Other, "ADR-001")
+        );
 
         await Assert.That(result.Findings.Count).IsEqualTo(2);
     }
@@ -59,7 +66,8 @@ public class LlmArbiterTests
         var result = await Arbitrate(
             """{"groups":[{"finding_ids":["F1","F2"]}],"order":[]}""",
             Policy(Storage, "POL-001"),
-            Model(Storage, "ADR-002"));
+            Model(Storage, "ADR-002")
+        );
 
         await Assert.That(result.Findings.Count).IsEqualTo(2);
     }
@@ -71,7 +79,10 @@ public class LlmArbiterTests
         const string Answer = """{"groups":[],"drop":["F1","F2"],"order":[]}""";
         var chat = new FakeChat(FakeChat.Answer(Answer), FakeChat.Answer(Answer));
 
-        var result = await new LlmArbiter(chat).ArbitrateAsync([Policy(Storage, "POL-001"), Model(Other, "ADR-001")], Plan);
+        var result = await new LlmArbiter(chat).ArbitrateAsync(
+            [Policy(Storage, "POL-001"), Model(Other, "ADR-001")],
+            Plan
+        );
 
         await Assert.That(result.Findings.Count).IsEqualTo(2);
     }
@@ -79,7 +90,11 @@ public class LlmArbiterTests
     [Test]
     public async Task Leaving_a_finding_out_of_the_order_keeps_it()
     {
-        var result = await Arbitrate("""{"groups":[],"order":["F1"]}""", Policy(Storage, "POL-001"), Model(Other, "ADR-001"));
+        var result = await Arbitrate(
+            """{"groups":[],"order":["F1"]}""",
+            Policy(Storage, "POL-001"),
+            Model(Other, "ADR-001")
+        );
 
         await Assert.That(result.Findings.Count).IsEqualTo(2);
     }
@@ -90,7 +105,8 @@ public class LlmArbiterTests
         var result = await Arbitrate(
             """{"groups":[{"finding_ids":["F1","F99"]}],"order":["F97"]}""",
             Policy(Storage, "POL-001"),
-            Policy(Other, "ADR-001"));
+            Policy(Other, "ADR-001")
+        );
 
         await Assert.That(result.Findings.Count).IsEqualTo(2);
     }
@@ -102,7 +118,8 @@ public class LlmArbiterTests
             """{"groups":[{"finding_ids":["F1","F2"]},{"finding_ids":["F2","F3"]}],"order":[]}""",
             Scanner(Storage, "CKV_AZURE_190"),
             Scanner(Storage, "CKV_AZURE_59"),
-            Policy(Storage, "POL-001"));
+            Policy(Storage, "POL-001")
+        );
 
         var rules = result.Findings.SelectMany(finding => (finding.RelatedRules ?? []).Append(finding.Rule)).ToList();
         await Assert.That(rules.Count).IsEqualTo(3);
@@ -122,7 +139,11 @@ public class LlmArbiterTests
     [Test]
     public async Task Orders_within_a_severity()
     {
-        var result = await Arbitrate("""{"groups":[],"order":["F2","F1"]}""", Policy(Storage, "POL-001"), Policy(Other, "POL-002"));
+        var result = await Arbitrate(
+            """{"groups":[],"order":["F2","F1"]}""",
+            Policy(Storage, "POL-001"),
+            Policy(Other, "POL-002")
+        );
 
         await Assert.That(result.Findings[0].ResourceAddress).IsEqualTo(Other);
     }
@@ -132,7 +153,11 @@ public class LlmArbiterTests
     {
         var chat = new FakeChat(FakeChat.Answer("""{"groups":[],"order":["F2","F1"]}"""));
 
-        var result = await new LlmArbiter(chat).ArbitrateAsync([Policy(Storage, "POL-001"), Policy(Other, "POL-002")], Plan, [Storage, Other]);
+        var result = await new LlmArbiter(chat).ArbitrateAsync(
+            [Policy(Storage, "POL-001"), Policy(Other, "POL-002")],
+            Plan,
+            [Storage, Other]
+        );
 
         await Assert.That(result.Findings[0].ResourceAddress).IsEqualTo(Storage);
     }
@@ -144,7 +169,10 @@ public class LlmArbiterTests
     {
         var chat = new FakeChat(FakeChat.Answer(answer), FakeChat.Answer(answer));
 
-        var result = await new LlmArbiter(chat).ArbitrateAsync([Policy(Storage, "POL-001"), Model(Other, "ADR-001")], Plan);
+        var result = await new LlmArbiter(chat).ArbitrateAsync(
+            [Policy(Storage, "POL-001"), Model(Other, "ADR-001")],
+            Plan
+        );
 
         await Assert.That(result.Findings.Count).IsEqualTo(2);
         await Assert.That(result.Calls.Count).IsEqualTo(2);
@@ -154,7 +182,9 @@ public class LlmArbiterTests
     public async Task A_failed_call_keeps_the_rule_based_result()
     {
         var result = await new LlmArbiter(new FakeChat(new InvalidOperationException("Down."))).ArbitrateAsync(
-            [Policy(Storage, "POL-001"), Model(Other, "ADR-001")], Plan);
+            [Policy(Storage, "POL-001"), Model(Other, "ADR-001")],
+            Plan
+        );
 
         await Assert.That(result.Findings.Count).IsEqualTo(2);
     }
@@ -186,7 +216,10 @@ public class LlmArbiterTests
     public async Task Too_many_findings_keep_the_rules_result_without_a_call()
     {
         var chat = new FakeChat();
-        var findings = Enumerable.Range(0, LlmArbiter.MaxFindings + 1).Select(index => Policy($"azurerm_storage_account.s{index}", "POL-001")).ToList();
+        var findings = Enumerable
+            .Range(0, LlmArbiter.MaxFindings + 1)
+            .Select(index => Policy($"azurerm_storage_account.s{index}", "POL-001"))
+            .ToList();
 
         var result = await new LlmArbiter(chat).ArbitrateAsync(findings, Plan);
 
@@ -197,12 +230,36 @@ public class LlmArbiterTests
     private static Task<Arbitration> Arbitrate(string answer, params Finding[] findings) =>
         new LlmArbiter(new FakeChat(FakeChat.Answer(answer))).ArbitrateAsync(findings, Plan);
 
-    private static Finding Policy(string address, string rule) => new(
-        address, rule, Severity.High, Reporter.Scanner, true, "Policy title", [new PlanEvidence($"/resource_changes/{address}/change/after"), new DocEvidence(rule)]);
+    private static Finding Policy(string address, string rule) =>
+        new(
+            address,
+            rule,
+            Severity.High,
+            Reporter.Scanner,
+            true,
+            "Policy title",
+            [new PlanEvidence($"/resource_changes/{address}/change/after"), new DocEvidence(rule)]
+        );
 
-    private static Finding Scanner(string address, string rule) => new(
-        address, rule, Severity.High, Reporter.Scanner, true, "Scanner title", [new PlanEvidence($"/resource_changes/{address}/change/after")]);
+    private static Finding Scanner(string address, string rule) =>
+        new(
+            address,
+            rule,
+            Severity.High,
+            Reporter.Scanner,
+            true,
+            "Scanner title",
+            [new PlanEvidence($"/resource_changes/{address}/change/after")]
+        );
 
-    private static Finding Model(string address, string rule) => new(
-        address, rule, Severity.Medium, Reporter.Conventions, false, "Model title", [new PlanEvidence($"/resource_changes/{address}/change/after"), new DocEvidence(rule)]);
+    private static Finding Model(string address, string rule) =>
+        new(
+            address,
+            rule,
+            Severity.Medium,
+            Reporter.Conventions,
+            false,
+            "Model title",
+            [new PlanEvidence($"/resource_changes/{address}/change/after"), new DocEvidence(rule)]
+        );
 }

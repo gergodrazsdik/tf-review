@@ -9,7 +9,13 @@ public class StepSummaryTests
     [Test]
     public async Task Shows_tokens_cost_and_time()
     {
-        var usage = new TokenUsage(1_000_000, 100_000) { CachedInputTokens = 0, Model = "gpt-5.4-mini", Calls = 2, LatencyMs = 2500 };
+        var usage = new TokenUsage(1_000_000, 100_000)
+        {
+            CachedInputTokens = 0,
+            Model = "gpt-5.4-mini",
+            Calls = 2,
+            LatencyMs = 2500,
+        };
 
         var summary = StepSummary.Render(Result() with { Usage = usage });
 
@@ -52,7 +58,15 @@ public class StepSummaryTests
     [Test]
     public async Task Holds_no_finding_text()
     {
-        Finding finding = new("a.secret-name", "ADR-002", Severity.Low, Reporter.Scanner, true, "plan text", [new PlanEvidence("/resource_changes/a.b")]);
+        Finding finding = new(
+            "a.secret-name",
+            "ADR-002",
+            Severity.Low,
+            Reporter.Scanner,
+            true,
+            "plan text",
+            [new PlanEvidence("/resource_changes/a.b")]
+        );
 
         var summary = StepSummary.Render(Result() with { Verdict = Verdict.Findings, Findings = [finding] });
 

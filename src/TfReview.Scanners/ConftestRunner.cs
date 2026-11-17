@@ -23,27 +23,32 @@ public sealed record ConftestRan(IReadOnlyList<ConftestViolation> Violations) : 
 {
     /// <summary>One finding per resource and rule, because ADR-002 fails once per missing tag.</summary>
     public IReadOnlyList<Finding> ToFindings(CondensedPlan plan) =>
-    [
-        .. Violations
-            .GroupBy(violation => (violation.Address, violation.DocId))
-            .Select(group => new Finding(
-                group.Key.Address,
-                group.Key.DocId,
-                group.Max(violation => violation.Severity),
-                Reporter.Scanner,
-                Deterministic: true,
-                string.Join("; ", group.Select(violation => violation.Message)),
-                [.. Pointers(plan, group.Key.Address, group), new DocEvidence(group.Key.DocId)]))
-            .OrderBy(finding => finding.ResourceAddress, StringComparer.Ordinal)
-            .ThenBy(finding => finding.Rule, StringComparer.Ordinal),
-    ];
+        [
+            .. Violations
+                .GroupBy(violation => (violation.Address, violation.DocId))
+                .Select(group => new Finding(
+                    group.Key.Address,
+                    group.Key.DocId,
+                    group.Max(violation => violation.Severity),
+                    Reporter.Scanner,
+                    Deterministic: true,
+                    string.Join("; ", group.Select(violation => violation.Message)),
+                    [.. Pointers(plan, group.Key.Address, group), new DocEvidence(group.Key.DocId)]
+                ))
+                .OrderBy(finding => finding.ResourceAddress, StringComparer.Ordinal)
+                .ThenBy(finding => finding.Rule, StringComparer.Ordinal),
+        ];
 
     /// <summary>
     /// A pointer per failed attribute. An attribute can be absent from the condensed plan, either because
     /// it's missing altogether, which is what POL-001 can fire on, or because an update left it unchanged.
     /// The evidence then points at the resource's planned values, so the evidence check keeps the finding.
     /// </summary>
-    private static IEnumerable<Evidence> Pointers(CondensedPlan plan, string address, IEnumerable<ConftestViolation> violations)
+    private static IEnumerable<Evidence> Pointers(
+        CondensedPlan plan,
+        string address,
+        IEnumerable<ConftestViolation> violations
+    )
     {
         var pointers = violations
             .Select(violation => violation.Attribute)
@@ -63,7 +68,13 @@ public sealed record ConftestRan(IReadOnlyList<ConftestViolation> Violations) : 
     }
 }
 
-public sealed record ConftestViolation(string DocId, string Address, Severity Severity, string Message, string? Attribute = null);
+public sealed record ConftestViolation(
+    string DocId,
+    string Address,
+    Severity Severity,
+    string Message,
+    string? Attribute = null
+);
 
 public sealed record ConftestFailed(ConftestFailure Reason) : ConftestOutcome;
 
@@ -83,7 +94,10 @@ public sealed partial class ConftestRunner(IProcessRunner processes, string prog
     private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(2);
 
     public async Task<ConftestOutcome> RunAsync(
-        RedactedPlan plan, string standardsDirectory, CancellationToken cancellationToken = default)
+        RedactedPlan plan,
+        string standardsDirectory,
+        CancellationToken cancellationToken = default
+    )
     {
         var directory = Directory.CreateTempSubdirectory("tfreview-");
         try
@@ -92,8 +106,10 @@ public sealed partial class ConftestRunner(IProcessRunner processes, string prog
             await File.WriteAllTextAsync(path, plan.ToCanonicalJson(), cancellationToken);
 
             var capabilities = Path.Combine(directory.FullName, "capabilities.json");
-            await using (var embedded = typeof(ConftestRunner).Assembly.GetManifestResourceStream(CapabilitiesResource)
-                ?? throw new InvalidOperationException("The conftest capabilities aren't embedded."))
+            await using (
+                var embedded = typeof(ConftestRunner).Assembly.GetManifestResourceStream(CapabilitiesResource)
+                    ?? throw new InvalidOperationException("The conftest capabilities aren't embedded.")
+            )
             await using (var file = File.Create(capabilities))
             {
                 await embedded.CopyToAsync(file, cancellationToken);
@@ -103,9 +119,23 @@ public sealed partial class ConftestRunner(IProcessRunner processes, string prog
             // finds nothing there, and reports a clean result that checked nothing.
             var result = await processes.RunAsync(
                 program,
-                ["test", "--no-color", "--all-namespaces", "--output", "json", "--parser", "json", "--capabilities", capabilities, "--policy", standardsDirectory, path],
+                [
+                    "test",
+                    "--no-color",
+                    "--all-namespaces",
+                    "--output",
+                    "json",
+                    "--parser",
+                    "json",
+                    "--capabilities",
+                    capabilities,
+                    "--policy",
+                    standardsDirectory,
+                    path,
+                ],
                 Timeout,
-                cancellationToken);
+                cancellationToken
+            );
 
             return result is null ? new ConftestFailed(ConftestFailure.CouldNotRun) : Parse(result.Output);
         }
@@ -173,8 +203,7 @@ public sealed partial class ConftestRunner(IProcessRunner processes, string prog
             return new ConftestFailed(ConftestFailure.NoPolicyRan);
         }
 
-        return new ConftestRan(
-        [
+        return new ConftestRan([
             .. violations
                 .Distinct()
                 .OrderBy(violation => violation.Address, StringComparer.Ordinal)
@@ -212,7 +241,13 @@ public sealed partial class ConftestRunner(IProcessRunner processes, string prog
             }
         }
 
-        return new ConftestViolation(docId, address, severity, failure.GetProperty("msg").GetString() ?? string.Empty, attribute);
+        return new ConftestViolation(
+            docId,
+            address,
+            severity,
+            failure.GetProperty("msg").GetString() ?? string.Empty,
+            attribute
+        );
     }
 
     [GeneratedRegex("^[A-Za-z0-9_-]+$")]

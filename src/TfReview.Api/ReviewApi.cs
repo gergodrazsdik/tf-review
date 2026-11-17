@@ -42,7 +42,10 @@ public static partial class ReviewApi
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
     };
 
-    private static readonly JsonSerializerOptions ResponseOptions = new() { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
+    private static readonly JsonSerializerOptions ResponseOptions = new()
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    };
 
     /// <summary>Runs the service's API from its environment. An empty list refuses everyone.</summary>
     public static async Task RunAsync()
@@ -57,14 +60,25 @@ public static partial class ReviewApi
         await app.RunAsync();
     }
 
-    public static void MapReviews(this WebApplication app, ApiOptions options, GitHubTokens tokens, ServiceStores stores)
+    public static void MapReviews(
+        this WebApplication app,
+        ApiOptions options,
+        GitHubTokens tokens,
+        ServiceStores stores
+    )
     {
         var logger = app.Logger;
         var refusals = new RefusalLog(
-            count => logger.LogInformation("Refused {Count} token(s) that aren't valid since the last count.", count), RefusalLogPeriod);
-        var limiter = PartitionedRateLimiter.Create<string, string>(repository => RateLimitPartition.GetFixedWindowLimiter(
-            repository,
-            _ => new FixedWindowRateLimiterOptions { PermitLimit = options.ReviewsPerHour, Window = TimeSpan.FromHours(1) }));
+            count => logger.LogInformation("Refused {Count} token(s) that aren't valid since the last count.", count),
+            RefusalLogPeriod
+        );
+        var limiter = PartitionedRateLimiter.Create<string, string>(repository =>
+            RateLimitPartition.GetFixedWindowLimiter(repository, _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = options.ReviewsPerHour,
+                Window = TimeSpan.FromHours(1),
+            })
+        );
 
         app.MapGet("/healthz", () => Results.Ok());
 
@@ -112,7 +126,9 @@ public static partial class ReviewApi
 
             try
             {
-                return await stores.Statuses.ReadAsync(decision.Caller!.RepositoryId, id, context.RequestAborted) is { } status
+                return
+                    await stores.Statuses.ReadAsync(decision.Caller!.RepositoryId, id, context.RequestAborted)
+                        is { } status
                     ? Results.Json(ToResponse(status), ResponseOptions)
                     : Results.NotFound();
             }
@@ -134,18 +150,31 @@ public static partial class ReviewApi
         ServiceStores stores,
         PartitionedRateLimiter<string> limiter,
         ILogger logger,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         if (stores.Counters is { } counters)
         {
             try
             {
-                var hour = DateTimeOffset.UtcNow.ToString("yyyyMMddHH", System.Globalization.CultureInfo.InvariantCulture);
-                return await counters.AddAsync(caller.RepositoryId, $"rate-{hour}", 1, RateWindowLife, cancellationToken) <= options.ReviewsPerHour;
+                var hour = DateTimeOffset.UtcNow.ToString(
+                    "yyyyMMddHH",
+                    System.Globalization.CultureInfo.InvariantCulture
+                );
+                return await counters.AddAsync(
+                        caller.RepositoryId,
+                        $"rate-{hour}",
+                        1,
+                        RateWindowLife,
+                        cancellationToken
+                    ) <= options.ReviewsPerHour;
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {
-                logger.LogWarning("Couldn't count a review against the rate limit, so this replica counts it: {Type}.", e.GetType().Name);
+                logger.LogWarning(
+                    "Couldn't count a review against the rate limit, so this replica counts it: {Type}.",
+                    e.GetType().Name
+                );
             }
         }
 
@@ -154,7 +183,12 @@ public static partial class ReviewApi
     }
 
     private static HashSet<string> List(string name) =>
-        [.. (Environment.GetEnvironmentVariable(name) ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+        [
+            .. (Environment.GetEnvironmentVariable(name) ?? string.Empty).Split(
+                ',',
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+            ),
+        ];
 
     /// <summary>The same inputs give the same ID, so a retry after a cold start is one review, and a re-run is another.</summary>
     internal static string ReviewId(Caller caller, string commit)
@@ -164,7 +198,12 @@ public static partial class ReviewApi
     }
 
     private static async Task<(Caller? Caller, IResult? Failure)> AuthenticateAsync(
-        HttpContext context, ApiOptions options, GitHubTokens tokens, ILogger logger, RefusalLog refusals)
+        HttpContext context,
+        ApiOptions options,
+        GitHubTokens tokens,
+        ILogger logger,
+        RefusalLog refusals
+    )
     {
         var header = context.Request.Headers.Authorization.ToString();
         if (!header.StartsWith("Bearer ", StringComparison.Ordinal))
@@ -186,7 +225,10 @@ public static partial class ReviewApi
 
         // These rules are in a public repo, so naming the one that failed tells a caller nothing new.
         logger.LogWarning("Refused a caller: {Refusal}.", decision.Refusal);
-        return (null, Results.Json(new { refused = decision.Refusal.ToString() }, statusCode: StatusCodes.Status403Forbidden));
+        return (
+            null,
+            Results.Json(new { refused = decision.Refusal.ToString() }, statusCode: StatusCodes.Status403Forbidden)
+        );
     }
 
     private static async Task<(byte[]? Bytes, bool TooLarge)> ReadBodyAsync(HttpContext context, long limit)
@@ -218,7 +260,8 @@ public static partial class ReviewApi
         try
         {
             var request = JsonSerializer.Deserialize<SubmitRequest>(body, RequestOptions);
-            return request is not null
+            return
+                request is not null
                 && CommitFormat().IsMatch(request.Commit)
                 && IsConfigPath(request.ConfigPath)
                 && (request.WorkingDirectory is null || IsConfigPath(request.WorkingDirectory))
@@ -236,7 +279,12 @@ public static partial class ReviewApi
         ConfigPathFormat().IsMatch(path) && !path.Split('/').Contains("..", StringComparer.Ordinal);
 
     private static async Task<IResult> SubmitAsync(
-        Caller caller, SubmitRequest request, ServiceStores stores, ILogger logger, CancellationToken cancellationToken)
+        Caller caller,
+        SubmitRequest request,
+        ServiceStores stores,
+        ILogger logger,
+        CancellationToken cancellationToken
+    )
     {
         var id = ReviewId(caller, request.Commit);
         try
@@ -247,11 +295,27 @@ public static partial class ReviewApi
             {
                 await stores.Plans.SaveAsync(id, RedactAgain(request.Plan, logger), cancellationToken);
                 await stores.Queue.EnqueueAsync(
-                    new ReviewJob(id, caller.RepositoryId, caller.Repository, caller.PullRequest, request.Commit, request.ConfigPath, request.WorkingDirectory),
-                    cancellationToken);
+                    new ReviewJob(
+                        id,
+                        caller.RepositoryId,
+                        caller.Repository,
+                        caller.PullRequest,
+                        request.Commit,
+                        request.ConfigPath,
+                        request.WorkingDirectory
+                    ),
+                    cancellationToken
+                );
 
                 status = new ReviewStatus(
-                    id, caller.RepositoryId, caller.Repository, caller.PullRequest, request.Commit, ReviewState.Queued, DateTimeOffset.UtcNow);
+                    id,
+                    caller.RepositoryId,
+                    caller.Repository,
+                    caller.PullRequest,
+                    request.Commit,
+                    ReviewState.Queued,
+                    DateTimeOffset.UtcNow
+                );
                 await stores.Statuses.WriteAsync(status, cancellationToken);
             }
 
@@ -281,7 +345,13 @@ public static partial class ReviewApi
     }
 
     private static ReviewResponse ToResponse(ReviewStatus status) =>
-        new(status.ReviewId, status.State.ToString().ToLowerInvariant(), status.Commit, status.PullRequest, status.Verdict);
+        new(
+            status.ReviewId,
+            status.State.ToString().ToLowerInvariant(),
+            status.Commit,
+            status.PullRequest,
+            status.Verdict
+        );
 
     [GeneratedRegex("^[0-9a-f]{40}$")]
     private static partial Regex CommitFormat();
@@ -296,14 +366,15 @@ public static partial class ReviewApi
         [property: JsonPropertyName("commit")] string Commit,
         [property: JsonPropertyName("config_path")] string ConfigPath,
         [property: JsonPropertyName("plan")] string Plan,
-
         // Where the project is, to read its lock file at the base commit. Callers from before it was sent leave it out.
-        [property: JsonPropertyName("working_directory")] string? WorkingDirectory = null);
+        [property: JsonPropertyName("working_directory")] string? WorkingDirectory = null
+    );
 
     private sealed record ReviewResponse(
         [property: JsonPropertyName("id")] string Id,
         [property: JsonPropertyName("state")] string State,
         [property: JsonPropertyName("commit")] string Commit,
         [property: JsonPropertyName("pull_request")] int PullRequest,
-        [property: JsonPropertyName("verdict")] string? Verdict);
+        [property: JsonPropertyName("verdict")] string? Verdict
+    );
 }

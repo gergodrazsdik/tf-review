@@ -7,13 +7,28 @@ public class CheckovRunnerTests
 {
     private const string Storage = "azurerm_storage_account.a";
 
-    private static readonly string Canary = Failure(ScannablePlan.CanaryAddress, "CKV_AZURE_190", "Canary", "allow_nested_items_to_be_public");
+    private static readonly string Canary = Failure(
+        ScannablePlan.CanaryAddress,
+        "CKV_AZURE_190",
+        "Canary",
+        "allow_nested_items_to_be_public"
+    );
 
     [Test]
     public async Task Keeps_allowlisted_checks_and_sets_their_severity()
     {
-        var outcome = (CheckovRan)CheckovRunner.Parse(Output(
-            Canary, Failure(Storage, "CKV_AZURE_190", "Ensure that Storage blobs restrict public access", "allow_nested_items_to_be_public")));
+        var outcome = (CheckovRan)
+            CheckovRunner.Parse(
+                Output(
+                    Canary,
+                    Failure(
+                        Storage,
+                        "CKV_AZURE_190",
+                        "Ensure that Storage blobs restrict public access",
+                        "allow_nested_items_to_be_public"
+                    )
+                )
+            );
 
         var violation = outcome.Violations.Single();
         await Assert.That(violation.CheckId).IsEqualTo("CKV_AZURE_190");
@@ -25,17 +40,31 @@ public class CheckovRunnerTests
     [Test]
     public async Task Uses_our_words_for_a_finding()
     {
-        var outcome = (CheckovRan)CheckovRunner.Parse(Output(Canary, Failure(Storage, "CKV_AZURE_190", "Ensure that Storage blobs restrict public access", null)));
+        var outcome = (CheckovRan)
+            CheckovRunner.Parse(
+                Output(
+                    Canary,
+                    Failure(Storage, "CKV_AZURE_190", "Ensure that Storage blobs restrict public access", null)
+                )
+            );
 
-        await Assert.That(outcome.Violations.Single().Title).IsEqualTo("The storage account allows public access to blobs.");
+        await Assert
+            .That(outcome.Violations.Single().Title)
+            .IsEqualTo("The storage account allows public access to blobs.");
     }
 
     // D34: the spike's storage account failed 11 checks, most of them about related resources.
     [Test]
     public async Task Drops_checks_outside_the_allowlist()
     {
-        var outcome = (CheckovRan)CheckovRunner.Parse(Output(
-            Canary, Failure(Storage, "CKV2_AZURE_38", "Soft delete", null), Failure(Storage, "CKV_AZURE_206", "Replication", "account_replication_type")));
+        var outcome = (CheckovRan)
+            CheckovRunner.Parse(
+                Output(
+                    Canary,
+                    Failure(Storage, "CKV2_AZURE_38", "Soft delete", null),
+                    Failure(Storage, "CKV_AZURE_206", "Replication", "account_replication_type")
+                )
+            );
 
         await Assert.That(outcome.Violations).IsEmpty();
     }
@@ -50,7 +79,9 @@ public class CheckovRunnerTests
 
     // The spike's false clean: a plan it didn't recognize gave exit 0 and an empty summary.
     [Test]
-    [Arguments("""{"passed":0,"failed":0,"skipped":0,"parsing_errors":0,"resource_count":0,"checkov_version":"3.4.0"}""")]
+    [Arguments(
+        """{"passed":0,"failed":0,"skipped":0,"parsing_errors":0,"resource_count":0,"checkov_version":"3.4.0"}"""
+    )]
     [Arguments("""{"check_type":"terraform_plan","results":{"failed_checks":[]},"summary":{"failed":0}}""")]
     public async Task Never_calls_a_scan_clean_if_it_didnt_see_the_canary(string output)
     {
@@ -73,26 +104,41 @@ public class CheckovRunnerTests
     [Test]
     public async Task Sorts_so_the_bytes_are_stable()
     {
-        var outcome = (CheckovRan)CheckovRunner.Parse(Output(
-            Failure("a.z", "CKV_AZURE_44", "t", null), Canary, Failure("a.a", "CKV_AZURE_59", "t", null), Failure("a.a", "CKV_AZURE_190", "t", null)));
+        var outcome = (CheckovRan)
+            CheckovRunner.Parse(
+                Output(
+                    Failure("a.z", "CKV_AZURE_44", "t", null),
+                    Canary,
+                    Failure("a.a", "CKV_AZURE_59", "t", null),
+                    Failure("a.a", "CKV_AZURE_190", "t", null)
+                )
+            );
 
-        await Assert.That(outcome.Violations.Select(violation => $"{violation.Address} {violation.CheckId}")).IsEquivalentTo(
-            ["a.a CKV_AZURE_190", "a.a CKV_AZURE_59", "a.z CKV_AZURE_44"],
-            TUnit.Assertions.Enums.CollectionOrdering.Matching);
+        await Assert
+            .That(outcome.Violations.Select(violation => $"{violation.Address} {violation.CheckId}"))
+            .IsEquivalentTo(
+                ["a.a CKV_AZURE_190", "a.a CKV_AZURE_59", "a.z CKV_AZURE_44"],
+                TUnit.Assertions.Enums.CollectionOrdering.Matching
+            );
     }
 
     [Test]
     public async Task A_finding_is_deterministic_points_at_the_attribute_and_needs_no_doc()
     {
         var plan = Condensed(Change(Storage, """{"allow_nested_items_to_be_public":true}"""));
-        var outcome = (CheckovRan)CheckovRunner.Parse(Output(Canary, Failure(Storage, "CKV_AZURE_190", "Public blobs", "allow_nested_items_to_be_public")));
+        var outcome = (CheckovRan)
+            CheckovRunner.Parse(
+                Output(Canary, Failure(Storage, "CKV_AZURE_190", "Public blobs", "allow_nested_items_to_be_public"))
+            );
 
         var finding = outcome.ToFindings(plan).Single();
 
         await Assert.That(finding.Deterministic).IsTrue();
         await Assert.That(finding.Agent).IsEqualTo(Reporter.Scanner);
         await Assert.That(finding.Rule).IsEqualTo("CKV_AZURE_190");
-        await Assert.That(finding.Evidence.Single().Value).IsEqualTo(new PlanEvidence($"/resource_changes/{Storage}/change/after/allow_nested_items_to_be_public"));
+        await Assert
+            .That(finding.Evidence.Single().Value)
+            .IsEqualTo(new PlanEvidence($"/resource_changes/{Storage}/change/after/allow_nested_items_to_be_public"));
     }
 
     [Test]
@@ -106,7 +152,9 @@ public class CheckovRunnerTests
 
         var pointer = ((PlanEvidence)outcome.ToFindings(plan).Single().Evidence.Single().Value!).PlanPointer;
 
-        await Assert.That(pointer).IsEqualTo($"/resource_changes/{Storage}/change/after" + (resolves ? "/min_tls_version" : string.Empty));
+        await Assert
+            .That(pointer)
+            .IsEqualTo($"/resource_changes/{Storage}/change/after" + (resolves ? "/min_tls_version" : string.Empty));
         await Assert.That(plan.Resolves(pointer)).IsTrue();
     }
 
@@ -159,12 +207,18 @@ public class CheckovRunnerTests
             """;
     }
 
-    private static string Change(string address, string after) => $$"""
-        {"address":"{{address}}","type":"azurerm_storage_account","mode":"managed","change":{"actions":["create"],"before":null,"after":{{after}},"after_unknown":{},"before_sensitive":false,"after_sensitive":{} } }
-        """;
+    private static string Change(string address, string after) =>
+        $$"""
+            {"address":"{{address}}","type":"azurerm_storage_account","mode":"managed","change":{"actions":["create"],"before":null,"after":{{after}},"after_unknown":{},"before_sensitive":false,"after_sensitive":{} } }
+            """;
 
     private static RedactedPlan Redacted(params string[] changes) =>
-        ((Redacted)new PlanRedactor().Redact($$"""{"format_version":"1.2","resource_changes":[{{string.Join(',', changes)}}]}""")).Plan;
+        (
+            (Redacted)
+                new PlanRedactor().Redact(
+                    $$"""{"format_version":"1.2","resource_changes":[{{string.Join(',', changes)}}]}"""
+                )
+        ).Plan;
 
     private static CondensedPlan Condensed(params string[] changes) => CondensedPlan.From(Redacted(changes));
 
@@ -175,7 +229,11 @@ public class CheckovRunnerTests
         public IReadOnlyList<string>? Arguments { get; private set; }
 
         public async Task<ProcessResult?> RunAsync(
-            string program, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken = default)
+            string program,
+            IReadOnlyList<string> arguments,
+            TimeSpan timeout,
+            CancellationToken cancellationToken = default
+        )
         {
             Arguments = arguments;
             PlanSeen = await File.ReadAllTextAsync(arguments[1], cancellationToken);

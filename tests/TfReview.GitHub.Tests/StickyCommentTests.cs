@@ -99,8 +99,11 @@ public class StickyCommentTests
     [Test]
     public async Task Finds_its_comment_on_a_later_page()
     {
-        var comments = Enumerable.Range(1, 100).Select(id => Comment(id, "someone", "hello"))
-            .Append(Comment(101, "github-actions[bot]", Marked)).ToArray();
+        var comments = Enumerable
+            .Range(1, 100)
+            .Select(id => Comment(id, "someone", "hello"))
+            .Append(Comment(101, "github-actions[bot]", Marked))
+            .ToArray();
         var github = new FakeGitHub(comments);
 
         var action = await Upsert(github, "new body");
@@ -125,12 +128,13 @@ public class StickyCommentTests
         return new StickyComment(http, Repository, PullRequest).UpsertAsync(body);
     }
 
-    private static JsonObject Comment(long id, string login, string body) => new()
-    {
-        ["id"] = id,
-        ["user"] = new JsonObject { ["login"] = login },
-        ["body"] = body,
-    };
+    private static JsonObject Comment(long id, string login, string body) =>
+        new()
+        {
+            ["id"] = id,
+            ["user"] = new JsonObject { ["login"] = login },
+            ["body"] = body,
+        };
 
     private sealed class FakeGitHub(params JsonObject[] comments) : HttpMessageHandler
     {
@@ -141,13 +145,18 @@ public class StickyCommentTests
         public List<(HttpMethod Method, string Path, string? Body)> Writes { get; } = [];
 
         protected override async Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request, CancellationToken cancellationToken)
+            HttpRequestMessage request,
+            CancellationToken cancellationToken
+        )
         {
             if (request.Method == HttpMethod.Get)
             {
                 var page = int.Parse(request.RequestUri!.Query.Split("page=").Last());
-                var items = comments.Skip((page - 1) * PageSize).Take(PageSize)
-                    .Select(comment => (JsonNode)comment.DeepClone()).ToArray();
+                var items = comments
+                    .Skip((page - 1) * PageSize)
+                    .Take(PageSize)
+                    .Select(comment => (JsonNode)comment.DeepClone())
+                    .ToArray();
                 return Json(new JsonArray(items).ToJsonString());
             }
 
@@ -157,9 +166,7 @@ public class StickyCommentTests
             return new HttpResponseMessage(WriteStatus) { Content = new StringContent("{}") };
         }
 
-        private static HttpResponseMessage Json(string json) => new(HttpStatusCode.OK)
-        {
-            Content = new StringContent(json, Encoding.UTF8, "application/json"),
-        };
+        private static HttpResponseMessage Json(string json) =>
+            new(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
     }
 }

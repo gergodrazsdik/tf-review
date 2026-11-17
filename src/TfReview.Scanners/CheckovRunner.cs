@@ -18,16 +18,17 @@ public closed record CheckovOutcome;
 public sealed record CheckovRan(IReadOnlyList<CheckovViolation> Violations) : CheckovOutcome
 {
     public IReadOnlyList<Finding> ToFindings(CondensedPlan plan) =>
-    [
-        .. Violations.Select(violation => new Finding(
-            violation.Address,
-            violation.CheckId,
-            violation.Severity,
-            Reporter.Scanner,
-            Deterministic: true,
-            violation.Title,
-            [new PlanEvidence(Pointer(plan, violation))])),
-    ];
+        [
+            .. Violations.Select(violation => new Finding(
+                violation.Address,
+                violation.CheckId,
+                violation.Severity,
+                Reporter.Scanner,
+                Deterministic: true,
+                violation.Title,
+                [new PlanEvidence(Pointer(plan, violation))]
+            )),
+        ];
 
     // An attribute can be absent, for example when it's missing altogether, which is what a check can fail on.
     private static string Pointer(CondensedPlan plan, CheckovViolation violation)
@@ -45,7 +46,13 @@ public sealed record CheckovRan(IReadOnlyList<CheckovViolation> Violations) : Ch
     }
 }
 
-public sealed record CheckovViolation(string CheckId, string Address, Severity Severity, string Title, string? Attribute);
+public sealed record CheckovViolation(
+    string CheckId,
+    string Address,
+    Severity Severity,
+    string Title,
+    string? Attribute
+);
 
 public sealed record CheckovFailed(CheckovFailure Reason) : CheckovOutcome;
 
@@ -62,7 +69,9 @@ public sealed class CheckovRunner(IProcessRunner processes, string program = "ch
 
     // Checks worth a row, in words that say what's wrong, since Checkov's own titles read like advice ("Ensure
     // that..."). Checks that would need `configuration` don't belong here.
-    private static readonly Dictionary<string, (Severity Severity, string Title)> Allowlist = new(StringComparer.Ordinal)
+    private static readonly Dictionary<string, (Severity Severity, string Title)> Allowlist = new(
+        StringComparer.Ordinal
+    )
     {
         ["CKV_AZURE_9"] = (Severity.High, "RDP is open to the internet."),
         ["CKV_AZURE_10"] = (Severity.High, "SSH is open to the internet."),
@@ -89,9 +98,20 @@ public sealed class CheckovRunner(IProcessRunner processes, string program = "ch
 
             var result = await processes.RunAsync(
                 program,
-                ["-f", path, "--framework", "terraform_plan", "--skip-download", "--quiet", "--compact", "--output", "json"],
+                [
+                    "-f",
+                    path,
+                    "--framework",
+                    "terraform_plan",
+                    "--skip-download",
+                    "--quiet",
+                    "--compact",
+                    "--output",
+                    "json",
+                ],
                 Timeout,
-                cancellationToken);
+                cancellationToken
+            );
 
             return result is null ? new CheckovFailed(CheckovFailure.CouldNotRun) : Parse(result.Output);
         }
@@ -147,7 +167,9 @@ public sealed class CheckovRunner(IProcessRunner processes, string program = "ch
                 var checkId = failure.GetProperty("check_id").GetString() ?? throw new JsonException();
                 if (Allowlist.TryGetValue(checkId, out var check))
                 {
-                    violations.Add(new CheckovViolation(checkId, address, check.Severity, check.Title, Attribute(failure)));
+                    violations.Add(
+                        new CheckovViolation(checkId, address, check.Severity, check.Title, Attribute(failure))
+                    );
                 }
             }
         }
@@ -157,8 +179,7 @@ public sealed class CheckovRunner(IProcessRunner processes, string program = "ch
             return new CheckovFailed(CheckovFailure.CanaryNotSeen);
         }
 
-        return new CheckovRan(
-        [
+        return new CheckovRan([
             .. violations
                 .Distinct()
                 .OrderBy(violation => violation.Address, StringComparer.Ordinal)
@@ -169,9 +190,11 @@ public sealed class CheckovRunner(IProcessRunner processes, string program = "ch
     // Evaluated keys can go deeper, such as security_rule/[0]/access. Pointers stop at the top-level attribute.
     private static string? Attribute(JsonElement failure)
     {
-        if (!failure.TryGetProperty("check_result", out var result)
+        if (
+            !failure.TryGetProperty("check_result", out var result)
             || !result.TryGetProperty("evaluated_keys", out var keys)
-            || keys.ValueKind != JsonValueKind.Array)
+            || keys.ValueKind != JsonValueKind.Array
+        )
         {
             return null;
         }

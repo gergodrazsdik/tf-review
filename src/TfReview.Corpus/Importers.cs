@@ -22,7 +22,8 @@ public sealed record ReferenceChunk(
     [property: JsonPropertyName("heading")] string Heading,
     [property: JsonPropertyName("applies_to")] IReadOnlyList<string> AppliesTo,
     [property: JsonPropertyName("text")] string Text,
-    [property: JsonPropertyName("content_hash")] string ContentHash)
+    [property: JsonPropertyName("content_hash")] string ContentHash
+)
 {
     [JsonPropertyName("provider_version")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -54,7 +55,11 @@ public static partial class Importers
     // Only links to other pages, which say nothing by themselves.
     private static readonly string[] LinkHeadings = ["Next step", "Next steps", "Related content", "Related resources"];
 
-    private static readonly JsonDocumentOptions JsonOptions = new() { MaxDepth = 64, CommentHandling = JsonCommentHandling.Skip };
+    private static readonly JsonDocumentOptions JsonOptions = new()
+    {
+        MaxDepth = 64,
+        CommentHandling = JsonCommentHandling.Skip,
+    };
 
     /// <summary>Whether a file is one this source's importer reads.</summary>
     public static bool Wants(SourcePin pin, string path) =>
@@ -64,12 +69,17 @@ public static partial class Importers
         {
             "azure-policy" => path.EndsWith(".json", StringComparison.Ordinal),
             "azurerm-docs" => path.EndsWith(".html.markdown", StringComparison.Ordinal),
-            _ => path.EndsWith(".md", StringComparison.Ordinal) && !path.Contains("/includes/", StringComparison.Ordinal),
+            _ => path.EndsWith(".md", StringComparison.Ordinal)
+                && !path.Contains("/includes/", StringComparison.Ordinal),
         };
 
     /// <summary>A source's chunks, in a stable order, and how many of its files had nothing to keep.</summary>
     public static (IReadOnlyList<ReferenceChunk> Chunks, int Documents, int Skipped) Import(
-        SourcePin pin, IEnumerable<UpstreamFile> files, string corpusVersion, string embeddingModel)
+        SourcePin pin,
+        IEnumerable<UpstreamFile> files,
+        string corpusVersion,
+        string embeddingModel
+    )
     {
         var chunks = new List<ReferenceChunk>();
         var documents = 0;
@@ -172,7 +182,13 @@ public static partial class Importers
         }
     }
 
-    private static List<ReferenceChunk> ToChunks(SourcePin pin, string path, ImportedDoc doc, string corpusVersion, string embeddingModel)
+    private static List<ReferenceChunk> ToChunks(
+        SourcePin pin,
+        string path,
+        ImportedDoc doc,
+        string corpusVersion,
+        string embeddingModel
+    )
     {
         var chunks = new List<ReferenceChunk>();
         var seen = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -182,24 +198,30 @@ public static partial class Importers
             var ordinal = seen.GetValueOrDefault(section.Heading);
             seen[section.Heading] = ordinal + 1;
 
-            chunks.Add(new ReferenceChunk(
-                ReferenceDocs.IdPrefix + Hash($"{pin.Id}\n{pin.ProviderVersion}\n{path}\n{section.Heading}\n{ordinal}")[..32],
-                corpusVersion,
-                pin.Id,
-                pin.Repository,
-                pin.Commit,
-                path,
-                $"https://github.com/{pin.Repository}/blob/{pin.Commit}/{path}",
-                pin.License,
-                pin.Attribution,
-                doc.Title,
-                section.Heading,
-                doc.AppliesTo,
-                section.Text,
-                Hash($"{ReferenceChunk.EmbeddingInput(doc.Title, section.Heading, section.Text)}\n{embeddingModel}\n{CorpusSources.ChunkerVersion}"))
-            {
-                ProviderVersion = pin.ProviderVersion,
-            });
+            chunks.Add(
+                new ReferenceChunk(
+                    ReferenceDocs.IdPrefix
+                        + Hash($"{pin.Id}\n{pin.ProviderVersion}\n{path}\n{section.Heading}\n{ordinal}")[..32],
+                    corpusVersion,
+                    pin.Id,
+                    pin.Repository,
+                    pin.Commit,
+                    path,
+                    $"https://github.com/{pin.Repository}/blob/{pin.Commit}/{path}",
+                    pin.License,
+                    pin.Attribution,
+                    doc.Title,
+                    section.Heading,
+                    doc.AppliesTo,
+                    section.Text,
+                    Hash(
+                        $"{ReferenceChunk.EmbeddingInput(doc.Title, section.Heading, section.Text)}\n{embeddingModel}\n{CorpusSources.ChunkerVersion}"
+                    )
+                )
+                {
+                    ProviderVersion = pin.ProviderVersion,
+                }
+            );
         }
 
         return chunks;
@@ -211,17 +233,25 @@ public static partial class Importers
         try
         {
             using var document = JsonDocument.Parse(json, JsonOptions);
-            if (document.RootElement.ValueKind != JsonValueKind.Object
+            if (
+                document.RootElement.ValueKind != JsonValueKind.Object
                 || !document.RootElement.TryGetProperty("properties", out var properties)
                 || properties.ValueKind != JsonValueKind.Object
-                || !TryString(properties, "displayName", out var title))
+                || !TryString(properties, "displayName", out var title)
+            )
             {
                 return null;
             }
 
-            var hasMetadata = properties.TryGetProperty("metadata", out var metadata) && metadata.ValueKind == JsonValueKind.Object;
-            var deprecated = title.StartsWith("[Deprecated]", StringComparison.OrdinalIgnoreCase)
-                || (hasMetadata && metadata.TryGetProperty("deprecated", out var flag) && flag.ValueKind == JsonValueKind.True);
+            var hasMetadata =
+                properties.TryGetProperty("metadata", out var metadata) && metadata.ValueKind == JsonValueKind.Object;
+            var deprecated =
+                title.StartsWith("[Deprecated]", StringComparison.OrdinalIgnoreCase)
+                || (
+                    hasMetadata
+                    && metadata.TryGetProperty("deprecated", out var flag)
+                    && flag.ValueKind == JsonValueKind.True
+                );
             if (deprecated)
             {
                 return null;
@@ -241,7 +271,12 @@ public static partial class Importers
             if (properties.TryGetProperty("policyRule", out var rule))
             {
                 var raw = rule.GetRawText();
-                var types = AzureType().Matches(raw).Select(match => match.Value).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToList();
+                var types = AzureType()
+                    .Matches(raw)
+                    .Select(match => match.Value)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Order(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
                 if (types.Count > 0)
                 {
                     text.AppendLine($"Azure types: {string.Join(", ", types)}");
@@ -251,7 +286,11 @@ public static partial class Importers
             }
 
             // Azure's types aren't azurerm's, and no list maps them, so these are found by search, not by filter.
-            return new ImportedDoc(title, [], [.. Fit(text.ToString().Trim()).Select(part => new DocSection(string.Empty, part))]);
+            return new ImportedDoc(
+                title,
+                [],
+                [.. Fit(text.ToString().Trim()).Select(part => new DocSection(string.Empty, part))]
+            );
         }
         catch (JsonException)
         {
@@ -287,15 +326,19 @@ public static partial class Importers
         var title = FrontmatterTitle().Match(frontmatter) is { Success: true } match
             ? match.Groups[1].Value.Trim().Trim('"', '\'')
             : FirstHeading().Match(body).Groups[1].Value.Trim();
-        var sections = SplitByHeading(body).Where(section => !LinkHeadings.Contains(section.Heading, StringComparer.OrdinalIgnoreCase)).ToList();
+        var sections = SplitByHeading(body)
+            .Where(section => !LinkHeadings.Contains(section.Heading, StringComparer.OrdinalIgnoreCase))
+            .ToList();
         return sections.Count == 0 || title.Length == 0 ? null : new ImportedDoc(title, [], sections);
     }
 
     private static (string Frontmatter, string Body) WithoutFrontmatter(string markdown)
     {
         var text = markdown.ReplaceLineEndings("\n");
-        if (text.StartsWith("---\n", StringComparison.Ordinal)
-            && text.IndexOf("\n---\n", 3, StringComparison.Ordinal) is var end and > 0)
+        if (
+            text.StartsWith("---\n", StringComparison.Ordinal)
+            && text.IndexOf("\n---\n", 3, StringComparison.Ordinal) is var end and > 0
+        )
         {
             return (text[4..end], text[(end + 5)..]);
         }
@@ -305,7 +348,11 @@ public static partial class Importers
 
     private static bool TryString(JsonElement element, string name, out string value)
     {
-        if (element.TryGetProperty(name, out var property) && property.ValueKind == JsonValueKind.String && property.GetString() is { Length: > 0 } text)
+        if (
+            element.TryGetProperty(name, out var property)
+            && property.ValueKind == JsonValueKind.String
+            && property.GetString() is { Length: > 0 } text
+        )
         {
             value = text;
             return true;

@@ -7,7 +7,9 @@ public class RuleArbiterTests
     private const string Address = "a.b";
     private const string Pointer = "/resource_changes/a.b/change/after/tags";
 
-    private static readonly CondensedPlan Plan = TestPlans.Condensed(TestPlans.Create(Address, "a", """{"tags":null}"""));
+    private static readonly CondensedPlan Plan = TestPlans.Condensed(
+        TestPlans.Create(Address, "a", """{"tags":null}""")
+    );
 
     [Test]
     public async Task Nothing_to_report_means_no_findings()
@@ -25,18 +27,25 @@ public class RuleArbiterTests
             Scanner("b.low", "ADR-001", Severity.Low),
             Scanner("a.medium", "ADR-002", Severity.Medium),
             Scanner("a.medium", "ADR-001", Severity.Medium),
-            Scanner("c.high", "POL-001", Severity.High));
+            Scanner("c.high", "POL-001", Severity.High)
+        );
 
         await Assert.That(arbitration.Verdict).IsEqualTo(Verdict.Findings);
-        await Assert.That(arbitration.Findings.Select(finding => $"{finding.ResourceAddress} {finding.Rule}")).IsEquivalentTo(
-            ["c.high POL-001", "a.medium ADR-001", "a.medium ADR-002", "b.low ADR-001"],
-            TUnit.Assertions.Enums.CollectionOrdering.Matching);
+        await Assert
+            .That(arbitration.Findings.Select(finding => $"{finding.ResourceAddress} {finding.Rule}"))
+            .IsEquivalentTo(
+                ["c.high POL-001", "a.medium ADR-001", "a.medium ADR-002", "b.low ADR-001"],
+                TUnit.Assertions.Enums.CollectionOrdering.Matching
+            );
     }
 
     [Test]
     public async Task Keeps_different_rules_on_one_resource_apart()
     {
-        var arbitration = await Arbitrate(Scanner(Address, "ADR-001", Severity.Low), Scanner(Address, "ADR-002", Severity.Low));
+        var arbitration = await Arbitrate(
+            Scanner(Address, "ADR-001", Severity.Low),
+            Scanner(Address, "ADR-002", Severity.Low)
+        );
 
         await Assert.That(arbitration.Findings.Count).IsEqualTo(2);
     }
@@ -44,7 +53,10 @@ public class RuleArbiterTests
     [Test]
     public async Task Merging_with_a_scanner_stays_deterministic_and_names_the_agent()
     {
-        var arbitration = await Arbitrate(Model(Address, "ADR-002", "Model's words", "Add the tags"), Scanner(Address, "ADR-002", Severity.Medium));
+        var arbitration = await Arbitrate(
+            Model(Address, "ADR-002", "Model's words", "Add the tags"),
+            Scanner(Address, "ADR-002", Severity.Medium)
+        );
 
         var merged = arbitration.Findings.Single();
         await Assert.That(merged.Deterministic).IsTrue();
@@ -56,7 +68,10 @@ public class RuleArbiterTests
     [Test]
     public async Task Merging_keeps_the_scanners_title()
     {
-        var arbitration = await Arbitrate(Model(Address, "ADR-002", "AAA nothing to see here", null), Scanner(Address, "ADR-002", Severity.Medium));
+        var arbitration = await Arbitrate(
+            Model(Address, "ADR-002", "AAA nothing to see here", null),
+            Scanner(Address, "ADR-002", Severity.Medium)
+        );
 
         await Assert.That(arbitration.Findings.Single().Title).IsEqualTo("policy title");
     }
@@ -64,7 +79,10 @@ public class RuleArbiterTests
     [Test]
     public async Task The_highest_severity_wins()
     {
-        var arbitration = await Arbitrate(Scanner(Address, "ADR-002", Severity.Low), Scanner(Address, "ADR-002", Severity.High));
+        var arbitration = await Arbitrate(
+            Scanner(Address, "ADR-002", Severity.Low),
+            Scanner(Address, "ADR-002", Severity.High)
+        );
 
         await Assert.That(arbitration.Findings.Single().Severity).IsEqualTo(Severity.High);
     }
@@ -80,8 +98,16 @@ public class RuleArbiterTests
         var arbitration = await Arbitrate(Scanner(Address, "ADR-002", Severity.Low), other);
 
         var evidence = arbitration.Findings.Single().Evidence.Select(item => item.Value).ToArray();
-        await Assert.That(evidence).IsEquivalentTo(
-            new object[] { new PlanEvidence("/resource_changes/a.b/change/after"), new PlanEvidence(Pointer), new DocEvidence("ADR-002") });
+        await Assert
+            .That(evidence)
+            .IsEquivalentTo(
+                new object[]
+                {
+                    new PlanEvidence("/resource_changes/a.b/change/after"),
+                    new PlanEvidence(Pointer),
+                    new DocEvidence("ADR-002"),
+                }
+            );
     }
 
     [Test]
@@ -93,24 +119,56 @@ public class RuleArbiterTests
         var forward = (await Arbitrate(model, scanner)).Findings.Single();
         var backward = (await Arbitrate(scanner, model)).Findings.Single();
 
-        await Assert.That(CanonicalJson.Write(System.Text.Json.Nodes.JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(forward))))
-            .IsEqualTo(CanonicalJson.Write(System.Text.Json.Nodes.JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(backward))));
+        await Assert
+            .That(
+                CanonicalJson.Write(
+                    System.Text.Json.Nodes.JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(forward))
+                )
+            )
+            .IsEqualTo(
+                CanonicalJson.Write(
+                    System.Text.Json.Nodes.JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(backward))
+                )
+            );
     }
 
     [Test]
     public async Task Within_a_severity_the_riskiest_resource_comes_first()
     {
         var arbitration = await new RuleArbiter().ArbitrateAsync(
-            [Scanner("a.first", "ADR-001", Severity.High), Scanner("z.last", "ADR-001", Severity.High)], Plan, ["z.last", "a.first"]);
+            [Scanner("a.first", "ADR-001", Severity.High), Scanner("z.last", "ADR-001", Severity.High)],
+            Plan,
+            ["z.last", "a.first"]
+        );
 
         await Assert.That(arbitration.Findings[0].ResourceAddress).IsEqualTo("z.last");
     }
 
-    private static Task<Arbitration> Arbitrate(params Finding[] findings) => new RuleArbiter().ArbitrateAsync(findings, Plan);
+    private static Task<Arbitration> Arbitrate(params Finding[] findings) =>
+        new RuleArbiter().ArbitrateAsync(findings, Plan);
 
     private static Finding Scanner(string address, string rule, Severity severity) =>
-        new(address, rule, severity, Reporter.Scanner, true, "policy title", [new PlanEvidence(Pointer), new DocEvidence(rule)]);
+        new(
+            address,
+            rule,
+            severity,
+            Reporter.Scanner,
+            true,
+            "policy title",
+            [new PlanEvidence(Pointer), new DocEvidence(rule)]
+        );
 
     private static Finding Model(string address, string rule, string title, string? suggestion) =>
-        new(address, rule, Severity.Medium, Reporter.Conventions, false, title, [new PlanEvidence(Pointer), new DocEvidence(rule)]) { Suggestion = suggestion };
+        new(
+            address,
+            rule,
+            Severity.Medium,
+            Reporter.Conventions,
+            false,
+            title,
+            [new PlanEvidence(Pointer), new DocEvidence(rule)]
+        )
+        {
+            Suggestion = suggestion,
+        };
 }

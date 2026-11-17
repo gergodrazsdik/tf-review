@@ -48,7 +48,9 @@ public sealed class PlanRedactor
     private static readonly Regex Placeholder = new(@"^\[redacted:\d+\]$", RegexOptions.Compiled);
 
     private static readonly Regex Guid = new(
-        @"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", RegexOptions.Compiled);
+        @"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b",
+        RegexOptions.Compiled
+    );
 
     /// <summary>
     /// Azure's built-in role definition IDs, which are the same in every tenant and public, so they identify no one.
@@ -65,30 +67,60 @@ public sealed class PlanRedactor
 
     private static readonly string[] SecretNames =
     [
-        "password", "passwd", "pwd", "secret", "token", "credential", "apikey", "accesskey", "accountkey",
-        "sharedkey", "privatekey", "primarykey", "secondarykey", "connectionstring", "sasurl",
-        "customdata", "userdata", "appsettings", "clientcertificate", "kubeconfig",
+        "password",
+        "passwd",
+        "pwd",
+        "secret",
+        "token",
+        "credential",
+        "apikey",
+        "accesskey",
+        "accountkey",
+        "sharedkey",
+        "privatekey",
+        "primarykey",
+        "secondarykey",
+        "connectionstring",
+        "sasurl",
+        "customdata",
+        "userdata",
+        "appsettings",
+        "clientcertificate",
+        "kubeconfig",
     ];
 
     private static readonly string[] RootFields = ["format_version", ResourceChanges, OutputChanges];
 
     private static readonly string[] ResourceFields =
     [
-        "address", "previous_address", "module_address", "mode", "type", "name", "index", "deposed",
-        "provider_name", "action_reason", Change,
+        "address",
+        "previous_address",
+        "module_address",
+        "mode",
+        "type",
+        "name",
+        "index",
+        "deposed",
+        "provider_name",
+        "action_reason",
+        Change,
     ];
 
     private static readonly string[] ChangeFields =
     [
-        "actions", "before", "after", "after_unknown", "before_sensitive", "after_sensitive", "replace_paths",
+        "actions",
+        "before",
+        "after",
+        "after_unknown",
+        "before_sensitive",
+        "after_sensitive",
+        "replace_paths",
     ];
 
     private readonly RedactionLayers layers;
 
     public PlanRedactor()
-        : this(RedactionLayers.All)
-    {
-    }
+        : this(RedactionLayers.All) { }
 
     internal PlanRedactor(RedactionLayers layers) => this.layers = layers;
 
@@ -109,7 +141,8 @@ public sealed class PlanRedactor
             return new Refused(RefusalRule.MalformedJson, "/");
         }
 
-        var format = plan["format_version"] is JsonValue version && version.TryGetValue<string>(out var text) ? text : null;
+        var format =
+            plan["format_version"] is JsonValue version && version.TryGetValue<string>(out var text) ? text : null;
         if (format is null || !format.StartsWith("1.", StringComparison.Ordinal))
         {
             return new Refused(RefusalRule.UnsupportedFormat, "/format_version");
@@ -211,8 +244,11 @@ public sealed class PlanRedactor
         {
             foreach (var (name, variable) in value)
             {
-                if (plan["configuration"]?["root_module"]?["variables"]?[name]?["sensitive"] is JsonValue declared
-                    && declared.TryGetValue<bool>(out var isSensitive) && isSensitive)
+                if (
+                    plan["configuration"]?["root_module"]?["variables"]?[name]?["sensitive"] is JsonValue declared
+                    && declared.TryGetValue<bool>(out var isSensitive)
+                    && isSensitive
+                )
                 {
                     AddStrings(variable?["value"], secrets);
                 }
@@ -314,7 +350,12 @@ public sealed class PlanRedactor
             foreach (var (name, change) in items.OrderBy(pair => pair.Key, StringComparer.Ordinal))
             {
                 outputs[Sweep(name, forms, new Scope())] = BuildChange(
-                    change, $"/{OutputChanges}", forms, new Scope(), ref dropped);
+                    change,
+                    $"/{OutputChanges}",
+                    forms,
+                    new Scope(),
+                    ref dropped
+                );
             }
         }
 
@@ -353,7 +394,13 @@ public sealed class PlanRedactor
         return result;
     }
 
-    private JsonObject BuildChange(JsonNode? item, string location, List<SecretForm> forms, Scope scope, ref int dropped)
+    private JsonObject BuildChange(
+        JsonNode? item,
+        string location,
+        List<SecretForm> forms,
+        Scope scope,
+        ref int dropped
+    )
     {
         if (item is not JsonObject change || change["actions"] is not JsonArray)
         {
@@ -413,9 +460,10 @@ public sealed class PlanRedactor
                 var result = new JsonObject();
                 foreach (var (key, child) in children.OrderBy(pair => pair.Key, StringComparer.Ordinal))
                 {
-                    result[key] = layers.HasFlag(RedactionLayers.Names) && IsSecretName(key) && IsRedactable(child)
-                        ? scope.Placeholder(child!)
-                        : RedactValue(child, (mark as JsonObject)?[key], scope, location);
+                    result[key] =
+                        layers.HasFlag(RedactionLayers.Names) && IsSecretName(key) && IsRedactable(child)
+                            ? scope.Placeholder(child!)
+                            : RedactValue(child, (mark as JsonObject)?[key], scope, location);
                 }
 
                 return result;
@@ -443,13 +491,14 @@ public sealed class PlanRedactor
     }
 
     // Empty strings stay, because ADR-002 tests for them, and booleans carry no secret.
-    private static bool IsRedactable(JsonNode? value) => value switch
-    {
-        null => false,
-        JsonValue scalar when scalar.GetValueKind() is JsonValueKind.True or JsonValueKind.False => false,
-        JsonValue scalar when IsString(scalar, out var text) && text.Length == 0 => false,
-        _ => true,
-    };
+    private static bool IsRedactable(JsonNode? value) =>
+        value switch
+        {
+            null => false,
+            JsonValue scalar when scalar.GetValueKind() is JsonValueKind.True or JsonValueKind.False => false,
+            JsonValue scalar when IsString(scalar, out var text) && text.Length == 0 => false,
+            _ => true,
+        };
 
     private JsonNode? SweepTree(JsonNode? node, List<SecretForm> forms, Scope scope)
     {
@@ -515,9 +564,9 @@ public sealed class PlanRedactor
     }
 
     private static string MaskGuids(string text, Scope scope) =>
-        Guid.Replace(text, match => BuiltInRoles.Contains(match.Value)
-            ? match.Value
-            : scope.PlaceholderFor(match.Value.ToLowerInvariant()));
+        Guid.Replace(text, match =>
+            BuiltInRoles.Contains(match.Value) ? match.Value : scope.PlaceholderFor(match.Value.ToLowerInvariant())
+        );
 
     private string Sweep(string text, List<SecretForm> forms, Scope scope)
     {
@@ -551,10 +600,13 @@ public sealed class PlanRedactor
         }
 
         // Longest first, so a secret containing another isn't left half replaced. Then ordinal, to stay deterministic.
-        return [.. forms
-            .DistinctBy(form => form.Text)
-            .OrderByDescending(form => form.Text.Length)
-            .ThenBy(form => form.Text, StringComparer.Ordinal)];
+        return
+        [
+            .. forms
+                .DistinctBy(form => form.Text)
+                .OrderByDescending(form => form.Text.Length)
+                .ThenBy(form => form.Text, StringComparer.Ordinal),
+        ];
     }
 
     private static void Verify(JsonNode? node, List<SecretForm> forms)
@@ -611,14 +663,15 @@ public sealed class PlanRedactor
         }
     }
 
-    private static bool OnlyBooleans(JsonNode? node) => node switch
-    {
-        null => true,
-        JsonObject value => value.All(field => OnlyBooleans(field.Value)),
-        JsonArray value => value.All(OnlyBooleans),
-        JsonValue value => value.GetValueKind() is JsonValueKind.True or JsonValueKind.False,
-        _ => false,
-    };
+    private static bool OnlyBooleans(JsonNode? node) =>
+        node switch
+        {
+            null => true,
+            JsonObject value => value.All(field => OnlyBooleans(field.Value)),
+            JsonArray value => value.All(OnlyBooleans),
+            JsonValue value => value.GetValueKind() is JsonValueKind.True or JsonValueKind.False,
+            _ => false,
+        };
 
     private sealed record SecretForm(string Secret, string Text);
 

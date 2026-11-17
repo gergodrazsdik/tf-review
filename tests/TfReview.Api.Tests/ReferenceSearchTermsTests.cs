@@ -7,7 +7,9 @@ public class ReferenceSearchTermsTests
     [Test]
     public async Task Terms_are_the_words_that_say_what_a_query_is_about()
     {
-        var terms = CosmosReferenceRetriever.SearchTerms("azurerm_storage_account changed attributes: min_tls_version, allow_nested_items_to_be_public");
+        var terms = CosmosReferenceRetriever.SearchTerms(
+            "azurerm_storage_account changed attributes: min_tls_version, allow_nested_items_to_be_public"
+        );
 
         await Assert.That(terms).Contains("storage").And.Contains("tls").And.Contains("public");
         await Assert.That(terms).DoesNotContain("azurerm").And.DoesNotContain("changed").And.DoesNotContain("to");

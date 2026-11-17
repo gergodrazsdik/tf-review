@@ -11,8 +11,11 @@ namespace TfReview.Agents;
 /// <param name="inner">The model.</param>
 /// <param name="tokensPerMinute">The budget, below the deployment's capacity.</param>
 /// <param name="time">The clock, for tests.</param>
-public sealed class TokenPacer(IChatClient inner, int tokensPerMinute = TokenPacer.DefaultTokensPerMinute, TimeProvider? time = null)
-    : DelegatingChatClient(inner)
+public sealed class TokenPacer(
+    IChatClient inner,
+    int tokensPerMinute = TokenPacer.DefaultTokensPerMinute,
+    TimeProvider? time = null
+) : DelegatingChatClient(inner)
 {
     /// <summary>
     /// 90% of gpt-6.1-sol's 100K capacity in infra/main.tf, which leaves room for the estimate being low. Change it with
@@ -32,7 +35,12 @@ public sealed class TokenPacer(IChatClient inner, int tokensPerMinute = TokenPac
 
     /// <summary>A budget from the variable, or null when it's unset or not a whole number of at least the minimum.</summary>
     public static int? ParseBudget(string? value) =>
-        int.TryParse(value, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var budget)
+        int.TryParse(
+            value,
+            System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var budget
+        )
         && budget >= MinTokensPerMinute
             ? budget
             : null;

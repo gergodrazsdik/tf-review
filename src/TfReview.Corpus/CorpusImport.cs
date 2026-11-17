@@ -3,7 +3,13 @@ namespace TfReview.Corpus;
 public sealed class LicenseMismatchException(string message) : Exception(message);
 
 /// <summary>What importing one pin came to, for the dry run's report.</summary>
-public sealed record ImportReport(SourcePin Pin, int Documents, int Skipped, int TooLarge, IReadOnlyList<ReferenceChunk> Chunks);
+public sealed record ImportReport(
+    SourcePin Pin,
+    int Documents,
+    int Skipped,
+    int TooLarge,
+    IReadOnlyList<ReferenceChunk> Chunks
+);
 
 /// <summary>Imports one pin from its archive, after checking it's really under the licence the sources file says.</summary>
 public static class CorpusImport
@@ -18,7 +24,12 @@ public static class CorpusImport
     };
 
     public static async Task<ImportReport> ImportAsync(
-        SourcePin pin, Stream archive, string corpusVersion, string embeddingModel, CancellationToken cancellationToken = default)
+        SourcePin pin,
+        Stream archive,
+        string corpusVersion,
+        string embeddingModel,
+        CancellationToken cancellationToken = default
+    )
     {
         var contents = await UpstreamArchive.ReadAsync(archive, path => Importers.Wants(pin, path), cancellationToken);
         CheckLicense(pin, contents.License);
@@ -35,8 +46,10 @@ public static class CorpusImport
             throw new LicenseMismatchException($"{pin.Id} has no licence file at {pin.Commit}.");
         }
 
-        if (!LicenseMarkers.TryGetValue(pin.License, out var marker)
-            || !license.ReplaceLineEndings(" ").Contains(marker, StringComparison.OrdinalIgnoreCase))
+        if (
+            !LicenseMarkers.TryGetValue(pin.License, out var marker)
+            || !license.ReplaceLineEndings(" ").Contains(marker, StringComparison.OrdinalIgnoreCase)
+        )
         {
             throw new LicenseMismatchException($"{pin.Id}'s licence file at {pin.Commit} isn't {pin.License}.");
         }

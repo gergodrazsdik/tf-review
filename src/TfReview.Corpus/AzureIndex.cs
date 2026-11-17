@@ -24,24 +24,30 @@ public sealed class CosmosReferenceStore(Container container) : IReferenceStore
 
     private const int Parallelism = 16;
 
-    public static CosmosReferenceStore Create(string endpoint, TokenCredential credential) => new(
-        new CosmosClient(
-            endpoint,
-            credential,
-            new CosmosClientOptions
-            {
-                ApplicationName = "tf-review-corpus",
-                ConnectionMode = ConnectionMode.Gateway,
+    public static CosmosReferenceStore Create(string endpoint, TokenCredential credential) =>
+        new(
+            new CosmosClient(
+                endpoint,
+                credential,
+                new CosmosClientOptions
+                {
+                    ApplicationName = "tf-review-corpus",
+                    ConnectionMode = ConnectionMode.Gateway,
 
-                // The container's 600 RU/s is the limit on writing, so waiting through throttling is expected.
-                MaxRetryAttemptsOnRateLimitedRequests = 60,
-                MaxRetryWaitTimeOnRateLimitedRequests = TimeSpan.FromMinutes(10),
-            })
-        .GetContainer("tfreview", "references"));
+                    // The container's 600 RU/s is the limit on writing, so waiting through throttling is expected.
+                    MaxRetryAttemptsOnRateLimitedRequests = 60,
+                    MaxRetryWaitTimeOnRateLimitedRequests = TimeSpan.FromMinutes(10),
+                }
+            ).GetContainer("tfreview", "references")
+        );
 
     public async Task<string?> ReadActiveVersionAsync(CancellationToken cancellationToken = default)
     {
-        using var response = await container.ReadItemStreamAsync(ActiveDocument, new PartitionKey(StatePartition), cancellationToken: cancellationToken);
+        using var response = await container.ReadItemStreamAsync(
+            ActiveDocument,
+            new PartitionKey(StatePartition),
+            cancellationToken: cancellationToken
+        );
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
@@ -52,10 +58,15 @@ public sealed class CosmosReferenceStore(Container container) : IReferenceStore
         return document?["active_version"]?.GetValue<string>();
     }
 
-    public async Task<IReadOnlyDictionary<string, float[]>> ReadEmbeddingsAsync(string version, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyDictionary<string, float[]>> ReadEmbeddingsAsync(
+        string version,
+        CancellationToken cancellationToken = default
+    )
     {
         var vectors = new Dictionary<string, float[]>(StringComparer.Ordinal);
-        await foreach (var item in this.QueryAsync("SELECT c.content_hash, c.embedding FROM c", version, cancellationToken))
+        await foreach (
+            var item in this.QueryAsync("SELECT c.content_hash, c.embedding FROM c", version, cancellationToken)
+        )
         {
             if (item["content_hash"]?.GetValue<string>() is { } hash && item["embedding"] is JsonArray embedding)
             {
@@ -66,7 +77,11 @@ public sealed class CosmosReferenceStore(Container container) : IReferenceStore
         return vectors;
     }
 
-    public async Task UpsertAsync(string version, IReadOnlyList<StoredChunk> chunks, CancellationToken cancellationToken = default)
+    public async Task UpsertAsync(
+        string version,
+        IReadOnlyList<StoredChunk> chunks,
+        CancellationToken cancellationToken = default
+    )
     {
         await Parallel.ForEachAsync(
             chunks,
@@ -77,9 +92,14 @@ public sealed class CosmosReferenceStore(Container container) : IReferenceStore
                 document["embedding"] = new JsonArray([.. stored.Embedding.Select(value => (JsonNode)value)]);
 
                 using var content = new MemoryStream(Encoding.UTF8.GetBytes(document.ToJsonString()));
-                using var response = await container.UpsertItemStreamAsync(content, new PartitionKey(version), cancellationToken: token);
+                using var response = await container.UpsertItemStreamAsync(
+                    content,
+                    new PartitionKey(version),
+                    cancellationToken: token
+                );
                 response.EnsureSuccessStatusCode();
-            });
+            }
+        );
     }
 
     public async Task<int> CountAsync(string version, CancellationToken cancellationToken = default)
@@ -104,14 +124,20 @@ public sealed class CosmosReferenceStore(Container container) : IReferenceStore
         };
 
         using var content = new MemoryStream(Encoding.UTF8.GetBytes(document.ToJsonString()));
-        using var response = await container.UpsertItemStreamAsync(content, new PartitionKey(StatePartition), cancellationToken: cancellationToken);
+        using var response = await container.UpsertItemStreamAsync(
+            content,
+            new PartitionKey(StatePartition),
+            cancellationToken: cancellationToken
+        );
         response.EnsureSuccessStatusCode();
     }
 
     public async Task<IReadOnlyList<string>> ListVersionsAsync(CancellationToken cancellationToken = default)
     {
         var versions = new List<string>();
-        await foreach (var item in this.QueryAsync("SELECT DISTINCT VALUE c.corpus_version FROM c", null, cancellationToken))
+        await foreach (
+            var item in this.QueryAsync("SELECT DISTINCT VALUE c.corpus_version FROM c", null, cancellationToken)
+        )
         {
             if (item.GetValue<string>() is { } version && version != StatePartition)
             {
@@ -135,18 +161,28 @@ public sealed class CosmosReferenceStore(Container container) : IReferenceStore
             new ParallelOptions { MaxDegreeOfParallelism = Parallelism, CancellationToken = cancellationToken },
             async (id, token) =>
             {
-                using var response = await container.DeleteItemStreamAsync(id, new PartitionKey(version), cancellationToken: token);
+                using var response = await container.DeleteItemStreamAsync(
+                    id,
+                    new PartitionKey(version),
+                    cancellationToken: token
+                );
                 if (response.StatusCode != HttpStatusCode.NotFound)
                 {
                     response.EnsureSuccessStatusCode();
                 }
-            });
+            }
+        );
     }
 
     private async IAsyncEnumerable<JsonNode> QueryAsync(
-        string query, string? partition, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        string query,
+        string? partition,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken
+    )
     {
-        var options = partition is null ? new QueryRequestOptions() : new QueryRequestOptions { PartitionKey = new PartitionKey(partition) };
+        var options = partition is null
+            ? new QueryRequestOptions()
+            : new QueryRequestOptions { PartitionKey = new PartitionKey(partition) };
         using var iterator = container.GetItemQueryStreamIterator(new QueryDefinition(query), requestOptions: options);
         while (iterator.HasMoreResults)
         {
@@ -179,10 +215,16 @@ public sealed class AzureEmbedder(EmbeddingClient client) : IEmbedder
         return new AzureEmbedder(client.GetEmbeddingClient(deployment));
     }
 
-    public async Task<IReadOnlyList<float[]>> EmbedAsync(IReadOnlyList<string> texts, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<float[]>> EmbedAsync(
+        IReadOnlyList<string> texts,
+        CancellationToken cancellationToken = default
+    )
     {
         var result = await client.GenerateEmbeddingsAsync(texts, cancellationToken: cancellationToken);
-        return [.. result.Value.OrderBy(embedding => embedding.Index).Select(embedding => embedding.ToFloats().ToArray())];
+        return
+        [
+            .. result.Value.OrderBy(embedding => embedding.Index).Select(embedding => embedding.ToFloats().ToArray()),
+        ];
     }
 }
 

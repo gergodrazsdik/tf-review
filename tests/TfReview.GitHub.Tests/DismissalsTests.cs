@@ -18,7 +18,9 @@ public class DismissalsTests
     {
         var key = Dismissals.Key(Finding("azurerm_network_security_rule.a"));
 
-        await Assert.That(Dismissals.Key(Finding("azurerm_network_security_rule.a") with { Title = "Other words" })).IsEqualTo(key);
+        await Assert
+            .That(Dismissals.Key(Finding("azurerm_network_security_rule.a") with { Title = "Other words" }))
+            .IsEqualTo(key);
         await Assert.That(Dismissals.Key(Finding("azurerm_network_security_rule.b"))).IsNotEqualTo(key);
         await Assert.That(Dismissals.Key(Finding("azurerm_network_security_rule.a", "POL-001"))).IsNotEqualTo(key);
     }
@@ -26,8 +28,15 @@ public class DismissalsTests
     [Test]
     public async Task Reads_what_a_reviewer_ticked_and_ignores_the_rest()
     {
-        var body = CommentRenderer.Render(Result(Finding("azurerm_network_security_rule.a"), Finding("azurerm_subnet.b", "ADR-001")), null);
-        var ticked = body.Replace("- [ ] Dismiss `azurerm_subnet.b`", "- [x] Dismiss `azurerm_subnet.b`", StringComparison.Ordinal);
+        var body = CommentRenderer.Render(
+            Result(Finding("azurerm_network_security_rule.a"), Finding("azurerm_subnet.b", "ADR-001")),
+            null
+        );
+        var ticked = body.Replace(
+            "- [ ] Dismiss `azurerm_subnet.b`",
+            "- [x] Dismiss `azurerm_subnet.b`",
+            StringComparison.Ordinal
+        );
 
         var dismissal = Dismissals.Ticked(ticked).Single();
 
@@ -40,7 +49,10 @@ public class DismissalsTests
     [Test]
     public async Task Reads_a_tick_with_windows_line_endings()
     {
-        var body = CommentRenderer.Render(Result(Finding("azurerm_subnet.b")), null).Replace("- [ ]", "- [X]", StringComparison.Ordinal).ReplaceLineEndings("\r\n");
+        var body = CommentRenderer
+            .Render(Result(Finding("azurerm_subnet.b")), null)
+            .Replace("- [ ]", "- [X]", StringComparison.Ordinal)
+            .ReplaceLineEndings("\r\n");
 
         await Assert.That(Dismissals.Ticked(body)).Count().IsEqualTo(1);
     }
@@ -50,11 +62,15 @@ public class DismissalsTests
     {
         var finding = Finding("azurerm_subnet.b");
 
-        var body = CommentRenderer.Rewrite(Result(finding), null, Tick(CommentRenderer.Render(Result(finding), null)), record: true).Body;
+        var body = CommentRenderer
+            .Rewrite(Result(finding), null, Tick(CommentRenderer.Render(Result(finding), null)), record: true)
+            .Body;
 
         var dismissal = Dismissals.Ticked(body).Single();
         await Assert.That(dismissal.Recorded).IsTrue();
-        await Assert.That(CommentRenderer.Rewrite(Result(finding), null, body, record: true).CountedDismissals).IsEmpty();
+        await Assert
+            .That(CommentRenderer.Rewrite(Result(finding), null, body, record: true).CountedDismissals)
+            .IsEmpty();
     }
 
     // BUG-2: a failed review, no findings, or a push where the finding is missing keeps the tick, hidden, until it's back.
@@ -69,7 +85,14 @@ public class DismissalsTests
         var between = verdict switch
         {
             Verdict.NotReviewed => ReviewResult.Failed(Commit, ReviewScope.Plan, NotReviewedReason.Unavailable),
-            Verdict.NoFindings => new ReviewResult(1, Commit, Verdict.NoFindings, [], [], new Dictionary<string, int>()),
+            Verdict.NoFindings => new ReviewResult(
+                1,
+                Commit,
+                Verdict.NoFindings,
+                [],
+                [],
+                new Dictionary<string, int>()
+            ),
             _ => Result(Finding("azurerm_subnet.c")),
         };
 
@@ -91,7 +114,12 @@ public class DismissalsTests
         var finding = Finding("azurerm_subnet.b");
         var ticked = Tick(CommentRenderer.Render(Result(finding), null));
 
-        var fallback = CommentRenderer.Rewrite(ReviewResult.Failed(Commit, ReviewScope.Plan, NotReviewedReason.Unavailable), null, ticked, record: false);
+        var fallback = CommentRenderer.Rewrite(
+            ReviewResult.Failed(Commit, ReviewScope.Plan, NotReviewedReason.Unavailable),
+            null,
+            ticked,
+            record: false
+        );
         var next = CommentRenderer.Rewrite(Result(finding), null, fallback.Body, record: true);
 
         await Assert.That(fallback.CountedDismissals).IsEmpty();
@@ -103,7 +131,9 @@ public class DismissalsTests
     public async Task A_tick_counted_once_isnt_counted_again_after_an_untick()
     {
         var finding = Finding("azurerm_subnet.b");
-        var counted = CommentRenderer.Rewrite(Result(finding), null, Tick(CommentRenderer.Render(Result(finding), null)), record: true).Body;
+        var counted = CommentRenderer
+            .Rewrite(Result(finding), null, Tick(CommentRenderer.Render(Result(finding), null)), record: true)
+            .Body;
         var unticked = counted.Replace("- [x]", "- [ ]", StringComparison.Ordinal);
 
         var kept = CommentRenderer.Rewrite(Result(finding), null, unticked, record: true).Body;
@@ -122,7 +152,12 @@ public class DismissalsTests
         var ticked = Tick(CommentRenderer.Render(Result(alone), null));
 
         var asMerged = CommentRenderer.Rewrite(Result(merged), null, ticked, record: true).Body;
-        var apart = CommentRenderer.Rewrite(Result(alone, Finding("azurerm_subnet.b", "POL-001")), null, asMerged, record: true);
+        var apart = CommentRenderer.Rewrite(
+            Result(alone, Finding("azurerm_subnet.b", "POL-001")),
+            null,
+            asMerged,
+            record: true
+        );
 
         await Assert.That(asMerged).Contains("- [x] Dismiss `azurerm_subnet.b` (`POL-001`)");
         await Assert.That(apart.Body).Contains("- [x] Dismiss `azurerm_subnet.b` (`ADR-002`)");
@@ -135,7 +170,14 @@ public class DismissalsTests
     {
         var ticked = Tick(CommentRenderer.Render(Result(Finding("azurerm_subnet.b")), null));
 
-        var hidden = CommentRenderer.Rewrite(ReviewResult.Failed(Commit, ReviewScope.Plan, NotReviewedReason.Unavailable), null, ticked, record: true).Body;
+        var hidden = CommentRenderer
+            .Rewrite(
+                ReviewResult.Failed(Commit, ReviewScope.Plan, NotReviewedReason.Unavailable),
+                null,
+                ticked,
+                record: true
+            )
+            .Body;
 
         await Assert.That(hidden).DoesNotContain("- [x]");
         await Assert.That(hidden).Contains("<!-- tf-review:dismissed ");

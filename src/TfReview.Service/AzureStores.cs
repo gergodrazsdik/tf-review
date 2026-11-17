@@ -34,22 +34,37 @@ public sealed record ServiceStores(IPlanStore Plans, IReviewQueue Queue, IReview
         var cosmos = new CosmosClient(
             Required("TF_REVIEW_COSMOS_ENDPOINT"),
             credential,
-            new CosmosClientOptions { ApplicationName = "tf-review", ConnectionMode = ConnectionMode.Gateway });
+            new CosmosClientOptions { ApplicationName = "tf-review", ConnectionMode = ConnectionMode.Gateway }
+        );
 
         var reviews = cosmos.GetContainer(Database, ReviewsContainer);
         return new ServiceStores(
-            new BlobPlanStore(new BlobContainerClient(new Uri($"https://{account}.blob.core.windows.net/{PlansContainer}"), credential)),
-            new StorageReviewQueue(new QueueClient(new Uri($"https://{account}.queue.core.windows.net/{QueueName}"), credential)),
-            new CosmosStatusStore(reviews))
+            new BlobPlanStore(
+                new BlobContainerClient(
+                    new Uri($"https://{account}.blob.core.windows.net/{PlansContainer}"),
+                    credential
+                )
+            ),
+            new StorageReviewQueue(
+                new QueueClient(new Uri($"https://{account}.queue.core.windows.net/{QueueName}"), credential)
+            ),
+            new CosmosStatusStore(reviews)
+        )
         {
             Counters = new CosmosCounterStore(reviews),
-            Results = new BlobResultStore(new BlobContainerClient(new Uri($"https://{account}.blob.core.windows.net/{ResultsContainer}"), credential)),
+            Results = new BlobResultStore(
+                new BlobContainerClient(
+                    new Uri($"https://{account}.blob.core.windows.net/{ResultsContainer}"),
+                    credential
+                )
+            ),
         };
     }
 
-    private static string Required(string name) => Environment.GetEnvironmentVariable(name) is { Length: > 0 } value
-        ? value
-        : throw new InvalidOperationException($"{name} isn't set.");
+    private static string Required(string name) =>
+        Environment.GetEnvironmentVariable(name) is { Length: > 0 } value
+            ? value
+            : throw new InvalidOperationException($"{name} isn't set.");
 }
 
 internal sealed class BlobPlanStore(BlobContainerClient container) : IPlanStore
@@ -82,10 +97,17 @@ internal sealed class BlobPlanStore(BlobContainerClient container) : IPlanStore
 /// </summary>
 internal sealed class BlobResultStore(BlobContainerClient container) : IResultStore
 {
-    public async Task SaveAsync(string repositoryId, string reviewId, string resultJson, CancellationToken cancellationToken = default)
+    public async Task SaveAsync(
+        string repositoryId,
+        string reviewId,
+        string resultJson,
+        CancellationToken cancellationToken = default
+    )
     {
         using var content = new MemoryStream(Encoding.UTF8.GetBytes(resultJson));
-        await container.GetBlobClient($"{repositoryId}/{reviewId}.json").UploadAsync(content, overwrite: true, cancellationToken);
+        await container
+            .GetBlobClient($"{repositoryId}/{reviewId}.json")
+            .UploadAsync(content, overwrite: true, cancellationToken);
     }
 }
 
@@ -112,18 +134,25 @@ internal sealed class StorageReviewQueue(QueueClient queue) : IReviewQueue
             job = null;
         }
 
-        return new ReceivedJob(
-            job,
-            message.DequeueCount,
-            async token => await queue.DeleteMessageAsync(message.MessageId, message.PopReceipt, token));
+        return new ReceivedJob(job, message.DequeueCount, async token =>
+            await queue.DeleteMessageAsync(message.MessageId, message.PopReceipt, token)
+        );
     }
 }
 
 internal sealed class CosmosStatusStore(Container container) : IReviewStatusStore
 {
-    public async Task<ReviewStatus?> ReadAsync(string repositoryId, string reviewId, CancellationToken cancellationToken = default)
+    public async Task<ReviewStatus?> ReadAsync(
+        string repositoryId,
+        string reviewId,
+        CancellationToken cancellationToken = default
+    )
     {
-        using var response = await container.ReadItemStreamAsync(reviewId, new PartitionKey(repositoryId), cancellationToken: cancellationToken);
+        using var response = await container.ReadItemStreamAsync(
+            reviewId,
+            new PartitionKey(repositoryId),
+            cancellationToken: cancellationToken
+        );
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
@@ -140,7 +169,8 @@ internal sealed class CosmosStatusStore(Container container) : IReviewStatusStor
             document["pull_request"]!.GetValue<int>(),
             document["commit"]!.GetValue<string>(),
             Enum.Parse<ReviewState>(document["state"]!.GetValue<string>()),
-            document["updated_at"]!.GetValue<DateTimeOffset>())
+            document["updated_at"]!.GetValue<DateTimeOffset>()
+        )
         {
             Verdict = document["verdict"]?.GetValue<string>(),
         };
@@ -162,7 +192,11 @@ internal sealed class CosmosStatusStore(Container container) : IReviewStatusStor
         };
 
         using var content = new MemoryStream(Encoding.UTF8.GetBytes(document.ToJsonString()));
-        using var response = await container.UpsertItemStreamAsync(content, new PartitionKey(status.RepositoryId), cancellationToken: cancellationToken);
+        using var response = await container.UpsertItemStreamAsync(
+            content,
+            new PartitionKey(status.RepositoryId),
+            cancellationToken: cancellationToken
+        );
         response.EnsureSuccessStatusCode();
     }
 }
@@ -178,7 +212,13 @@ internal sealed class CosmosCounterStore(Container container) : ICounterStore
     public async Task<double> ReadAsync(string partition, string id, CancellationToken cancellationToken = default) =>
         (await this.ReadDocumentAsync(partition, id, cancellationToken)).Value;
 
-    public async Task<double> AddAsync(string partition, string id, double amount, TimeSpan timeToLive, CancellationToken cancellationToken = default)
+    public async Task<double> AddAsync(
+        string partition,
+        string id,
+        double amount,
+        TimeSpan timeToLive,
+        CancellationToken cancellationToken = default
+    )
     {
         for (var attempt = 1; ; attempt++)
         {
@@ -194,11 +234,23 @@ internal sealed class CosmosCounterStore(Container container) : ICounterStore
 
             using var content = new MemoryStream(Encoding.UTF8.GetBytes(document.ToJsonString()));
             using var response = etag is null
-                ? await container.CreateItemStreamAsync(content, new PartitionKey(partition), cancellationToken: cancellationToken)
+                ? await container.CreateItemStreamAsync(
+                    content,
+                    new PartitionKey(partition),
+                    cancellationToken: cancellationToken
+                )
                 : await container.ReplaceItemStreamAsync(
-                    content, id, new PartitionKey(partition), new ItemRequestOptions { IfMatchEtag = etag }, cancellationToken);
+                    content,
+                    id,
+                    new PartitionKey(partition),
+                    new ItemRequestOptions { IfMatchEtag = etag },
+                    cancellationToken
+                );
 
-            if (response.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed && attempt < MaxTries)
+            if (
+                response.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed
+                && attempt < MaxTries
+            )
             {
                 continue;
             }
@@ -208,9 +260,17 @@ internal sealed class CosmosCounterStore(Container container) : ICounterStore
         }
     }
 
-    private async Task<(double Value, string? ETag)> ReadDocumentAsync(string partition, string id, CancellationToken cancellationToken)
+    private async Task<(double Value, string? ETag)> ReadDocumentAsync(
+        string partition,
+        string id,
+        CancellationToken cancellationToken
+    )
     {
-        using var response = await container.ReadItemStreamAsync(id, new PartitionKey(partition), cancellationToken: cancellationToken);
+        using var response = await container.ReadItemStreamAsync(
+            id,
+            new PartitionKey(partition),
+            cancellationToken: cancellationToken
+        );
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return (0, null);
@@ -218,6 +278,9 @@ internal sealed class CosmosCounterStore(Container container) : ICounterStore
 
         response.EnsureSuccessStatusCode();
         var document = await JsonNode.ParseAsync(response.Content, cancellationToken: cancellationToken);
-        return (document?["kind"]?.GetValue<string>() == "counter" ? document["value"]?.GetValue<double>() ?? 0 : 0, response.Headers.ETag);
+        return (
+            document?["kind"]?.GetValue<string>() == "counter" ? document["value"]?.GetValue<double>() ?? 0 : 0,
+            response.Headers.ETag
+        );
     }
 }

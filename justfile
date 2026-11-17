@@ -16,6 +16,7 @@ claude *args:
 [group('dev')]
 hooks:
     lefthook install
+    dotnet tool restore
 
 # Run the checks that need no plugins, so they also work in the Claude sandbox; CI runs this too
 [group('dev')]
@@ -160,10 +161,11 @@ secrets-sync:
 image:
     podman build --format docker -t tf-review:dev -f Containerfile .
 
-# Check C# formatting and style in a way that works in the Claude sandbox; CI runs the full dotnet format
+# Check C# layout with CSharpier, then style, in a way that works in the Claude sandbox; CI adds dotnet format's
+# style and analyzer checks
 [group('dev')]
 lint-dotnet:
-    dotnet format whitespace --folder --verify-no-changes
+    dotnet csharpier check .
     dotnet build -m:1 --no-incremental -p:EnforceCodeStyleInBuild=true -warnaserror
 
 # Validate the contract examples against their JSON Schemas

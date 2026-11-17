@@ -3,7 +3,11 @@ using TfReview.Core;
 namespace TfReview.Rag;
 
 /// <summary>What an agent wants: the topics it declares and the resource types in its slice.</summary>
-public sealed record RetrievalQuery(IReadOnlyList<string> Topics, IReadOnlyCollection<string> ResourceTypes, int TokenCap = 8_000);
+public sealed record RetrievalQuery(
+    IReadOnlyList<string> Topics,
+    IReadOnlyCollection<string> ResourceTypes,
+    int TokenCap = 8_000
+);
 
 /// <summary>The documents an agent gets, and the IDs of those that matched but didn't fit its token cap.</summary>
 public sealed record Retrieval(IReadOnlyList<StandardsDoc> Docs, IReadOnlyList<string> OmittedDocIds);

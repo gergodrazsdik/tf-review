@@ -13,7 +13,8 @@ namespace TfReview.Agents;
 /// across resources, merge a model opinion into a deterministic finding, which could make it blocking, or
 /// rank a lower severity above a higher one. Without a usable answer the rule-based result stands.
 /// </summary>
-public sealed partial class LlmArbiter(IChatClient chat, IArbiter? fallback = null, TimeSpan? attemptTimeout = null) : IArbiter
+public sealed partial class LlmArbiter(IChatClient chat, IArbiter? fallback = null, TimeSpan? attemptTimeout = null)
+    : IArbiter
 {
     public const string Name = "arbiter";
 
@@ -45,7 +46,11 @@ public sealed partial class LlmArbiter(IChatClient chat, IArbiter? fallback = nu
     private readonly TimeSpan timeout = attemptTimeout ?? TimeSpan.FromMinutes(1);
 
     public async Task<Arbitration> ArbitrateAsync(
-        IReadOnlyList<Finding> findings, CondensedPlan plan, IReadOnlyList<string>? riskOrder = null, CancellationToken cancellationToken = default)
+        IReadOnlyList<Finding> findings,
+        CondensedPlan plan,
+        IReadOnlyList<string>? riskOrder = null,
+        CancellationToken cancellationToken = default
+    )
     {
         var merged = await fallback.ArbitrateAsync(findings, plan, riskOrder, cancellationToken);
 
@@ -57,31 +62,47 @@ public sealed partial class LlmArbiter(IChatClient chat, IArbiter? fallback = nu
         }
 
         var prompt = Prompts.Load(Name);
-        var byId = merged.Findings.Select((finding, index) => (Id: $"F{index + 1}", Finding: finding)).ToDictionary(item => item.Id, item => item.Finding, StringComparer.Ordinal);
+        var byId = merged
+            .Findings.Select((finding, index) => (Id: $"F{index + 1}", Finding: finding))
+            .ToDictionary(item => item.Id, item => item.Finding, StringComparer.Ordinal);
         var result = await StructuredCall.RunAsync(
-            chat, Name, prompt.Body, UserMessage(byId), Schema, StructuredCall.ParseWire<WireOutput>, timeout, cancellationToken);
+            chat,
+            Name,
+            prompt.Body,
+            UserMessage(byId),
+            Schema,
+            StructuredCall.ParseWire<WireOutput>,
+            timeout,
+            cancellationToken
+        );
 
         if (result.Value is not { } answer)
         {
             return merged with { Calls = result.Calls, PromptVersion = prompt.Version };
         }
 
-        return Apply(answer, byId, riskOrder) with { Calls = result.Calls, PromptVersion = prompt.Version };
+        return Apply(answer, byId, riskOrder) with
+        {
+            Calls = result.Calls,
+            PromptVersion = prompt.Version,
+        };
     }
 
     private static string UserMessage(IReadOnlyDictionary<string, Finding> byId)
     {
-        var list = new JsonArray(
-        [
-            .. byId.Select(item => (JsonNode)new JsonObject
-            {
-                ["id"] = item.Key,
-                ["resource_address"] = item.Value.ResourceAddress,
-                ["rule"] = item.Value.Rule,
-                ["severity"] = SeverityName(item.Value.Severity),
-                ["source"] = item.Value.Deterministic ? "scanner" : "model",
-                ["title"] = item.Value.Title,
-            }),
+        var list = new JsonArray([
+            .. byId.Select(item =>
+                (JsonNode)
+                    new JsonObject
+                    {
+                        ["id"] = item.Key,
+                        ["resource_address"] = item.Value.ResourceAddress,
+                        ["rule"] = item.Value.Rule,
+                        ["severity"] = SeverityName(item.Value.Severity),
+                        ["source"] = item.Value.Deterministic ? "scanner" : "model",
+                        ["title"] = item.Value.Title,
+                    }
+            ),
         ]);
 
         return $"""
@@ -91,21 +112,29 @@ public sealed partial class LlmArbiter(IChatClient chat, IArbiter? fallback = nu
             """;
     }
 
-    private static string SeverityName(Severity severity) => severity switch
-    {
-        Severity.Low => "low",
-        Severity.Medium => "medium",
-        _ => "high",
-    };
+    private static string SeverityName(Severity severity) =>
+        severity switch
+        {
+            Severity.Low => "low",
+            Severity.Medium => "medium",
+            _ => "high",
+        };
 
-    private static Arbitration Apply(WireOutput answer, IReadOnlyDictionary<string, Finding> byId, IReadOnlyList<string>? riskOrder)
+    private static Arbitration Apply(
+        WireOutput answer,
+        IReadOnlyDictionary<string, Finding> byId,
+        IReadOnlyList<string>? riskOrder
+    )
     {
         var claimed = new HashSet<string>(StringComparer.Ordinal);
         var rows = new List<(string Id, Finding Finding)>();
 
         foreach (var group in answer.Groups)
         {
-            var members = group.FindingIds.Distinct(StringComparer.Ordinal).Where(id => byId.ContainsKey(id) && !claimed.Contains(id)).ToList();
+            var members = group
+                .FindingIds.Distinct(StringComparer.Ordinal)
+                .Where(id => byId.ContainsKey(id) && !claimed.Contains(id))
+                .ToList();
             if (members.Count < 2 || !CanMerge([.. members.Select(id => byId[id])]))
             {
                 continue;
@@ -117,15 +146,14 @@ public sealed partial class LlmArbiter(IChatClient chat, IArbiter? fallback = nu
 
         rows.AddRange(byId.Where(item => !claimed.Contains(item.Key)).Select(item => (item.Key, item.Value)));
 
-        var modelRanks = answer.Order
-            .Select((id, index) => (id, index))
+        var modelRanks = answer
+            .Order.Select((id, index) => (id, index))
             .DistinctBy(rank => rank.id)
             .ToDictionary(rank => rank.id, rank => rank.index, StringComparer.Ordinal);
 
         Finding[] ordered =
         [
-            .. rows
-                .OrderByDescending(row => row.Finding.Severity)
+            .. rows.OrderByDescending(row => row.Finding.Severity)
                 .ThenBy(row => RuleArbiter.RiskRank(row.Finding, riskOrder))
                 .ThenBy(row => modelRanks.GetValueOrDefault(row.Id, int.MaxValue))
                 .ThenBy(row => row.Finding.ResourceAddress, StringComparer.Ordinal)
@@ -154,9 +182,19 @@ public sealed partial class LlmArbiter(IChatClient chat, IArbiter? fallback = nu
             Severity = findings.Max(finding => finding.Severity),
             Agent = findings.FirstOrDefault(finding => finding.Agent != Reporter.Scanner)?.Agent ?? Reporter.Scanner,
             Evidence = RuleArbiter.MergeEvidence(findings),
-            RelatedRules = [.. findings.Select(finding => finding.Rule).Where(rule => rule != primary.Rule).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)],
-            Suggestion = primary.Suggestion ?? findings.Select(finding => finding.Suggestion).FirstOrDefault(suggestion => suggestion is not null),
-            MonthlyCostDeltaUsd = findings.Select(finding => finding.MonthlyCostDeltaUsd).FirstOrDefault(delta => delta is not null),
+            RelatedRules =
+            [
+                .. findings
+                    .Select(finding => finding.Rule)
+                    .Where(rule => rule != primary.Rule)
+                    .Distinct(StringComparer.Ordinal)
+                    .Order(StringComparer.Ordinal),
+            ],
+            Suggestion = primary.Suggestion
+                ?? findings.Select(finding => finding.Suggestion).FirstOrDefault(suggestion => suggestion is not null),
+            MonthlyCostDeltaUsd = findings
+                .Select(finding => finding.MonthlyCostDeltaUsd)
+                .FirstOrDefault(delta => delta is not null),
         };
     }
 
@@ -165,7 +203,8 @@ public sealed partial class LlmArbiter(IChatClient chat, IArbiter? fallback = nu
 
     private sealed record WireOutput(
         [property: JsonPropertyName("groups")] IReadOnlyList<WireGroup> Groups,
-        [property: JsonPropertyName("order")] IReadOnlyList<string> Order);
+        [property: JsonPropertyName("order")] IReadOnlyList<string> Order
+    );
 
     private sealed record WireGroup([property: JsonPropertyName("finding_ids")] IReadOnlyList<string> FindingIds);
 }

@@ -37,7 +37,8 @@ internal static class StructuredCall
         string schema,
         Func<string, T?> parse,
         TimeSpan timeout,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
         where T : class
     {
         var calls = new List<AgentCall>();
@@ -62,7 +63,9 @@ internal static class StructuredCall
         // The review's own time (D54): past it nothing new starts, and its cut-off ends a running attempt as a timeout,
         // so the review can still post what it has. Only the caller's own token is a real cancellation.
         var clock = chat.GetService<ReviewClock>();
-        using var limit = clock is null ? null : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, clock.CutOff);
+        using var limit = clock is null
+            ? null
+            : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, clock.CutOff);
         var callToken = limit?.Token ?? cancellationToken;
 
         for (var attempt = 1; attempt <= MaxAttempts; attempt++)
@@ -91,7 +94,8 @@ internal static class StructuredCall
             {
                 using var deadline = CancellationTokenSource.CreateLinkedTokenSource(callToken);
                 deadline.CancelAfter(timeout);
-                await NewAgent(capture, name, system, schema, maxOutputTokens).RunAsync(user, cancellationToken: deadline.Token);
+                await NewAgent(capture, name, system, schema, maxOutputTokens)
+                    .RunAsync(user, cancellationToken: deadline.Token);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -147,10 +151,10 @@ internal static class StructuredCall
     /// Text from a PR, as JSON. Escaping these characters keeps the JSON valid and means no value can close
     /// the fence around it.
     /// </summary>
-    public static string Escape(string json) => json
-        .Replace("&", "\\u0026", StringComparison.Ordinal)
-        .Replace("<", "\\u003c", StringComparison.Ordinal)
-        .Replace(">", "\\u003e", StringComparison.Ordinal);
+    public static string Escape(string json) =>
+        json.Replace("&", "\\u0026", StringComparison.Ordinal)
+            .Replace("<", "\\u003c", StringComparison.Ordinal)
+            .Replace(">", "\\u003e", StringComparison.Ordinal);
 
     /// <summary>Reads an answer against its wire record, or returns null if it doesn't match exactly.</summary>
     public static T? ParseWire<T>(string text)
@@ -166,45 +170,61 @@ internal static class StructuredCall
         }
     }
 
-    private static ChatClientAgent NewAgent(IChatClient client, string name, string system, string schema, int maxOutputTokens) => new(
-        client,
-        new ChatClientAgentOptions
-        {
-            Name = name,
-            ChatOptions = new ChatOptions
+    private static ChatClientAgent NewAgent(
+        IChatClient client,
+        string name,
+        string system,
+        string schema,
+        int maxOutputTokens
+    ) =>
+        new(
+            client,
+            new ChatClientAgentOptions
             {
-                Instructions = system,
-                MaxOutputTokens = maxOutputTokens,
+                Name = name,
+                ChatOptions = new ChatOptions
+                {
+                    Instructions = system,
+                    MaxOutputTokens = maxOutputTokens,
 
-                // gpt-5.4-mini defaults to none, and without any reasoning it fails valid names on the evals.
-                Reasoning = new ReasoningOptions { Effort = ReasoningEffort.Low },
-                ResponseFormat = ChatResponseFormat.ForJsonSchema(JsonDocument.Parse(schema).RootElement, $"{name}_output"),
-                AdditionalProperties = new AdditionalPropertiesDictionary { ["strict"] = true },
-            },
-        });
+                    // gpt-5.4-mini defaults to none, and without any reasoning it fails valid names on the evals.
+                    Reasoning = new ReasoningOptions { Effort = ReasoningEffort.Low },
+                    ResponseFormat = ChatResponseFormat.ForJsonSchema(
+                        JsonDocument.Parse(schema).RootElement,
+                        $"{name}_output"
+                    ),
+                    AdditionalProperties = new AdditionalPropertiesDictionary { ["strict"] = true },
+                },
+            }
+        );
 
-    private static AgentCall Call(int attempt, string finish, ChatResponse? response, TimeSpan latency) => new(
-        attempt,
-        finish,
-        response?.Usage?.InputTokenCount ?? 0,
-        response?.Usage?.OutputTokenCount ?? 0,
-        response?.Usage?.CachedInputTokenCount ?? 0,
-        latency);
+    private static AgentCall Call(int attempt, string finish, ChatResponse? response, TimeSpan latency) =>
+        new(
+            attempt,
+            finish,
+            response?.Usage?.InputTokenCount ?? 0,
+            response?.Usage?.OutputTokenCount ?? 0,
+            response?.Usage?.CachedInputTokenCount ?? 0,
+            latency
+        );
 
-    private static NotReviewedReason Classify(Exception exception) => exception switch
-    {
-        ClientResultException { Status: 429 } => NotReviewedReason.RateLimited,
-        ClientResultException { Status: 408 } => NotReviewedReason.Timeout,
-        ClientResultException { Status: 400 } failure when MentionsContentFilter(failure) => NotReviewedReason.ContentFilter,
-        _ => NotReviewedReason.Unavailable,
-    };
+    private static NotReviewedReason Classify(Exception exception) =>
+        exception switch
+        {
+            ClientResultException { Status: 429 } => NotReviewedReason.RateLimited,
+            ClientResultException { Status: 408 } => NotReviewedReason.Timeout,
+            ClientResultException { Status: 400 } failure when MentionsContentFilter(failure) =>
+                NotReviewedReason.ContentFilter,
+            _ => NotReviewedReason.Unavailable,
+        };
 
     // Azure rejects a filtered prompt with a 400 and this code, rather than with a finish reason.
     private static bool MentionsContentFilter(ClientResultException failure)
     {
         try
         {
-            return failure.GetRawResponse()?.Content.ToString().Contains("content_filter", StringComparison.Ordinal) == true;
+            return failure.GetRawResponse()?.Content.ToString().Contains("content_filter", StringComparison.Ordinal)
+                == true;
         }
         catch (InvalidOperationException)
         {
@@ -214,7 +234,10 @@ internal static class StructuredCall
     }
 
     private static bool IsRefusal(ChatResponse response) =>
-        response.Messages.SelectMany(message => message.Contents).OfType<ErrorContent>().Any(error => error.ErrorCode == "Refusal");
+        response
+            .Messages.SelectMany(message => message.Contents)
+            .OfType<ErrorContent>()
+            .Any(error => error.ErrorCode == "Refusal");
 
     /// <summary>Keeps the response, because Agent Framework's own doesn't expose the finish reason.</summary>
     private sealed class ResponseCapture(IChatClient inner) : DelegatingChatClient(inner)
@@ -222,7 +245,10 @@ internal static class StructuredCall
         public ChatResponse? Response { get; private set; }
 
         public override async Task<ChatResponse> GetResponseAsync(
-            IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default
+        )
         {
             Response = await base.GetResponseAsync(messages, options, cancellationToken);
             return Response;

@@ -16,7 +16,8 @@ public sealed record StandardsDoc(
     IReadOnlyList<string> AppliesTo,
     IReadOnlyList<string> Topics,
     string Path,
-    string Body)
+    string Body
+)
 {
     public const string Accepted = "accepted";
 
@@ -118,12 +119,18 @@ public sealed partial class StandardsCorpus
             throw new CorpusException($"{path}: status is missing or unknown.");
         }
 
-        if (frontmatter.AppliesTo is not { Count: > 0 } appliesTo || !appliesTo.All(type => ResourceType().IsMatch(type)))
+        if (
+            frontmatter.AppliesTo is not { Count: > 0 } appliesTo
+            || !appliesTo.All(type => ResourceType().IsMatch(type))
+        )
         {
             throw new CorpusException($"{path}: applies_to is missing or malformed.");
         }
 
-        if (frontmatter.Topics is not { Count: > 0 } topics || !topics.All(topic => KnownTopics.Contains(topic, StringComparer.Ordinal)))
+        if (
+            frontmatter.Topics is not { Count: > 0 } topics
+            || !topics.All(topic => KnownTopics.Contains(topic, StringComparer.Ordinal))
+        )
         {
             throw new CorpusException($"{path}: topics is missing or has an unknown topic.");
         }

@@ -70,8 +70,9 @@ public class FileRetrieverTests
         corpus.Write("adr/ADR-002.md", Doc("ADR-002", body: new string('x', 3000)));
         corpus.Write("adr/ADR-003.md", Doc("ADR-003", body: new string('x', 300)));
 
-        var result = await new FileRetriever(await corpus.LoadAsync())
-            .RetrieveAsync(new RetrievalQuery(ConventionsTopics, ["a"], TokenCap: 250));
+        var result = await new FileRetriever(await corpus.LoadAsync()).RetrieveAsync(
+            new RetrievalQuery(ConventionsTopics, ["a"], TokenCap: 250)
+        );
 
         await Assert.That(result.Docs.Select(doc => doc.Id)).IsEquivalentTo(["ADR-001", "ADR-003"]);
         await Assert.That(result.OmittedDocIds).IsEquivalentTo(["ADR-002"]);
@@ -85,8 +86,9 @@ public class FileRetrieverTests
         corpus.Write("adr/z.md", Doc("ADR-001", body: new string('x', 300)));
         corpus.Write("adr/a.md", Doc("ADR-002", body: new string('x', 300)));
 
-        var result = await new FileRetriever(await corpus.LoadAsync())
-            .RetrieveAsync(new RetrievalQuery(ConventionsTopics, ["a"], TokenCap: 100));
+        var result = await new FileRetriever(await corpus.LoadAsync()).RetrieveAsync(
+            new RetrievalQuery(ConventionsTopics, ["a"], TokenCap: 100)
+        );
 
         await Assert.That(result.Docs.Single().Id).IsEqualTo("ADR-001");
         await Assert.That(result.OmittedDocIds).IsEquivalentTo(["ADR-002"]);
@@ -130,7 +132,12 @@ public class FileRetrieverTests
         using var corpus = new TempCorpus();
         corpus.Write("adr/ADR-001.md", text);
 
-        await Assert.That(async () => { await corpus.LoadAsync(); }).Throws<CorpusException>();
+        await Assert
+            .That(async () =>
+            {
+                await corpus.LoadAsync();
+            })
+            .Throws<CorpusException>();
     }
 
     [Test]
@@ -140,7 +147,12 @@ public class FileRetrieverTests
         corpus.Write("adr/a.md", Doc("ADR-001"));
         corpus.Write("adr/b.md", Doc("ADR-001"));
 
-        await Assert.That(async () => { await corpus.LoadAsync(); }).Throws<CorpusException>();
+        await Assert
+            .That(async () =>
+            {
+                await corpus.LoadAsync();
+            })
+            .Throws<CorpusException>();
     }
 
     [Test]
@@ -194,19 +206,26 @@ public class FileRetrieverTests
         using var target = new TempCorpus();
         var config = new TfReviewConfig("a/b", new string('0', 40), ["conventions"], false);
 
-        await Assert.That(() => new LocalDirectorySource("/does/not/exist").FetchAsync(config, target.Path))
+        await Assert
+            .That(() => new LocalDirectorySource("/does/not/exist").FetchAsync(config, target.Path))
             .Throws<StandardsFetchException>();
     }
 
     private static async Task<IEnumerable<string>> Retrieve(TempCorpus corpus, string[] resourceTypes)
     {
-        var result = await new FileRetriever(await corpus.LoadAsync())
-            .RetrieveAsync(new RetrievalQuery(ConventionsTopics, resourceTypes));
+        var result = await new FileRetriever(await corpus.LoadAsync()).RetrieveAsync(
+            new RetrievalQuery(ConventionsTopics, resourceTypes)
+        );
         return result.Docs.Select(doc => doc.Id);
     }
 
     private static string Doc(
-        string id, string status = "accepted", string appliesTo = "[\"*\"]", string topics = "[naming]", string body = "Text.") =>
+        string id,
+        string status = "accepted",
+        string appliesTo = "[\"*\"]",
+        string topics = "[naming]",
+        string body = "Text."
+    ) =>
         $"---\nid: {id}\ntype: adr\nstatus: {status}\napplies_to: {appliesTo}\ntopics: {topics}\nseverity: low\nrego: {id}.rego\n---\n\n{body}\n";
 
     private sealed class TempCorpus : IDisposable

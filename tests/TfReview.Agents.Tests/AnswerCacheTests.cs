@@ -7,7 +7,9 @@ namespace TfReview.Agents.Tests;
 public class AnswerCacheTests
 {
     private static readonly CondensedPlan Plan = TestPlans.Condensed(
-        TestPlans.Create("a.first", "a", "{}"), TestPlans.Create("a.second", "a", "{}"));
+        TestPlans.Create("a.first", "a", "{}"),
+        TestPlans.Create("a.second", "a", "{}")
+    );
 
     private const string Ranked = """
         {"resources":[{"resource_address":"a.second","reason":"People depend on this."},{"resource_address":"a.first","reason":null}]}
@@ -23,8 +25,12 @@ public class AnswerCacheTests
         var again = await Rank(chat, answers);
 
         await Assert.That(chat.Requests).Count().IsEqualTo(1);
-        await Assert.That(again.Order.Select(item => item.ResourceAddress)).IsEquivalentTo(
-            first.Order.Select(item => item.ResourceAddress), TUnit.Assertions.Enums.CollectionOrdering.Matching);
+        await Assert
+            .That(again.Order.Select(item => item.ResourceAddress))
+            .IsEquivalentTo(
+                first.Order.Select(item => item.ResourceAddress),
+                TUnit.Assertions.Enums.CollectionOrdering.Matching
+            );
         await Assert.That(again.Calls.Single().Finish).IsEqualTo(AnswerCache.Finish);
         await Assert.That(again.Calls.Single().InputTokens).IsEqualTo(0);
     }
@@ -37,7 +43,8 @@ public class AnswerCacheTests
 
         await Rank(chat, answers);
         await new RiskOrchestrator(Cached(chat, answers)).RankAsync(
-            TestPlans.Condensed(TestPlans.Create("a.first", "a", "{}"), TestPlans.Create("a.third", "a", "{}")));
+            TestPlans.Condensed(TestPlans.Create("a.first", "a", "{}"), TestPlans.Create("a.third", "a", "{}"))
+        );
 
         await Assert.That(chat.Requests).Count().IsEqualTo(2);
     }
@@ -99,10 +106,14 @@ public class AnswerCacheTests
         var chat = new FakeChat(FakeChat.Answer(Ranked));
         var log = new List<string>();
 
-        var ranking = await new RiskOrchestrator(new AnswerCache(chat, new BrokenAnswers(), "repo", "test-model", log.Add)).RankAsync(Plan);
+        var ranking = await new RiskOrchestrator(
+            new AnswerCache(chat, new BrokenAnswers(), "repo", "test-model", log.Add)
+        ).RankAsync(Plan);
 
         await Assert.That(ranking.Order[0].ResourceAddress).IsEqualTo("a.second");
-        await Assert.That(log).IsEquivalentTo(["answer cache: read failed, IOException.", "answer cache: write failed, IOException."]);
+        await Assert
+            .That(log)
+            .IsEquivalentTo(["answer cache: read failed, IOException.", "answer cache: write failed, IOException."]);
     }
 
     [Test]
@@ -116,14 +127,23 @@ public class AnswerCacheTests
         await Assert.That(answers.Keys.Single()).Matches("^[0-9a-f]{64}$");
     }
 
-    private static AnswerCache Cached(IChatClient chat, IAnswerStore answers) => new(chat, answers, "repo", "test-model");
+    private static AnswerCache Cached(IChatClient chat, IAnswerStore answers) =>
+        new(chat, answers, "repo", "test-model");
 
-    private static Task<RiskRanking> Rank(FakeChat chat, MemoryAnswers answers) => new RiskOrchestrator(Cached(chat, answers)).RankAsync(Plan);
+    private static Task<RiskRanking> Rank(FakeChat chat, MemoryAnswers answers) =>
+        new RiskOrchestrator(Cached(chat, answers)).RankAsync(Plan);
 
     private sealed class BrokenAnswers : IAnswerStore
     {
-        public Task<string?> ReadAsync(string scope, string key, CancellationToken cancellationToken) => throw new IOException();
+        public Task<string?> ReadAsync(string scope, string key, CancellationToken cancellationToken) =>
+            throw new IOException();
 
-        public Task WriteAsync(string scope, string key, string role, string answer, CancellationToken cancellationToken) => throw new IOException();
+        public Task WriteAsync(
+            string scope,
+            string key,
+            string role,
+            string answer,
+            CancellationToken cancellationToken
+        ) => throw new IOException();
     }
 }

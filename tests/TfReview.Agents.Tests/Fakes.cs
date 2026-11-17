@@ -27,9 +27,20 @@ internal sealed class FakeChat(params object[] script) : IChatClient
         };
 
     public async Task<ChatResponse> GetResponseAsync(
-        IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default
+    )
     {
-        Requests.Add(new ChatRequest(string.Join('\n', messages.Where(message => message.Role == ChatRole.User).Select(message => message.Text)), options));
+        Requests.Add(
+            new ChatRequest(
+                string.Join(
+                    '\n',
+                    messages.Where(message => message.Role == ChatRole.User).Select(message => message.Text)
+                ),
+                options
+            )
+        );
         if (hang)
         {
             await Task.Delay(Timeout.Infinite, cancellationToken);
@@ -44,14 +55,14 @@ internal sealed class FakeChat(params object[] script) : IChatClient
     }
 
     public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
-        IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException();
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default
+    ) => throw new NotSupportedException();
 
     public object? GetService(Type serviceType, object? serviceKey = null) => null;
 
-    public void Dispose()
-    {
-    }
+    public void Dispose() { }
 }
 
 /// <summary>Stands in for conftest: returns fixed output, and keeps the plan it was given.</summary>
@@ -60,7 +71,11 @@ internal sealed class FakeProcesses(string output) : IProcessRunner
     public string? PlanSeen { get; private set; }
 
     public async Task<ProcessResult?> RunAsync(
-        string program, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken = default)
+        string program,
+        IReadOnlyList<string> arguments,
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default
+    )
     {
         // Conftest takes the plan last, and Checkov right after -f.
         PlanSeen = await File.ReadAllTextAsync(arguments[0] == "-f" ? arguments[1] : arguments[^1], cancellationToken);

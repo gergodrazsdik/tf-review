@@ -43,7 +43,11 @@ public class PromptsTests
     public async Task The_check_catches_a_version_moved_backwards()
     {
         var old = new Prompt("a", 1, "original");
-        var recorded = new Dictionary<string, string> { ["1"] = old.Hash(), ["2"] = new Prompt("a", 2, "newer").Hash() };
+        var recorded = new Dictionary<string, string>
+        {
+            ["1"] = old.Hash(),
+            ["2"] = new Prompt("a", 2, "newer").Hash(),
+        };
 
         await Assert.That(VersionProblem(old, recorded)).Contains("isn't the newest");
     }
@@ -87,10 +91,13 @@ public class PromptsTests
             return $"{prompt.Agent} changed without a version bump. Raise its version and add {prompt.Hash()} to {Versions}.";
         }
 
-        return prompt.Version == recorded.Keys.Max(int.Parse) ? null : $"{prompt.Agent} v{version} isn't the newest recorded version.";
+        return prompt.Version == recorded.Keys.Max(int.Parse)
+            ? null
+            : $"{prompt.Agent} v{version} isn't the newest recorded version.";
     }
 
     private static async Task<Dictionary<string, Dictionary<string, string>>> ReadRecorded() =>
-        JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, string>>>(await File.ReadAllTextAsync(Versions))
-        ?? throw new JsonException($"{Versions} is empty.");
+        JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, string>>>(
+            await File.ReadAllTextAsync(Versions)
+        ) ?? throw new JsonException($"{Versions} is empty.");
 }

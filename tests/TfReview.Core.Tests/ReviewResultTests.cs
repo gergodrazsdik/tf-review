@@ -14,13 +14,16 @@ public class ReviewResultTests
 
         await Assert.That(result.Verdict).IsEqualTo(Verdict.Findings);
         await Assert.That(result.Findings[0].Agent).IsEqualTo(Reporter.Conventions);
-        await Assert.That(JsonNode.DeepEquals(
-            JsonNode.Parse(json), JsonNode.Parse(JsonSerializer.Serialize(result)))).IsTrue();
+        await Assert
+            .That(JsonNode.DeepEquals(JsonNode.Parse(json), JsonNode.Parse(JsonSerializer.Serialize(result))))
+            .IsTrue();
     }
 
     [Test]
     [Arguments("""{"version":1,"commit":"a","verdict":"no_findings","findings":[],"evidence_drops":{}}""")]
-    [Arguments("""{"version":1,"commit":"a","verdict":"unknown","findings":[],"not_reviewed":[],"evidence_drops":{}}""")]
+    [Arguments(
+        """{"version":1,"commit":"a","verdict":"unknown","findings":[],"not_reviewed":[],"evidence_drops":{}}"""
+    )]
     [Arguments("not json")]
     public async Task Rejects_a_malformed_result(string json)
     {

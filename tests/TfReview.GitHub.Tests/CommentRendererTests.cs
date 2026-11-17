@@ -9,7 +9,15 @@ public class CommentRendererTests
     private static readonly string Commit = new('a', 40);
 
     private static readonly PlanCounts Counts = new(
-        3, new Dictionary<string, int> { ["create"] = 2, ["delete"] = 1, ["no-op"] = 4, ["update"] = 0 });
+        3,
+        new Dictionary<string, int>
+        {
+            ["create"] = 2,
+            ["delete"] = 1,
+            ["no-op"] = 4,
+            ["update"] = 0,
+        }
+    );
 
     [Test]
     public async Task Starts_with_the_marker_the_sticky_comment_looks_for()
@@ -29,13 +37,29 @@ public class CommentRendererTests
     [Test]
     public async Task Marks_what_blocks_and_says_what_the_gate_does()
     {
-        var blocking = new Finding("azurerm_network_security_rule.a", "POL-002", Severity.High, Reporter.Security, true, "SSH", [new DocEvidence("POL-002")]) { Blocking = true };
-        var result = new ReviewResult(1, Commit, Verdict.Findings, [blocking], [], new Dictionary<string, int>()) { Gate = GateMode.Blocking };
+        var blocking = new Finding(
+            "azurerm_network_security_rule.a",
+            "POL-002",
+            Severity.High,
+            Reporter.Security,
+            true,
+            "SSH",
+            [new DocEvidence("POL-002")]
+        )
+        {
+            Blocking = true,
+        };
+        var result = new ReviewResult(1, Commit, Verdict.Findings, [blocking], [], new Dictionary<string, int>())
+        {
+            Gate = GateMode.Blocking,
+        };
 
         var comment = CommentRenderer.Render(result, Counts);
 
         await Assert.That(comment).Contains("| high, **blocking** | `azurerm_network_security_rule.a` |");
-        await Assert.That(comment).Contains("This repo blocks merges only on high findings a policy or scanner reported itself");
+        await Assert
+            .That(comment)
+            .Contains("This repo blocks merges only on high findings a policy or scanner reported itself");
         await Assert.That(comment).DoesNotContain("This review is advisory");
     }
 
@@ -44,13 +68,23 @@ public class CommentRendererTests
     public async Task Names_the_resources_a_scope_left_out()
     {
         var skipped = Enumerable.Range(0, 12).Select(index => $"azurerm_subnet.s{index:00}").ToList();
-        var result = new ReviewResult(1, Commit, Verdict.NoFindings, [], [new NotReviewed(ReviewScope.Security, NotReviewedReason.PlanTooLarge) { Resources = skipped }], new Dictionary<string, int>());
+        var result = new ReviewResult(
+            1,
+            Commit,
+            Verdict.NoFindings,
+            [],
+            [new NotReviewed(ReviewScope.Security, NotReviewedReason.PlanTooLarge) { Resources = skipped }],
+            new Dictionary<string, int>()
+        );
 
         var comment = CommentRenderer.Render(result, Counts);
 
-        await Assert.That(comment).Contains(
-            "Not reviewed by security (the plan is too large): `azurerm_subnet.s00`, `azurerm_subnet.s01`, `azurerm_subnet.s02`, `azurerm_subnet.s03`, "
-            + "`azurerm_subnet.s04`, `azurerm_subnet.s05`, `azurerm_subnet.s06`, `azurerm_subnet.s07`, `azurerm_subnet.s08`, `azurerm_subnet.s09` and 2 more.");
+        await Assert
+            .That(comment)
+            .Contains(
+                "Not reviewed by security (the plan is too large): `azurerm_subnet.s00`, `azurerm_subnet.s01`, `azurerm_subnet.s02`, `azurerm_subnet.s03`, "
+                    + "`azurerm_subnet.s04`, `azurerm_subnet.s05`, `azurerm_subnet.s06`, `azurerm_subnet.s07`, `azurerm_subnet.s08`, `azurerm_subnet.s09` and 2 more."
+            );
     }
 
     [Test]
@@ -82,10 +116,15 @@ public class CommentRendererTests
     [Test]
     public async Task Shows_findings_in_a_table()
     {
-        var comment = CommentRenderer.Render(Result(Verdict.Findings, Finding("Required tag owner is missing")), Counts);
+        var comment = CommentRenderer.Render(
+            Result(Verdict.Findings, Finding("Required tag owner is missing")),
+            Counts
+        );
 
         await Assert.That(comment).Contains("**1 finding(s)**");
-        await Assert.That(comment).Contains("| medium | `azurerm_x.y` | `ADR-002` | `Required tag owner is missing` |  | policy |");
+        await Assert
+            .That(comment)
+            .Contains("| medium | `azurerm_x.y` | `ADR-002` | `Required tag owner is missing` |  | policy |");
     }
 
     [Test]
@@ -99,13 +138,17 @@ public class CommentRendererTests
     [Test]
     public async Task Shows_a_saving()
     {
-        await Assert.That(CommentRenderer.Render(WithCost(new CostSummary(10m, 4m, [])), Counts)).Contains("**-$6.00**");
+        await Assert
+            .That(CommentRenderer.Render(WithCost(new CostSummary(10m, 4m, [])), Counts))
+            .Contains("**-$6.00**");
     }
 
     [Test]
     public async Task Says_when_cost_doesnt_change()
     {
-        await Assert.That(CommentRenderer.Render(WithCost(new CostSummary(10m, 10m, [])), Counts)).Contains("Monthly cost: no change");
+        await Assert
+            .That(CommentRenderer.Render(WithCost(new CostSummary(10m, 10m, [])), Counts))
+            .Contains("Monthly cost: no change");
     }
 
     [Test]
@@ -118,11 +161,17 @@ public class CommentRendererTests
     [Test]
     public async Task Names_what_couldnt_be_priced_as_inert_text()
     {
-        var cost = new CostSummary(0m, 0m, [new ResourceCostChange("a.b[\"[x](https://evil.example)\"]", 0m, 0m, false)]);
+        var cost = new CostSummary(
+            0m,
+            0m,
+            [new ResourceCostChange("a.b[\"[x](https://evil.example)\"]", 0m, 0m, false)]
+        );
 
         var comment = CommentRenderer.Render(WithCost(cost), Counts);
 
-        await Assert.That(comment).Contains("Couldn't be priced, so not counted: `a.b[\"[x](https://evil.example)\"]`.");
+        await Assert
+            .That(comment)
+            .Contains("Couldn't be priced, so not counted: `a.b[\"[x](https://evil.example)\"]`.");
     }
 
     [Test]
@@ -162,7 +211,10 @@ public class CommentRendererTests
     [Test]
     public async Task Limits_what_to_look_at_first()
     {
-        var result = Linked("adr/x.md") with { RiskOrder = [.. Enumerable.Range(0, 8).Select(i => new RiskItem($"a.r{i}") { Reason = "Why." })] };
+        var result = Linked("adr/x.md") with
+        {
+            RiskOrder = [.. Enumerable.Range(0, 8).Select(i => new RiskItem($"a.r{i}") { Reason = "Why." })],
+        };
 
         await Assert.That(CommentRenderer.Render(result, Counts)).DoesNotContain("a.r5");
     }
@@ -171,7 +223,10 @@ public class CommentRendererTests
     public async Task A_merged_row_names_its_other_rules_as_inert_text()
     {
         var result = Linked("adr/x.md");
-        result = result with { Findings = [result.Findings[0] with { RelatedRules = ["CKV_AZURE_190", "[x](https://evil.example)"] }] };
+        result = result with
+        {
+            Findings = [result.Findings[0] with { RelatedRules = ["CKV_AZURE_190", "[x](https://evil.example)"] }],
+        };
 
         var comment = CommentRenderer.Render(result, Counts);
 
@@ -182,7 +237,18 @@ public class CommentRendererTests
     public async Task A_scanner_rule_is_labelled_as_a_scanner()
     {
         var result = Linked("adr/x.md");
-        result = result with { Findings = [result.Findings[0] with { Rule = "CKV_AZURE_190", Deterministic = true, Agent = Reporter.Scanner }] };
+        result = result with
+        {
+            Findings =
+            [
+                result.Findings[0] with
+                {
+                    Rule = "CKV_AZURE_190",
+                    Deterministic = true,
+                    Agent = Reporter.Scanner,
+                },
+            ],
+        };
 
         await Assert.That(CommentRenderer.Render(result, Counts)).Contains("| scanner |");
     }
@@ -192,7 +258,9 @@ public class CommentRendererTests
     {
         var comment = CommentRenderer.Render(Linked("adr/ADR-002-tags.md"), Counts);
 
-        await Assert.That(comment).Contains($"[ADR-002](https://github.com/owner/standards/blob/{LinkCommit}/adr/ADR-002-tags.md)");
+        await Assert
+            .That(comment)
+            .Contains($"[ADR-002](https://github.com/owner/standards/blob/{LinkCommit}/adr/ADR-002-tags.md)");
     }
 
     // The result file passes between jobs, so a bad value mustn't become a link.
@@ -211,7 +279,10 @@ public class CommentRendererTests
     [Test]
     public async Task Doesnt_link_a_rule_that_isnt_a_doc_id()
     {
-        var result = Linked("adr/x.md") with { DocPaths = new Dictionary<string, string> { ["CKV_AZURE_1"] = "adr/x.md" } };
+        var result = Linked("adr/x.md") with
+        {
+            DocPaths = new Dictionary<string, string> { ["CKV_AZURE_1"] = "adr/x.md" },
+        };
         result = result with { Findings = [result.Findings[0] with { Rule = "CKV_AZURE_1" }] };
 
         await Assert.That(CommentRenderer.Render(result, Counts)).DoesNotContain("](https://");
@@ -221,7 +292,10 @@ public class CommentRendererTests
     public async Task Shows_a_suggestion_as_inert_text()
     {
         var result = Linked("adr/x.md");
-        result = result with { Findings = [result.Findings[0] with { Suggestion = "See [this](https://evil.example)" }] };
+        result = result with
+        {
+            Findings = [result.Findings[0] with { Suggestion = "See [this](https://evil.example)" }],
+        };
 
         await Assert.That(CommentRenderer.Render(result, Counts)).Contains("| `See [this](https://evil.example)` |");
     }
@@ -254,14 +328,19 @@ public class CommentRendererTests
     {
         var result = Linked("adr/x.md") with { OmittedDocs = ["ADR-003"] };
 
-        await Assert.That(CommentRenderer.Render(result, Counts)).Contains("Not checked, too large for the prompt: `ADR-003`.");
+        await Assert
+            .That(CommentRenderer.Render(result, Counts))
+            .Contains("Not checked, too large for the prompt: `ADR-003`.");
     }
 
     [Test]
     public async Task Labels_a_finding_both_found()
     {
         var result = Linked("adr/x.md");
-        result = result with { Findings = [result.Findings[0] with { Deterministic = true, Agent = Reporter.Conventions }] };
+        result = result with
+        {
+            Findings = [result.Findings[0] with { Deterministic = true, Agent = Reporter.Conventions }],
+        };
 
         await Assert.That(CommentRenderer.Render(result, Counts)).Contains("| policy and model |");
     }
@@ -364,12 +443,15 @@ public class CommentRendererTests
     [Test]
     public async Task A_comment_too_long_for_github_drops_rows_and_says_so()
     {
-        var findings = Enumerable.Range(0, 60)
-            .Select(index => Finding(new string('t', 400)) with
-            {
-                ResourceAddress = $"module.m[\"{index}{new string('k', 400)}\"].azurerm_storage_account.a",
-                Suggestion = new string('s', 400),
-            })
+        var findings = Enumerable
+            .Range(0, 60)
+            .Select(index =>
+                Finding(new string('t', 400)) with
+                {
+                    ResourceAddress = $"module.m[\"{index}{new string('k', 400)}\"].azurerm_storage_account.a",
+                    Suggestion = new string('s', 400),
+                }
+            )
             .ToArray();
 
         var comment = CommentRenderer.Render(Result(Verdict.Findings, findings), Counts);
@@ -433,9 +515,16 @@ public class CommentRendererTests
         await Assert.That(comment).Contains($"Not reviewed: the whole plan ({text}).");
     }
 
-    private static Finding Finding(string title) => new(
-        "azurerm_x.y", "ADR-002", Severity.Medium, Reporter.Scanner, true, title,
-        [new PlanEvidence("/resource_changes/azurerm_x.y/change/after"), new DocEvidence("ADR-002")]);
+    private static Finding Finding(string title) =>
+        new(
+            "azurerm_x.y",
+            "ADR-002",
+            Severity.Medium,
+            Reporter.Scanner,
+            true,
+            title,
+            [new PlanEvidence("/resource_changes/azurerm_x.y/change/after"), new DocEvidence("ADR-002")]
+        );
 
     private static ReviewResult Result(Verdict verdict, params Finding[] findings) =>
         new(1, Commit, verdict, findings, [], new Dictionary<string, int>());
@@ -448,9 +537,20 @@ public class CommentRendererTests
             1,
             Commit,
             Verdict.Findings,
-            [new Finding("a.b", "ADR-002", Severity.Medium, Reporter.Conventions, false, "t", [new PlanEvidence("/resource_changes/a.b")])],
+            [
+                new Finding(
+                    "a.b",
+                    "ADR-002",
+                    Severity.Medium,
+                    Reporter.Conventions,
+                    false,
+                    "t",
+                    [new PlanEvidence("/resource_changes/a.b")]
+                ),
+            ],
             [],
-            new Dictionary<string, int>())
+            new Dictionary<string, int>()
+        )
         {
             StandardsCommit = LinkCommit,
             StandardsRepository = "owner/standards",

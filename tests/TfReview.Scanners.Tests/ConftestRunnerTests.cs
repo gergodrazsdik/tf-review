@@ -1,5 +1,5 @@
-using TfReview.Core;
 using System.Diagnostics;
+using TfReview.Core;
 
 namespace TfReview.Scanners.Tests;
 
@@ -79,13 +79,30 @@ public class ConftestRunnerTests
             await File.WriteAllTextAsync(path, Plan(resource));
             var raw = await new ProcessRunner().RunAsync(
                 "conftest",
-                ["test", "--no-color", "--all-namespaces", "--output", "json", "--parser", "json", "--policy", standards, path],
-                TimeSpan.FromMinutes(1));
+                [
+                    "test",
+                    "--no-color",
+                    "--all-namespaces",
+                    "--output",
+                    "json",
+                    "--parser",
+                    "json",
+                    "--policy",
+                    standards,
+                    path,
+                ],
+                TimeSpan.FromMinutes(1)
+            );
 
             var rawViolations = ((ConftestRan)ConftestRunner.Parse(raw!.Output)).Violations;
 
-            await Assert.That(redacted.Select(violation => (violation.DocId, violation.Address, violation.Severity)).ToArray())
-                .IsEquivalentTo(rawViolations.Select(violation => (violation.DocId, violation.Address, violation.Severity)).ToArray());
+            await Assert
+                .That(redacted.Select(violation => (violation.DocId, violation.Address, violation.Severity)).ToArray())
+                .IsEquivalentTo(
+                    rawViolations
+                        .Select(violation => (violation.DocId, violation.Address, violation.Severity))
+                        .ToArray()
+                );
         }
         finally
         {
@@ -97,7 +114,10 @@ public class ConftestRunnerTests
     public async Task A_missing_policy_directory_is_not_clean()
     {
         Standards();
-        var outcome = await new ConftestRunner(new ProcessRunner()).RunAsync(Redact(Plan(C6BadName)), "/nonexistent-policies");
+        var outcome = await new ConftestRunner(new ProcessRunner()).RunAsync(
+            Redact(Plan(C6BadName)),
+            "/nonexistent-policies"
+        );
 
         await Assert.That(outcome).IsEqualTo(new ConftestFailed(ConftestFailure.NoJson));
     }
@@ -105,8 +125,10 @@ public class ConftestRunnerTests
     [Test]
     public async Task A_missing_conftest_is_not_clean()
     {
-        var outcome = await new ConftestRunner(new ProcessRunner(), "conftest-does-not-exist")
-            .RunAsync(Redact(Plan(C6BadName)), "/nonexistent-policies");
+        var outcome = await new ConftestRunner(new ProcessRunner(), "conftest-does-not-exist").RunAsync(
+            Redact(Plan(C6BadName)),
+            "/nonexistent-policies"
+        );
 
         await Assert.That(outcome).IsEqualTo(new ConftestFailed(ConftestFailure.CouldNotRun));
     }
@@ -132,9 +154,13 @@ public class ConftestRunnerTests
                     value := {{call}}
                     msg := sprintf("%v", [value])
                 }
-                """);
+                """
+            );
 
-            var outcome = await new ConftestRunner(new ProcessRunner()).RunAsync(Redact(Plan(C6BadName)), directory.FullName);
+            var outcome = await new ConftestRunner(new ProcessRunner()).RunAsync(
+                Redact(Plan(C6BadName)),
+                directory.FullName
+            );
 
             await Assert.That(outcome).IsEqualTo(new ConftestFailed(ConftestFailure.NoJson));
         }

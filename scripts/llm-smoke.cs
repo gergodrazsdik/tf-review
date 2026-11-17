@@ -92,7 +92,8 @@ clientOptions.AddPolicy(requests, PipelinePosition.PerCall);
 
 var client = new OpenAIClient(
     new BearerTokenPolicy(new DefaultAzureCredential(), "https://ai.azure.com/.default"),
-    clientOptions);
+    clientOptions
+);
 var sdkClient = client.GetChatClient(deployment);
 var chatClient = sdkClient.AsIChatClient();
 
@@ -107,26 +108,33 @@ await Check("OpenAI SDK", async () =>
             MaxOutputTokenCount = MaxOutputTokens,
             ReasoningEffortLevel = SdkChat.ChatReasoningEffortLevel.Low,
             ResponseFormat = SdkChat.ChatResponseFormat.CreateJsonSchemaFormat(
-                SchemaName, BinaryData.FromString(Schema), jsonSchemaIsStrict: true),
-        });
+                SchemaName,
+                BinaryData.FromString(Schema),
+                jsonSchemaIsStrict: true
+            ),
+        }
+    );
     var value = completion.Value;
     return new Answer(
         value.Content[0].Text,
         value.FinishReason.ToString(),
         value.Usage.InputTokenCount,
-        value.Usage.OutputTokenCount);
+        value.Usage.OutputTokenCount
+    );
 });
 
 await Check("IChatClient", async () =>
 {
     var response = await chatClient.GetResponseAsync(
         [new(ChatRole.System, Instructions), new(ChatRole.User, Plan)],
-        StrictOptions());
+        StrictOptions()
+    );
     return new Answer(
         response.Text,
         response.FinishReason?.ToString() ?? "unknown",
         response.Usage?.InputTokenCount,
-        response.Usage?.OutputTokenCount);
+        response.Usage?.OutputTokenCount
+    );
 });
 
 await Check("Agent Framework", async () =>
@@ -135,26 +143,23 @@ await Check("Agent Framework", async () =>
     options.Instructions = Instructions;
     AIAgent agent = new ChatClientAgent(
         chatClient,
-        new ChatClientAgentOptions { Name = "conventions", ChatOptions = options });
+        new ChatClientAgentOptions { Name = "conventions", ChatOptions = options }
+    );
     var response = await agent.RunAsync(Plan);
-    return new Answer(
-        response.Text,
-        "unknown",
-        response.Usage?.InputTokenCount,
-        response.Usage?.OutputTokenCount);
+    return new Answer(response.Text, "unknown", response.Usage?.InputTokenCount, response.Usage?.OutputTokenCount);
 });
 
 Console.WriteLine(failures == 0 ? "PASS: every layer works." : $"FAIL: {failures} layer(s) failed.");
 return failures == 0 ? 0 : 1;
 
-static ChatOptions StrictOptions() => new()
-{
-    MaxOutputTokens = MaxOutputTokens,
-    Reasoning = new ReasoningOptions { Effort = ReasoningEffort.Low },
-    ResponseFormat = ChatResponseFormat.ForJsonSchema(
-        JsonDocument.Parse(Schema).RootElement, SchemaName),
-    AdditionalProperties = new() { ["strict"] = true },
-};
+static ChatOptions StrictOptions() =>
+    new()
+    {
+        MaxOutputTokens = MaxOutputTokens,
+        Reasoning = new ReasoningOptions { Effort = ReasoningEffort.Low },
+        ResponseFormat = ChatResponseFormat.ForJsonSchema(JsonDocument.Parse(Schema).RootElement, SchemaName),
+        AdditionalProperties = new() { ["strict"] = true },
+    };
 
 async Task Check(string layer, Func<Task<Answer>> call)
 {
@@ -162,7 +167,9 @@ async Task Check(string layer, Func<Task<Answer>> call)
     try
     {
         var answer = await call();
-        Console.WriteLine($"strict sent: {requests.LastWasStrict}, low reasoning effort sent: {requests.LastHadLowEffort}");
+        Console.WriteLine(
+            $"strict sent: {requests.LastWasStrict}, low reasoning effort sent: {requests.LastHadLowEffort}"
+        );
         Console.WriteLine($"finish: {answer.Finish}, tokens in: {answer.In}, out: {answer.Out}");
         Console.WriteLine($"answer: {answer.Text}");
 
@@ -176,10 +183,13 @@ async Task Check(string layer, Func<Task<Answer>> call)
         }
 
         var answered = policySuggestions.EnumerateArray().Any(item => item.GetProperty("id").GetString() == "P1");
-        var named = findings.EnumerateArray().Any(finding =>
-            finding.GetProperty("resource_address").GetString() == "azurerm_virtual_network.smoke"
-            && finding.GetProperty("doc_id").GetString() == "ADR-001"
-            && finding.GetProperty("breaks_standard").GetBoolean());
+        var named = findings
+            .EnumerateArray()
+            .Any(finding =>
+                finding.GetProperty("resource_address").GetString() == "azurerm_virtual_network.smoke"
+                && finding.GetProperty("doc_id").GetString() == "ADR-001"
+                && finding.GetProperty("breaks_standard").GetBoolean()
+            );
 
         if (!requests.LastWasStrict)
         {
@@ -193,7 +203,9 @@ async Task Check(string layer, Func<Task<Answer>> call)
 
         // A wrong answer isn't a failed smoke test: this proves the plumbing, and the evals judge
         // quality. It's still worth seeing.
-        Console.WriteLine($"OK: valid JSON, {findings.GetArrayLength()} finding(s), P1 answered: {answered}, ADR-001 name finding: {named}");
+        Console.WriteLine(
+            $"OK: valid JSON, {findings.GetArrayLength()} finding(s), P1 answered: {answered}, ADR-001 name finding: {named}"
+        );
     }
     catch (Exception e)
     {
@@ -212,15 +224,17 @@ internal sealed class RequestCapture : PipelinePolicy
 
     public bool LastHadLowEffort { get; private set; }
 
-    public override void Process(
-        PipelineMessage message, IReadOnlyList<PipelinePolicy> pipeline, int currentIndex)
+    public override void Process(PipelineMessage message, IReadOnlyList<PipelinePolicy> pipeline, int currentIndex)
     {
         Record(message);
         ProcessNext(message, pipeline, currentIndex);
     }
 
     public override async ValueTask ProcessAsync(
-        PipelineMessage message, IReadOnlyList<PipelinePolicy> pipeline, int currentIndex)
+        PipelineMessage message,
+        IReadOnlyList<PipelinePolicy> pipeline,
+        int currentIndex
+    )
     {
         Record(message);
         await ProcessNextAsync(message, pipeline, currentIndex);
@@ -234,7 +248,8 @@ internal sealed class RequestCapture : PipelinePolicy
         LastWasStrict = text.Contains("\"strict\":true", StringComparison.Ordinal);
 
         // Chat Completions sends reasoning_effort, the Responses API reasoning.effort.
-        LastHadLowEffort = text.Contains("\"reasoning_effort\":\"low\"", StringComparison.Ordinal)
+        LastHadLowEffort =
+            text.Contains("\"reasoning_effort\":\"low\"", StringComparison.Ordinal)
             || text.Contains("\"effort\":\"low\"", StringComparison.Ordinal);
     }
 }

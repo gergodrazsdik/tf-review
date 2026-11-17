@@ -12,7 +12,16 @@ public class ReviewMetricsTests
     {
         using var metrics = new Collector();
 
-        ReviewMetrics.RecordCall("security", 4, "gpt-5.4-mini", "stop", 1_000_000, 0, 0, TimeSpan.FromMilliseconds(250));
+        ReviewMetrics.RecordCall(
+            "security",
+            4,
+            "gpt-5.4-mini",
+            "stop",
+            1_000_000,
+            0,
+            0,
+            TimeSpan.FromMilliseconds(250)
+        );
 
         await Assert.That(metrics.Total("tfreview.llm.input_tokens")).IsEqualTo(1_000_000d);
         await Assert.That(metrics.Total("tfreview.llm.cost")).IsEqualTo(0.825d);
@@ -52,11 +61,28 @@ public class ReviewMetricsTests
             Commit,
             Verdict.Findings,
             [
-                new Finding("azurerm_a.a", "ADR-001", Severity.Low, Reporter.Conventions, false, "CANARY title", [new DocEvidence("ADR-001")]),
-                new Finding("azurerm_a.b", "ADR-001", Severity.Low, Reporter.Conventions, false, "CANARY title", [new DocEvidence("ADR-001")]),
+                new Finding(
+                    "azurerm_a.a",
+                    "ADR-001",
+                    Severity.Low,
+                    Reporter.Conventions,
+                    false,
+                    "CANARY title",
+                    [new DocEvidence("ADR-001")]
+                ),
+                new Finding(
+                    "azurerm_a.b",
+                    "ADR-001",
+                    Severity.Low,
+                    Reporter.Conventions,
+                    false,
+                    "CANARY title",
+                    [new DocEvidence("ADR-001")]
+                ),
             ],
             [new NotReviewed(ReviewScope.Cost, NotReviewedReason.ScannerFailed)],
-            new Dictionary<string, int> { ["attribute_unchanged"] = 3 });
+            new Dictionary<string, int> { ["attribute_unchanged"] = 3 }
+        );
 
         ReviewMetrics.RecordResult(result, "owner/repo");
 
@@ -87,18 +113,25 @@ public class ReviewMetricsTests
                     listener.EnableMeasurementEvents(instrument);
                 }
             };
-            this.listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) => this.Add(instrument, value, tags));
-            this.listener.SetMeasurementEventCallback<double>((instrument, value, tags, _) => this.Add(instrument, value, tags));
+            this.listener.SetMeasurementEventCallback<long>(
+                (instrument, value, tags, _) => this.Add(instrument, value, tags)
+            );
+            this.listener.SetMeasurementEventCallback<double>(
+                (instrument, value, tags, _) => this.Add(instrument, value, tags)
+            );
             this.listener.Start();
         }
 
         public bool Has(string name) => this.measurements.Any(measurement => measurement.Name == name);
 
-        public double Total(string name) => this.measurements.Where(measurement => measurement.Name == name).Sum(measurement => measurement.Value);
+        public double Total(string name) =>
+            this.measurements.Where(measurement => measurement.Name == name).Sum(measurement => measurement.Value);
 
-        public string? Tag(string name, string tag) => this.measurements.First(measurement => measurement.Name == name).Tags[tag];
+        public string? Tag(string name, string tag) =>
+            this.measurements.First(measurement => measurement.Name == name).Tags[tag];
 
-        public string AllTags() => string.Join(' ', this.measurements.SelectMany(measurement => measurement.Tags.Values));
+        public string AllTags() =>
+            string.Join(' ', this.measurements.SelectMany(measurement => measurement.Tags.Values));
 
         public void Dispose() => this.listener.Dispose();
 

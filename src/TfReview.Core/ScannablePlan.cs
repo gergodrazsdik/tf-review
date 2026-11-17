@@ -80,7 +80,8 @@ public sealed class ScannablePlan
                 ["planned_values"] = new JsonObject { ["root_module"] = new JsonObject { ["resources"] = resources } },
                 ["resource_changes"] = changes,
             },
-            addresses);
+            addresses
+        );
     }
 
     public string ToCanonicalJson() => CanonicalJson.Write(root);

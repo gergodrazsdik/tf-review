@@ -24,38 +24,70 @@ internal static class Judge
             problems.Add($"not reviewed: {missing.Scope} ({missing.Reason})");
         }
 
-        var actual = result.Findings
-            .Select(finding => new ExpectedFinding(finding.ResourceAddress, finding.Rule, Name(finding.Agent), finding.Deterministic))
+        var actual = result
+            .Findings.Select(finding => new ExpectedFinding(
+                finding.ResourceAddress,
+                finding.Rule,
+                Name(finding.Agent),
+                finding.Deterministic
+            ))
             .ToList();
 
         // An arbiter can merge rows about one problem, so a rule it folded into another row still counts as reported.
-        var folded = result.Findings
-            .SelectMany(finding => (finding.RelatedRules ?? []).Select(rule => (finding.ResourceAddress, Rule: rule)))
+        var folded = result
+            .Findings.SelectMany(finding =>
+                (finding.RelatedRules ?? []).Select(rule => (finding.ResourceAddress, Rule: rule))
+            )
             .ToHashSet();
 
-        problems.AddRange(expected.Findings.Except(actual)
-            .Where(finding => !folded.Contains((finding.ResourceAddress, finding.Rule)))
-            .Select(finding => $"missing: {finding}"));
+        problems.AddRange(
+            expected
+                .Findings.Except(actual)
+                .Where(finding => !folded.Contains((finding.ResourceAddress, finding.Rule)))
+                .Select(finding => $"missing: {finding}")
+        );
 
         // With the wording, because a false positive's reasoning is what a prompt fix needs. Evals only see fixtures,
         // so nothing private reaches these logs.
-        problems.AddRange(result.Findings
-            .Where(finding => !expected.Findings.Contains(new ExpectedFinding(finding.ResourceAddress, finding.Rule, Name(finding.Agent), finding.Deterministic)))
-            .Select(finding => $"unexpected: {finding.ResourceAddress} {finding.Rule} from {Name(finding.Agent)}, deterministic {finding.Deterministic}: {finding.Title}"));
+        problems.AddRange(
+            result
+                .Findings.Where(finding =>
+                    !expected.Findings.Contains(
+                        new ExpectedFinding(
+                            finding.ResourceAddress,
+                            finding.Rule,
+                            Name(finding.Agent),
+                            finding.Deterministic
+                        )
+                    )
+                )
+                .Select(finding =>
+                    $"unexpected: {finding.ResourceAddress} {finding.Rule} from {Name(finding.Agent)}, deterministic {finding.Deterministic}: {finding.Title}"
+                )
+        );
 
-        problems.AddRange(actual
-            .GroupBy(finding => finding)
-            .Where(group => group.Count() > 1)
-            .Select(group => $"reported {group.Count()} times: {group.Key}"));
+        problems.AddRange(
+            actual
+                .GroupBy(finding => finding)
+                .Where(group => group.Count() > 1)
+                .Select(group => $"reported {group.Count()} times: {group.Key}")
+        );
 
         if (expected.RiskFirst is { } riskFirst && result.RiskOrder?.FirstOrDefault()?.ResourceAddress != riskFirst)
         {
-            problems.Add($"risk order: expected {riskFirst} first, and got {result.RiskOrder?.FirstOrDefault()?.ResourceAddress ?? "nothing"}");
+            problems.Add(
+                $"risk order: expected {riskFirst} first, and got {result.RiskOrder?.FirstOrDefault()?.ResourceAddress ?? "nothing"}"
+            );
         }
 
-        if (expected.FirstFinding is { } firstFinding && result.Findings.FirstOrDefault()?.ResourceAddress != firstFinding)
+        if (
+            expected.FirstFinding is { } firstFinding
+            && result.Findings.FirstOrDefault()?.ResourceAddress != firstFinding
+        )
         {
-            problems.Add($"expected a finding on {firstFinding} first, and got {result.Findings.FirstOrDefault()?.ResourceAddress ?? "nothing"}");
+            problems.Add(
+                $"expected a finding on {firstFinding} first, and got {result.Findings.FirstOrDefault()?.ResourceAddress ?? "nothing"}"
+            );
         }
 
         foreach (var finding in result.Findings)
@@ -67,7 +99,10 @@ internal static class Judge
 
             // A scanner's own rule ID has no document behind it. Anything citing a standard has to name it.
             var citesStandard = Regex.IsMatch(finding.Rule, "^(ADR|POL|DES)-[0-9]{3}$");
-            if (citesStandard && !finding.Evidence.Any(item => item.Value is DocEvidence doc && doc.DocId == finding.Rule))
+            if (
+                citesStandard
+                && !finding.Evidence.Any(item => item.Value is DocEvidence doc && doc.DocId == finding.Rule)
+            )
             {
                 problems.Add($"{finding.ResourceAddress} {finding.Rule}: no citation");
             }
@@ -110,13 +145,15 @@ internal sealed record ExpectedFinding(
     [property: JsonPropertyName("resource_address")] string ResourceAddress,
     [property: JsonPropertyName("rule")] string Rule,
     [property: JsonPropertyName("agent")] string Agent,
-    [property: JsonPropertyName("deterministic")] bool Deterministic);
+    [property: JsonPropertyName("deterministic")] bool Deterministic
+);
 
 /// <summary>A finding as the scorer sees it, from a live result or a saved run.</summary>
 internal sealed record ScoredFinding(
     [property: JsonPropertyName("ResourceAddress")] string ResourceAddress,
     [property: JsonPropertyName("Rule")] string Rule,
-    [property: JsonPropertyName("Suggestion")] string? Suggestion);
+    [property: JsonPropertyName("Suggestion")] string? Suggestion
+);
 
 /// <summary>
 /// What a good suggestion for each expected finding should mention, as case-insensitive patterns. Patterns were fixed
@@ -124,7 +161,9 @@ internal sealed record ScoredFinding(
 /// accepting wording that isn't it, with every saved run rescored each time (docs/evals/baseline.md). A finding that's
 /// missing scores nothing for its concepts.
 /// </summary>
-internal sealed record SuggestionScore([property: JsonPropertyName("findings")] IReadOnlyList<SuggestionExpectation> Findings)
+internal sealed record SuggestionScore(
+    [property: JsonPropertyName("findings")] IReadOnlyList<SuggestionExpectation> Findings
+)
 {
     public static SuggestionScore? Load(string directory)
     {
@@ -134,10 +173,13 @@ internal sealed record SuggestionScore([property: JsonPropertyName("findings")] 
 
     /// <summary>Whether a suggestion expresses a concept: the pattern matches anywhere, ignoring case.</summary>
     public static bool Mentions(string? suggestion, string pattern) =>
-        suggestion is not null && Regex.IsMatch(suggestion, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        suggestion is not null
+        && Regex.IsMatch(suggestion, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     public (int Found, int Asked, IReadOnlyList<string> Missed) Score(IEnumerable<Finding> findings) =>
-        this.Score(findings.Select(finding => new ScoredFinding(finding.ResourceAddress, finding.Rule, finding.Suggestion)));
+        this.Score(
+            findings.Select(finding => new ScoredFinding(finding.ResourceAddress, finding.Rule, finding.Suggestion))
+        );
 
     public (int Found, int Asked, IReadOnlyList<string> Missed) Score(IEnumerable<ScoredFinding> findings)
     {
@@ -147,7 +189,9 @@ internal sealed record SuggestionScore([property: JsonPropertyName("findings")] 
         var list = findings.ToList();
         foreach (var expectation in this.Findings)
         {
-            var finding = list.FirstOrDefault(item => item.ResourceAddress == expectation.ResourceAddress && item.Rule == expectation.Rule);
+            var finding = list.FirstOrDefault(item =>
+                item.ResourceAddress == expectation.ResourceAddress && item.Rule == expectation.Rule
+            );
             foreach (var (name, pattern) in expectation.Concepts)
             {
                 asked++;
@@ -169,7 +213,8 @@ internal sealed record SuggestionScore([property: JsonPropertyName("findings")] 
 internal sealed record SuggestionExpectation(
     [property: JsonPropertyName("resource_address")] string ResourceAddress,
     [property: JsonPropertyName("rule")] string Rule,
-    [property: JsonPropertyName("concepts")] IReadOnlyDictionary<string, string> Concepts);
+    [property: JsonPropertyName("concepts")] IReadOnlyDictionary<string, string> Concepts
+);
 
 /// <summary>Running totals, kept apart for held-out and tuned cases.</summary>
 internal sealed class Tally

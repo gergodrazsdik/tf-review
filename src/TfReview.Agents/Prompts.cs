@@ -20,7 +20,9 @@ public static partial class Prompts
 
     public static Prompt Load(string agent)
     {
-        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream($"{ResourcePrefix}{agent}{ResourceSuffix}")
+        using var stream = Assembly
+            .GetExecutingAssembly()
+            .GetManifestResourceStream($"{ResourcePrefix}{agent}{ResourceSuffix}")
             ?? throw new InvalidOperationException($"There's no prompt for {agent}.");
         using var reader = new StreamReader(stream, Encoding.UTF8);
         return Parse(reader.ReadToEnd());
@@ -28,12 +30,17 @@ public static partial class Prompts
 
     /// <summary>The agents that have a prompt.</summary>
     public static IReadOnlyList<string> Agents() =>
-    [
-        .. Assembly.GetExecutingAssembly().GetManifestResourceNames()
-            .Where(name => name.StartsWith(ResourcePrefix, StringComparison.Ordinal) && name.EndsWith(ResourceSuffix, StringComparison.Ordinal))
-            .Select(name => name[ResourcePrefix.Length..^ResourceSuffix.Length])
-            .Order(StringComparer.Ordinal),
-    ];
+        [
+            .. Assembly
+                .GetExecutingAssembly()
+                .GetManifestResourceNames()
+                .Where(name =>
+                    name.StartsWith(ResourcePrefix, StringComparison.Ordinal)
+                    && name.EndsWith(ResourceSuffix, StringComparison.Ordinal)
+                )
+                .Select(name => name[ResourcePrefix.Length..^ResourceSuffix.Length])
+                .Order(StringComparer.Ordinal),
+        ];
 
     /// <summary>Reads a prompt's header and body. Line endings are normalized, so the hash doesn't depend on them.</summary>
     public static Prompt Parse(string text)
@@ -44,9 +51,16 @@ public static partial class Prompts
             throw new InvalidOperationException("A prompt must start with a header naming its agent and version.");
         }
 
-        return new Prompt(match.Groups["agent"].Value, int.Parse(match.Groups["version"].Value), match.Groups["body"].Value.Trim());
+        return new Prompt(
+            match.Groups["agent"].Value,
+            int.Parse(match.Groups["version"].Value),
+            match.Groups["body"].Value.Trim()
+        );
     }
 
-    [GeneratedRegex(@"\A---\nagent: (?<agent>[a-z_]+)\nversion: (?<version>[1-9][0-9]*)\n---\n(?<body>.*)\z", RegexOptions.Singleline)]
+    [GeneratedRegex(
+        @"\A---\nagent: (?<agent>[a-z_]+)\nversion: (?<version>[1-9][0-9]*)\n---\n(?<body>.*)\z",
+        RegexOptions.Singleline
+    )]
     private static partial Regex Header();
 }
