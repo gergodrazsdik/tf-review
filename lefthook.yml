@@ -23,8 +23,8 @@ pre-commit:
     hadolint:
       glob: "Containerfile"
       run: hadolint {staged_files}
-    dotnet-format:
-      glob: "*.cs"
-      run: dotnet format whitespace --folder --verify-no-changes --include {staged_files}
+    csharpier:
+      glob: "*.{cs,csproj}"
+      run: dotnet csharpier check {staged_files}
     gitleaks:
       run: gitleaks git --pre-commit --staged --no-banner

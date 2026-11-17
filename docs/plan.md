@@ -36,7 +36,7 @@ Installed and verified on 2026-11-01 (setup doc step 41), and on the laptop on 2
 | TFLint + azurerm ruleset | Provider-aware lint in the pre-commit hook | Release binary, SLSA attestation; ruleset fetched by `tflint --init` | M0, optional |
 | tofu-ls | OpenTofu language server for Neovim and the `dg-lsp` plugin Source build at a pinned tag (`go mod download` + `go build`, because `go install` rejects its `replace` directive), checked against Go's checksum database | Optional |
 
-Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET SDK 11 with TUnit templates, `podman`, `actionlint`, `pinact`, `yamllint`/`yamlfmt`, `shellcheck`, `hadolint`, `gitleaks`, `cosign`/`syft`/`grype`, `jq`/`yq`, `ijhttp`, Claude Code. Terraform stays installed for the D1 Terraform input in M2.
+Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET SDK 11 with TUnit templates, `podman`, `actionlint`, `pinact`, `yamllint`/`yamlfmt`, `shellcheck`, `hadolint`, `gitleaks`, `cosign`/`syft`/`grype`, `jq`/`yq`, `ijhttp`, Claude Code. CSharpier is pinned by the repo instead: 1.4.0 in `dotnet-tools.json`, restored by `just hooks` (`dotnet tool restore`). Terraform stays installed for the D1 Terraform input in M2.
 
 **Accounts and one-off setup**
 
@@ -49,7 +49,7 @@ Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET S
 - [ ] After an Infracost CLI release that fixes the x/net findings its release binaries have: go back to the release binary in the `Containerfile` instead of the source build reported as `2.19.1-patched`. v2.19.1's binary still has x/net v0.58.0 (one critical, three high; checked 2026-11-17)
 - [x] By 2027-02-01, or at any Infracost update: review the `.grype.yaml` exception for `infracost-parser-terraform-plan`, and remove it once a plugin version ships go-jose 4.1.6 or later. Removed 2026-11-17: plugin 0.0.41 ships go-jose v4.1.6
 - [x] By 2026-12-06, or at any Infracost update: the same plugin's exceptions for brotli (GO-2026-6888, on CISA's known-exploited list) and klauspost/compress (GO-2026-6865), added 2026-11-06 when `image-v0.0.17` stopped at the gate. Removed 2026-11-17: plugin 0.0.41 ships brotli v1.2.8 and compress v1.20.2, and the `Containerfile` pins it with the same checksum as the setup doc. Grype still reports three medium findings in it (go1.26.10's GO-2026-6859 and OpenTelemetry's GHSA-q7gw-24fr-5p69), under the gate's high cutoff
-- [ ] After a CSharpier release that parses C# 15 (1.3.0 fails on `union`): add it back to the prerequisites and decide where it runs; until then `dotnet format` is the only C# formatter
+- [x] After a CSharpier release that parses C# 15 (1.3.0 fails on `union`): add it back to the prerequisites and decide where it runs. Done 2026-11-17 with 1.4.0, pinned in `dotnet-tools.json` at width 120 (`.editorconfig`): it owns the C# layout in the pre-commit hook, `just lint-dotnet` and CI, and `dotnet format` keeps style and analyzers
 - [x] Infracost v2: create a personal access token, store it as `pass insert tf-review/infracost/cli-token`, clear any cached `infracost auth login` session
 - [x] M3: create the GitHub App and store its private key as `pass insert -m tf-review/github-app/private-key`
 
@@ -322,7 +322,7 @@ gh repo edit gergodrazsdik/tf-standards --template
 | `just lint` | all | The checks that need no plugins, on every file, so they work in the Claude sandbox; the CI `lint` job runs the same recipe |
 | `just validate` | `tf-review`, `tf-review-demo` | `tofu validate` and `tflint`, whose plugins can't start in the sandbox; the CI `lint` job runs it too |
 | `just test` | `tf-review` | `dotnet build -m:1`, then `dotnet run --project <tests> --no-build` for each TUnit project; CI runs `dotnet test` |
-| `just lint-dotnet` | `tf-review` | `dotnet format whitespace --folder --verify-no-changes`, then `dotnet build -m:1 --no-incremental -p:EnforceCodeStyleInBuild=true -warnaserror`; CI runs the full `dotnet format --verify-no-changes` |
+| `just lint-dotnet` | `tf-review` | `dotnet csharpier check .`, then `dotnet build -m:1 --no-incremental -p:EnforceCodeStyleInBuild=true -warnaserror`; CI runs CSharpier and `dotnet format style` and `analyzers` with `--verify-no-changes` |
 | `just cost <plan.json>` | `tf-review` | `infracost scan <plan.json> --json` with the token read from pass for that run only and `SSH_AUTH_SOCK` unset |
 | `just rescore [runs]` | `tf-review` | Scores saved runs' suggestions, by default `docs/evals/runs/`, against the current concept patterns; offline |
 | `just e2e` | `tf-review` | Replays recorded model responses over the committed fixtures and asserts the expected findings. A role without a recorded answer fails its case rather than falling back to rules, every result is checked against the contracts, and cases with a `references.json` replay again with references per finding through the suggester, the production default; offline, no Azure and no token spend, so the Claude Code Stop hook can run it |
@@ -353,7 +353,7 @@ claude *args:
 | actionlint, pinact | `.github/workflows/*` | `actionlint` and `pinact run --check` |
 | shellcheck | `*.sh` | `shellcheck {staged_files}` |
 | hadolint | `Containerfile` | `hadolint {staged_files}` |
-| dotnet format | `*.cs` | `dotnet format whitespace --folder --verify-no-changes --include {staged_files}` |
+| CSharpier | `*.cs`, `*.csproj` | `dotnet csharpier check {staged_files}` |
 | opa fmt | `*.rego` | `opa fmt --fail {staged_files}` |
 | gitleaks | everything staged | `gitleaks git --pre-commit --staged` |
 
