@@ -48,14 +48,28 @@ public sealed class RiskOrchestrator(IChatClient chat, TimeSpan? attemptTimeout 
         }
         """;
 
-    private static readonly string[] AccessTypes = ["role_assignment", "role_definition", "access_policy", "federated_identity"];
+    private static readonly string[] AccessTypes =
+    [
+        "role_assignment",
+        "role_definition",
+        "access_policy",
+        "federated_identity",
+    ];
 
-    private static readonly string[] NetworkTypes = ["network_security", "firewall", "public_ip", "route", "private_endpoint"];
+    private static readonly string[] NetworkTypes =
+    [
+        "network_security",
+        "firewall",
+        "public_ip",
+        "route",
+        "private_endpoint",
+    ];
 
     private readonly TimeSpan timeout = attemptTimeout ?? TimeSpan.FromMinutes(1);
 
     /// <summary>The order from the rules alone, which is also the fallback.</summary>
-    public static IReadOnlyList<RiskItem> ByRules(CondensedPlan plan) => Order(plan.Changes(), new Dictionary<string, int>(), new Dictionary<string, string>());
+    public static IReadOnlyList<RiskItem> ByRules(CondensedPlan plan) =>
+        Order(plan.Changes(), new Dictionary<string, int>(), new Dictionary<string, string>());
 
     public async Task<RiskRanking> RankAsync(CondensedPlan plan, CancellationToken cancellationToken = default)
     {
@@ -69,16 +83,25 @@ public sealed class RiskOrchestrator(IChatClient chat, TimeSpan? attemptTimeout 
 
         // Only the riskiest by the rules, so a plan with tens of thousands of changes can't make one huge call (SEC-5).
         // The rest keep the rules' order after those the model ranked.
-        var sent = ByRules(plan).Take(MaxChanges).Select(item => item.ResourceAddress).ToHashSet(StringComparer.Ordinal);
+        var sent = ByRules(plan)
+            .Take(MaxChanges)
+            .Select(item => item.ResourceAddress)
+            .ToHashSet(StringComparer.Ordinal);
         var prompt = Prompts.Load(Name);
-        var summary = new JsonArray(
-        [
-            .. changes.Where(change => sent.Contains(change.Address)).Select(change => (JsonNode)new JsonObject
-            {
-                ["resource_address"] = change.Address,
-                ["type"] = change.Type,
-                ["actions"] = new JsonArray([.. change.Actions.Select(action => (JsonNode)JsonValue.Create(action)!)]),
-            }),
+        var summary = new JsonArray([
+            .. changes
+                .Where(change => sent.Contains(change.Address))
+                .Select(change =>
+                    (JsonNode)
+                        new JsonObject
+                        {
+                            ["resource_address"] = change.Address,
+                            ["type"] = change.Type,
+                            ["actions"] = new JsonArray([
+                                .. change.Actions.Select(action => (JsonNode)JsonValue.Create(action)!),
+                            ]),
+                        }
+                ),
         ]);
         var user = $"""
             <plan_summary>
@@ -87,7 +110,15 @@ public sealed class RiskOrchestrator(IChatClient chat, TimeSpan? attemptTimeout 
             """;
 
         var result = await StructuredCall.RunAsync(
-            chat, Name, prompt.Body, user, Schema, StructuredCall.ParseWire<WireOutput>, timeout, cancellationToken);
+            chat,
+            Name,
+            prompt.Body,
+            user,
+            Schema,
+            StructuredCall.ParseWire<WireOutput>,
+            timeout,
+            cancellationToken
+        );
 
         if (result.Value is not { } answer)
         {
@@ -102,7 +133,11 @@ public sealed class RiskOrchestrator(IChatClient chat, TimeSpan? attemptTimeout 
         var reasons = wanted
             .Where(resource => HasReason(resource.Reason))
             .DistinctBy(resource => resource.ResourceAddress)
-            .ToDictionary(resource => resource.ResourceAddress, resource => resource.Reason!.Trim(), StringComparer.Ordinal);
+            .ToDictionary(
+                resource => resource.ResourceAddress,
+                resource => resource.Reason!.Trim(),
+                StringComparer.Ordinal
+            );
 
         return new RiskRanking(Order(changes, ranks, reasons), result.Calls, prompt.Version);
     }
@@ -114,14 +149,20 @@ public sealed class RiskOrchestrator(IChatClient chat, TimeSpan? attemptTimeout 
         && !reason.Trim().Equals("none", StringComparison.OrdinalIgnoreCase);
 
     private static List<RiskItem> Order(
-        IReadOnlyList<PlanChange> changes, IReadOnlyDictionary<string, int> ranks, IReadOnlyDictionary<string, string> reasons) =>
-    [
-        .. changes
-            .OrderBy(Tier)
-            .ThenBy(change => ranks.GetValueOrDefault(change.Address, int.MaxValue))
-            .ThenBy(change => change.Address, StringComparer.Ordinal)
-            .Select(change => new RiskItem(change.Address) { Reason = reasons.GetValueOrDefault(change.Address) ?? RuleReason(change) }),
-    ];
+        IReadOnlyList<PlanChange> changes,
+        IReadOnlyDictionary<string, int> ranks,
+        IReadOnlyDictionary<string, string> reasons
+    ) =>
+        [
+            .. changes
+                .OrderBy(Tier)
+                .ThenBy(change => ranks.GetValueOrDefault(change.Address, int.MaxValue))
+                .ThenBy(change => change.Address, StringComparer.Ordinal)
+                .Select(change => new RiskItem(change.Address)
+                {
+                    Reason = reasons.GetValueOrDefault(change.Address) ?? RuleReason(change),
+                }),
+        ];
 
     private static int Tier(PlanChange change)
     {
@@ -138,18 +179,20 @@ public sealed class RiskOrchestrator(IChatClient chat, TimeSpan? attemptTimeout 
         return NetworkTypes.Any(type => change.Type.Contains(type, StringComparison.Ordinal)) ? Network : Other;
     }
 
-    private static string? RuleReason(PlanChange change) => Tier(change) switch
-    {
-        Destructive when change.Actions.Contains("create", StringComparer.Ordinal) => "This plan replaces it.",
-        Destructive => "This plan deletes it.",
-        Access => "It changes who has access.",
-        Network => "It changes network exposure.",
-        _ => null,
-    };
+    private static string? RuleReason(PlanChange change) =>
+        Tier(change) switch
+        {
+            Destructive when change.Actions.Contains("create", StringComparer.Ordinal) => "This plan replaces it.",
+            Destructive => "This plan deletes it.",
+            Access => "It changes who has access.",
+            Network => "It changes network exposure.",
+            _ => null,
+        };
 
     private sealed record WireOutput([property: JsonPropertyName("resources")] IReadOnlyList<WireResource> Resources);
 
     private sealed record WireResource(
         [property: JsonPropertyName("resource_address")] string ResourceAddress,
-        [property: JsonPropertyName("reason")] string? Reason);
+        [property: JsonPropertyName("reason")] string? Reason
+    );
 }

@@ -52,7 +52,11 @@ public static partial class Dismissals
 
     /// <summary>Every ticked dismiss line in a comment body, shown or hidden. Unticked ones and any other text are ignored.</summary>
     public static IReadOnlyList<Dismissal> Ticked(string? body) =>
-        [.. Read(body).Where(line => line.Ticked).Select(line => new Dismissal(line.Keys[0], line.Rule, line.Recorded))];
+        [
+            .. Read(body)
+                .Where(line => line.Ticked)
+                .Select(line => new Dismissal(line.Keys[0], line.Rule, line.Recorded)),
+        ];
 
     /// <summary>Every dismiss line in a comment body, shown or hidden, ticked or not.</summary>
     public static IReadOnlyList<DismissLine> Read(string? body)
@@ -95,17 +99,24 @@ public static partial class Dismissals
         foreach (var finding in shown)
         {
             var keys = Keys(finding);
-            var matching = lines.Where(line => line.Keys.Any(key => keys.Contains(key, StringComparer.Ordinal))).ToList();
+            var matching = lines
+                .Where(line => line.Keys.Any(key => keys.Contains(key, StringComparer.Ordinal)))
+                .ToList();
             used.UnionWith(matching);
 
             var ticked = matching.Any(line => line.Ticked);
             var recorded = matching.Any(line => line.Recorded) || (ticked && Count(finding.Rule));
-            var allKeys = keys.Concat(matching.SelectMany(line => line.Keys)).Distinct(StringComparer.Ordinal).Take(MaxKeys).ToList();
+            var allKeys = keys.Concat(matching.SelectMany(line => line.Keys))
+                .Distinct(StringComparer.Ordinal)
+                .Take(MaxKeys)
+                .ToList();
             markers[finding] = (ticked, Marker(allKeys, finding.Rule, recorded));
         }
 
         var hidden = new List<string>();
-        foreach (var line in lines.Where(line => !used.Contains(line) && (line.Ticked || line.Recorded)).TakeLast(MaxHidden))
+        foreach (
+            var line in lines.Where(line => !used.Contains(line) && (line.Ticked || line.Recorded)).TakeLast(MaxHidden)
+        )
         {
             var recorded = line.Recorded || (line.Ticked && Count(line.Rule));
             hidden.Add(Hidden(line with { Recorded = recorded }));
@@ -124,26 +135,39 @@ public static partial class Dismissals
     private static string Hidden(DismissLine line) =>
         $"<!-- {Prefix}ed {line.Keys[0]}{Also(line.Keys)}{Rule(line.Rule)}{(line.Ticked ? " ticked" : string.Empty)}{(line.Recorded ? " recorded" : string.Empty)} -->";
 
-    private static string Also(IReadOnlyList<string> keys) => keys.Count > 1 ? $" also={string.Join(',', keys.Skip(1))}" : string.Empty;
+    private static string Also(IReadOnlyList<string> keys) =>
+        keys.Count > 1 ? $" also={string.Join(',', keys.Skip(1))}" : string.Empty;
 
-    private static string Rule(string? rule) => rule is not null && RuleId().IsMatch(rule) ? $" rule={rule}" : string.Empty;
+    private static string Rule(string? rule) =>
+        rule is not null && RuleId().IsMatch(rule) ? $" rule={rule}" : string.Empty;
 
-    private static DismissLine Line(Match match, bool ticked) => new(
-        [match.Groups["key"].Value, .. match.Groups["also"].Success ? match.Groups["also"].Value.Split(',') : []],
-        match.Groups["rule"].Success ? match.Groups["rule"].Value : null,
-        ticked,
-        match.Groups["recorded"].Success);
+    private static DismissLine Line(Match match, bool ticked) =>
+        new(
+            [match.Groups["key"].Value, .. match.Groups["also"].Success ? match.Groups["also"].Value.Split(',') : []],
+            match.Groups["rule"].Success ? match.Groups["rule"].Value : null,
+            ticked,
+            match.Groups["recorded"].Success
+        );
 
     [GeneratedRegex("^[A-Za-z0-9_.-]{1,64}$")]
     private static partial Regex RuleId();
 
-    [GeneratedRegex(@"^- \[(?<tick>[ xX])\] .*<!-- tf-review:dismiss (?<key>[0-9a-f]{16})(?: also=(?<also>[0-9a-f]{16}(?:,[0-9a-f]{16}){0,7}))?(?: rule=(?<rule>[A-Za-z0-9_.-]{1,64}))?(?<recorded> recorded)? -->\s*$", RegexOptions.Multiline)]
+    [GeneratedRegex(
+        @"^- \[(?<tick>[ xX])\] .*<!-- tf-review:dismiss (?<key>[0-9a-f]{16})(?: also=(?<also>[0-9a-f]{16}(?:,[0-9a-f]{16}){0,7}))?(?: rule=(?<rule>[A-Za-z0-9_.-]{1,64}))?(?<recorded> recorded)? -->\s*$",
+        RegexOptions.Multiline
+    )]
     private static partial Regex ShownLine();
 
-    [GeneratedRegex(@"^<!-- tf-review:dismissed (?<key>[0-9a-f]{16})(?: also=(?<also>[0-9a-f]{16}(?:,[0-9a-f]{16}){0,7}))?(?: rule=(?<rule>[A-Za-z0-9_.-]{1,64}))?(?<ticked> ticked)?(?<recorded> recorded)? -->\s*$", RegexOptions.Multiline)]
+    [GeneratedRegex(
+        @"^<!-- tf-review:dismissed (?<key>[0-9a-f]{16})(?: also=(?<also>[0-9a-f]{16}(?:,[0-9a-f]{16}){0,7}))?(?: rule=(?<rule>[A-Za-z0-9_.-]{1,64}))?(?<ticked> ticked)?(?<recorded> recorded)? -->\s*$",
+        RegexOptions.Multiline
+    )]
     private static partial Regex HiddenLine();
 }
 
 /// <summary>A rewrite's dismiss lines: each shown finding's tick and marker, the hidden lines, and the rules newly counted.</summary>
 public sealed record DismissPlan(
-    IReadOnlyDictionary<Finding, (bool Ticked, string Marker)> Shown, IReadOnlyList<string> Hidden, IReadOnlyList<string?> Counted);
+    IReadOnlyDictionary<Finding, (bool Ticked, string Marker)> Shown,
+    IReadOnlyList<string> Hidden,
+    IReadOnlyList<string?> Counted
+);

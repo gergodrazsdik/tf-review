@@ -24,7 +24,9 @@ public class ConftestParseTests
     [Test]
     public async Task A_run_that_only_read_the_default_namespace_is_not_clean()
     {
-        await Assert.That(ConftestRunner.Parse(OnlyDefaultNamespace)).IsEqualTo(new ConftestFailed(ConftestFailure.NoPolicyRan));
+        await Assert
+            .That(ConftestRunner.Parse(OnlyDefaultNamespace))
+            .IsEqualTo(new ConftestFailed(ConftestFailure.NoPolicyRan));
     }
 
     [Test]
@@ -56,9 +58,12 @@ public class ConftestParseTests
     {
         var outcome = (ConftestRan)ConftestRunner.Parse(TwoTagsMissing);
 
-        await Assert.That(outcome.Violations.Select(violation => violation.Address).ToArray())
+        await Assert
+            .That(outcome.Violations.Select(violation => violation.Address).ToArray())
             .IsEquivalentTo(["a.a", "a.b", "a.b"], TUnit.Assertions.Enums.CollectionOrdering.Matching);
-        await Assert.That(outcome.Violations[0]).IsEqualTo(new ConftestViolation("ADR-001", "a.a", Severity.Low, "ADR-001: a.a: name bad"));
+        await Assert
+            .That(outcome.Violations[0])
+            .IsEqualTo(new ConftestViolation("ADR-001", "a.a", Severity.Low, "ADR-001: a.a: name bad"));
     }
 
     [Test]
@@ -85,9 +90,15 @@ public class ConftestParseTests
 
     [Test]
     [Arguments("""[{"namespace":"x","failures":[{"msg":"m"}]}]""")]
-    [Arguments("""[{"namespace":"x","failures":[{"msg":"m","metadata":{"details":{"address":"a.b","doc_id":"nope","severity":"low"}}}]}]""")]
-    [Arguments("""[{"namespace":"x","failures":[{"msg":"m","metadata":{"details":{"address":"a.b","doc_id":"ADR-001","severity":"urgent"}}}]}]""")]
-    [Arguments("""[{"namespace":"x","failures":[{"msg":"m","metadata":{"details":{"address":"","doc_id":"ADR-001","severity":"low"}}}]}]""")]
+    [Arguments(
+        """[{"namespace":"x","failures":[{"msg":"m","metadata":{"details":{"address":"a.b","doc_id":"nope","severity":"low"}}}]}]"""
+    )]
+    [Arguments(
+        """[{"namespace":"x","failures":[{"msg":"m","metadata":{"details":{"address":"a.b","doc_id":"ADR-001","severity":"urgent"}}}]}]"""
+    )]
+    [Arguments(
+        """[{"namespace":"x","failures":[{"msg":"m","metadata":{"details":{"address":"","doc_id":"ADR-001","severity":"low"}}}]}]"""
+    )]
     [Arguments("""[{"failures":[]}]""")]
     public async Task A_failure_a_policy_didnt_describe_properly_is_not_clean(string output)
     {
@@ -99,7 +110,9 @@ public class ConftestParseTests
     {
         var findings = Findings("name");
 
-        await Assert.That(findings[0].Evidence[0].Value).IsEqualTo(new PlanEvidence("/resource_changes/a.a/change/after/name"));
+        await Assert
+            .That(findings[0].Evidence[0].Value)
+            .IsEqualTo(new PlanEvidence("/resource_changes/a.a/change/after/name"));
     }
 
     // POL-001 fires on a missing attribute, which a pointer can't reach. Without this fallback, the
@@ -109,7 +122,9 @@ public class ConftestParseTests
     {
         var findings = Findings("min_tls_version");
 
-        await Assert.That(findings[0].Evidence[0].Value).IsEqualTo(new PlanEvidence("/resource_changes/a.a/change/after"));
+        await Assert
+            .That(findings[0].Evidence[0].Value)
+            .IsEqualTo(new PlanEvidence("/resource_changes/a.a/change/after"));
     }
 
     [Test]
@@ -135,11 +150,14 @@ public class ConftestParseTests
     [Test]
     public async Task Keeps_a_pointer_per_failed_attribute()
     {
-        var outcome = (ConftestRan)ConftestRunner.Parse("""
-            [{"namespace":"pol001","failures":[
-              {"msg":"one","metadata":{"details":{"address":"a.a","doc_id":"POL-001","severity":"high","attribute":"tags"}}},
-              {"msg":"two","metadata":{"details":{"address":"a.a","doc_id":"POL-001","severity":"high","attribute":"name"}}}]}]
-            """);
+        var outcome = (ConftestRan)
+            ConftestRunner.Parse(
+                """
+                [{"namespace":"pol001","failures":[
+                  {"msg":"one","metadata":{"details":{"address":"a.a","doc_id":"POL-001","severity":"high","attribute":"tags"}}},
+                  {"msg":"two","metadata":{"details":{"address":"a.a","doc_id":"POL-001","severity":"high","attribute":"name"}}}]}]
+                """
+            );
 
         var evidence = outcome.ToFindings(Condensed()).Single().Evidence;
 
@@ -161,10 +179,13 @@ public class ConftestParseTests
 
     private static IReadOnlyList<Finding> Findings(string attribute)
     {
-        var outcome = (ConftestRan)ConftestRunner.Parse($$$"""
-            [{"namespace":"adr001","failures":[{"msg":"m","metadata":{"details":
-            {"address":"a.a","doc_id":"ADR-001","severity":"low","attribute":"{{{attribute}}}" } } }]}]
-            """);
+        var outcome = (ConftestRan)
+            ConftestRunner.Parse(
+                $$$"""
+                [{"namespace":"adr001","failures":[{"msg":"m","metadata":{"details":
+                {"address":"a.a","doc_id":"ADR-001","severity":"low","attribute":"{{{attribute}}}" } } }]}]
+                """
+            );
         return outcome.ToFindings(Condensed());
     }
 

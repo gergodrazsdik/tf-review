@@ -17,7 +17,11 @@ public class ReviewAgentBatchTests
 
     // About 8K estimated tokens each, so two fit in a call and a third doesn't.
     private static string Big(string address) =>
-        TestPlans.Create(address, address[..address.IndexOf('.', StringComparison.Ordinal)], $$"""{"name":"{{new string('x', 25_000)}}"}""");
+        TestPlans.Create(
+            address,
+            address[..address.IndexOf('.', StringComparison.Ordinal)],
+            $$"""{"name":"{{new string('x', 25_000)}}"}"""
+        );
 
     private static string Finds(string address) =>
         $$"""{"policy_suggestions":[],"findings":[{"breaks_standard":true,"resource_address":"{{address}}","doc_id":"ADR-002","attribute":"name","title":"t","suggestion":null}]}""";
@@ -43,7 +47,8 @@ public class ReviewAgentBatchTests
         var plan = TestPlans.Condensed(Big(Vnet), Big(Storage), Big(Rule), Big(Role));
         var chat = new FakeChat(FakeChat.Answer(Finds(Role)), FakeChat.Answer(Finds(Vnet)));
 
-        var outcome = (AgentReviewed)await new ReviewAgent(chat, AgentProfile.Conventions).ReviewAsync(plan, [Tagging], []);
+        var outcome = (AgentReviewed)
+            await new ReviewAgent(chat, AgentProfile.Conventions).ReviewAsync(plan, [Tagging], []);
 
         await Assert.That(outcome.Findings.Select(finding => finding.ResourceAddress)).IsEquivalentTo([Role, Vnet]);
         await Assert.That(outcome.Calls.Count).IsEqualTo(2);
@@ -55,7 +60,14 @@ public class ReviewAgentBatchTests
     {
         var plan = TestPlans.Condensed(Big(Vnet), Big(Storage), Big(Rule), Big(Role));
         var policy = new Finding(
-            Vnet, "ADR-002", Severity.Medium, Reporter.Scanner, true, "Policy says no tags", [new PlanEvidence($"/resource_changes/{Vnet}/change/after"), new DocEvidence("ADR-002")]);
+            Vnet,
+            "ADR-002",
+            Severity.Medium,
+            Reporter.Scanner,
+            true,
+            "Policy says no tags",
+            [new PlanEvidence($"/resource_changes/{Vnet}/change/after"), new DocEvidence("ADR-002")]
+        );
         var chat = new FakeChat(FakeChat.Answer(Empty), FakeChat.Answer(Empty));
 
         await new ReviewAgent(chat, AgentProfile.Conventions).ReviewAsync(plan, [Tagging], [policy]);
@@ -71,10 +83,13 @@ public class ReviewAgentBatchTests
         var plan = TestPlans.Condensed([.. addresses.Select(Big)]);
         var chat = new FakeChat([.. Enumerable.Repeat<object>(FakeChat.Answer(Empty), ReviewAgent.MaxBatches)]);
 
-        var outcome = (AgentReviewed)await new ReviewAgent(chat, AgentProfile.Conventions).ReviewAsync(plan, [Tagging], []);
+        var outcome = (AgentReviewed)
+            await new ReviewAgent(chat, AgentProfile.Conventions).ReviewAsync(plan, [Tagging], []);
 
         await Assert.That(chat.Requests.Count).IsEqualTo(ReviewAgent.MaxBatches);
-        await Assert.That(outcome.Skipped.Single().Resources).IsEquivalentTo(["azurerm_virtual_network.n8", "azurerm_virtual_network.n9"]);
+        await Assert
+            .That(outcome.Skipped.Single().Resources)
+            .IsEquivalentTo(["azurerm_virtual_network.n8", "azurerm_virtual_network.n9"]);
         await Assert.That(outcome.Skipped.Single().Reason).IsEqualTo(NotReviewedReason.PlanTooLarge);
     }
 
@@ -86,11 +101,16 @@ public class ReviewAgentBatchTests
         var plan = TestPlans.Condensed([.. addresses.Select(Big)]);
         var chat = new FakeChat(FakeChat.Answer(Empty), FakeChat.Answer("not json"), FakeChat.Answer("not json"));
 
-        var outcome = (AgentReviewed)await new ReviewAgent(chat, AgentProfile.Conventions).ReviewAsync(plan, [Tagging], []);
+        var outcome = (AgentReviewed)
+            await new ReviewAgent(chat, AgentProfile.Conventions).ReviewAsync(plan, [Tagging], []);
 
-        await Assert.That(outcome.Skipped.Select(part => part.Reason)).IsEquivalentTo([NotReviewedReason.InvalidOutput, NotReviewedReason.PlanTooLarge]);
+        await Assert
+            .That(outcome.Skipped.Select(part => part.Reason))
+            .IsEquivalentTo([NotReviewedReason.InvalidOutput, NotReviewedReason.PlanTooLarge]);
         await Assert.That(outcome.Skipped[0].Resources.Count).IsEqualTo(6);
-        await Assert.That(outcome.Skipped[1].Resources).IsEquivalentTo(["azurerm_virtual_network.n8", "azurerm_virtual_network.n9"]);
+        await Assert
+            .That(outcome.Skipped[1].Resources)
+            .IsEquivalentTo(["azurerm_virtual_network.n8", "azurerm_virtual_network.n9"]);
     }
 
     // A failed batch costs its own resources and the rest, but not what was already reviewed.
@@ -100,7 +120,8 @@ public class ReviewAgentBatchTests
         var plan = TestPlans.Condensed(Big(Vnet), Big(Storage), Big(Rule), Big(Role));
         var chat = new FakeChat(FakeChat.Answer(Finds(Role)), FakeChat.Answer("not json"), FakeChat.Answer("not json"));
 
-        var outcome = (AgentReviewed)await new ReviewAgent(chat, AgentProfile.Conventions).ReviewAsync(plan, [Tagging], []);
+        var outcome = (AgentReviewed)
+            await new ReviewAgent(chat, AgentProfile.Conventions).ReviewAsync(plan, [Tagging], []);
 
         await Assert.That(outcome.Findings.Single().ResourceAddress).IsEqualTo(Role);
         await Assert.That(outcome.Skipped.Single().Resources).IsEquivalentTo([Storage, Vnet]);
@@ -122,11 +143,16 @@ public class ReviewAgentBatchTests
     [Test]
     public async Task A_resource_too_large_on_its_own_is_left_out_and_the_rest_reviewed()
     {
-        var huge = TestPlans.Create("azurerm_storage_account.huge", "azurerm_storage_account", $$"""{"name":"{{new string('x', 80_000)}}"}""");
+        var huge = TestPlans.Create(
+            "azurerm_storage_account.huge",
+            "azurerm_storage_account",
+            $$"""{"name":"{{new string('x', 80_000)}}"}"""
+        );
         var plan = TestPlans.Condensed(huge, Big(Vnet), Big(Storage), Big(Role));
         var chat = new FakeChat(FakeChat.Answer(Empty), FakeChat.Answer(Empty));
 
-        var outcome = (AgentReviewed)await new ReviewAgent(chat, AgentProfile.Conventions).ReviewAsync(plan, [Tagging], []);
+        var outcome = (AgentReviewed)
+            await new ReviewAgent(chat, AgentProfile.Conventions).ReviewAsync(plan, [Tagging], []);
 
         await Assert.That(outcome.Skipped.Single().Resources).IsEquivalentTo(["azurerm_storage_account.huge"]);
         await Assert.That(outcome.Skipped.Single().Reason).IsEqualTo(NotReviewedReason.PlanTooLarge);
@@ -139,11 +165,14 @@ public class ReviewAgentBatchTests
             TestPlans.Create(Vnet, "azurerm_virtual_network", "{}"),
             TestPlans.Create(Storage, "azurerm_storage_account", "{}"),
             TestPlans.Create(Rule, "azurerm_network_security_rule", "{}"),
-            TestPlans.Create(Role, "azurerm_role_assignment", "{}"));
+            TestPlans.Create(Role, "azurerm_role_assignment", "{}")
+        );
 
         var (batches, left) = ReviewAgent.Batch(plan, addresses => addresses.Count * 10, maxTokens: 20, maxBatches: 1);
 
-        await Assert.That(batches.Single()).IsEquivalentTo([Role, Rule], TUnit.Assertions.Enums.CollectionOrdering.Matching);
+        await Assert
+            .That(batches.Single())
+            .IsEquivalentTo([Role, Rule], TUnit.Assertions.Enums.CollectionOrdering.Matching);
         await Assert.That(left).IsEquivalentTo([Storage, Vnet], TUnit.Assertions.Enums.CollectionOrdering.Matching);
     }
 }

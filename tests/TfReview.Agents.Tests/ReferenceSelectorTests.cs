@@ -5,12 +5,20 @@ namespace TfReview.Agents.Tests;
 
 public class ReferenceSelectorTests
 {
-    private static readonly CondensedPlan Slice = TestPlans.Condensed(TestPlans.Create(
-        "azurerm_network_security_rule.ssh",
-        "azurerm_network_security_rule",
-        """{"name":"CANARY-name","destination_port_range":"22","description":"CANARY free text that is long enough to leave out","priority":100,"tags":{"owner":"CANARY-tag"},"source_address_prefix":null}"""));
+    private static readonly CondensedPlan Slice = TestPlans.Condensed(
+        TestPlans.Create(
+            "azurerm_network_security_rule.ssh",
+            "azurerm_network_security_rule",
+            """{"name":"CANARY-name","destination_port_range":"22","description":"CANARY free text that is long enough to leave out","priority":100,"tags":{"owner":"CANARY-tag"},"source_address_prefix":null}"""
+        )
+    );
 
-    private static readonly ReferenceQuery Query = new("query", ["azurerm_network_security_rule"], "5.12.0", TokenBudget: 1_000);
+    private static readonly ReferenceQuery Query = new(
+        "query",
+        ["azurerm_network_security_rule"],
+        "5.12.0",
+        TokenBudget: 1_000
+    );
 
     [Test]
     public async Task The_models_picks_go_first_and_the_budget_takes_the_rest_in_the_searchs_order()
@@ -20,7 +28,9 @@ public class ReferenceSelectorTests
 
         var selection = await new ReferenceSelector(retriever, chat).SelectAsync(Query, ["security"], Slice);
 
-        await Assert.That(selection.Retrieval.Docs.Select(doc => doc.Id)).IsEquivalentTo(["REF-c", "REF-a", "REF-b"], TUnit.Assertions.Enums.CollectionOrdering.Matching);
+        await Assert
+            .That(selection.Retrieval.Docs.Select(doc => doc.Id))
+            .IsEquivalentTo(["REF-c", "REF-a", "REF-b"], TUnit.Assertions.Enums.CollectionOrdering.Matching);
         await Assert.That(retriever.Queries.Single().Candidates).IsEqualTo(ReferenceSelector.Pool);
         await Assert.That(selection.Calls.Count).IsEqualTo(1);
     }
@@ -30,9 +40,15 @@ public class ReferenceSelectorTests
     {
         var chat = new FakeChat(FakeChat.Answer("""{"ids":["REF-elsewhere","REF-b","REF-b"]}"""));
 
-        var selection = await new ReferenceSelector(new FakeRetriever(Doc("a", 10), Doc("b", 10)), chat).SelectAsync(Query, ["security"], Slice);
+        var selection = await new ReferenceSelector(new FakeRetriever(Doc("a", 10), Doc("b", 10)), chat).SelectAsync(
+            Query,
+            ["security"],
+            Slice
+        );
 
-        await Assert.That(selection.Retrieval.Docs.Select(doc => doc.Id)).IsEquivalentTo(["REF-b", "REF-a"], TUnit.Assertions.Enums.CollectionOrdering.Matching);
+        await Assert
+            .That(selection.Retrieval.Docs.Select(doc => doc.Id))
+            .IsEquivalentTo(["REF-b", "REF-a"], TUnit.Assertions.Enums.CollectionOrdering.Matching);
     }
 
     // Re-ranking is an improvement, not a dependency.
@@ -41,9 +57,15 @@ public class ReferenceSelectorTests
     {
         var chat = new FakeChat(new HttpRequestException("away"));
 
-        var selection = await new ReferenceSelector(new FakeRetriever(Doc("a", 10), Doc("b", 10)), chat).SelectAsync(Query, ["security"], Slice);
+        var selection = await new ReferenceSelector(new FakeRetriever(Doc("a", 10), Doc("b", 10)), chat).SelectAsync(
+            Query,
+            ["security"],
+            Slice
+        );
 
-        await Assert.That(selection.Retrieval.Docs.Select(doc => doc.Id)).IsEquivalentTo(["REF-a", "REF-b"], TUnit.Assertions.Enums.CollectionOrdering.Matching);
+        await Assert
+            .That(selection.Retrieval.Docs.Select(doc => doc.Id))
+            .IsEquivalentTo(["REF-a", "REF-b"], TUnit.Assertions.Enums.CollectionOrdering.Matching);
     }
 
     [Test]
@@ -66,7 +88,11 @@ public class ReferenceSelectorTests
         await new ReferenceSelector(new FakeRetriever(Doc("a", 10)), chat).SelectAsync(Query, ["security"], Slice);
 
         var user = chat.Requests.Single().User;
-        await Assert.That(user).Contains("azurerm_network_security_rule").And.Contains("\"destination_port_range\":\"22\"").And.Contains("\"priority\":100");
+        await Assert
+            .That(user)
+            .Contains("azurerm_network_security_rule")
+            .And.Contains("\"destination_port_range\":\"22\"")
+            .And.Contains("\"priority\":100");
         await Assert.That(user).DoesNotContain("CANARY");
         await Assert.That(user).DoesNotContain("source_address_prefix");
     }
@@ -79,14 +105,27 @@ public class ReferenceSelectorTests
         await Assert.That(chosen.Single().Id).IsEqualTo("REF-small");
     }
 
-    private static ReferenceDoc Doc(string id, int characters) => new(
-        $"REF-{id}", "azure-policy", $"Title {id}", string.Empty, new string('x', characters), "https://github.com/x", "MIT", "Microsoft, MIT", []);
+    private static ReferenceDoc Doc(string id, int characters) =>
+        new(
+            $"REF-{id}",
+            "azure-policy",
+            $"Title {id}",
+            string.Empty,
+            new string('x', characters),
+            "https://github.com/x",
+            "MIT",
+            "Microsoft, MIT",
+            []
+        );
 
     private sealed class FakeRetriever(params ReferenceDoc[] docs) : IReferenceRetriever
     {
         public List<ReferenceQuery> Queries { get; } = [];
 
-        public Task<ReferenceRetrieval> RetrieveAsync(ReferenceQuery query, CancellationToken cancellationToken = default)
+        public Task<ReferenceRetrieval> RetrieveAsync(
+            ReferenceQuery query,
+            CancellationToken cancellationToken = default
+        )
         {
             this.Queries.Add(query);
             return Task.FromResult(new ReferenceRetrieval(docs, "0123456789abcdef", false));

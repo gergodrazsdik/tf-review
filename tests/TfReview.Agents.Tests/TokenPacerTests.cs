@@ -24,8 +24,12 @@ public class TokenPacerTests
     [Test]
     public async Task The_fallback_model_gets_its_own_default()
     {
-        await Assert.That(new ReviewModel(new FakeChat(), "gpt-5.4-mini").TokensPerMinute).IsEqualTo(TokenPacer.FallbackTokensPerMinute);
-        await Assert.That(new ReviewModel(new FakeChat(), "gpt-6.1-sol").TokensPerMinute).IsEqualTo(TokenPacer.DefaultTokensPerMinute);
+        await Assert
+            .That(new ReviewModel(new FakeChat(), "gpt-5.4-mini").TokensPerMinute)
+            .IsEqualTo(TokenPacer.FallbackTokensPerMinute);
+        await Assert
+            .That(new ReviewModel(new FakeChat(), "gpt-6.1-sol").TokensPerMinute)
+            .IsEqualTo(TokenPacer.DefaultTokensPerMinute);
     }
 
     [Test]
@@ -68,7 +72,10 @@ public class TokenPacerTests
     [Test]
     public async Task A_call_reserves_its_prompt_and_its_output_limit()
     {
-        var pacer = new TokenPacer(new FakeChat(FakeChat.Answer("""{"resources":[]}""")), tokensPerMinute: 4_000 + 10_000);
+        var pacer = new TokenPacer(
+            new FakeChat(FakeChat.Answer("""{"resources":[]}""")),
+            tokensPerMinute: 4_000 + 10_000
+        );
         var plan = TestPlans.Condensed(TestPlans.Create("a.first", "a", "{}"), TestPlans.Create("a.second", "a", "{}"));
 
         await new RiskOrchestrator(pacer).RankAsync(plan);

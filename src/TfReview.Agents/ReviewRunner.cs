@@ -24,7 +24,8 @@ public sealed record ReviewModel(IChatClient Chat, string Deployment)
     public string? Version { get; init; }
 
     /// <summary>What the result cache's key holds for the model: the deployment, and its version when known.</summary>
-    public string CacheIdentity => this.Version is { Length: > 0 } version ? $"{this.Deployment}@{version}" : this.Deployment;
+    public string CacheIdentity =>
+        this.Version is { Length: > 0 } version ? $"{this.Deployment}@{version}" : this.Deployment;
 
     /// <summary>
     /// The model from the environment, or null when none is configured, which the agents report as not reviewed.
@@ -43,7 +44,10 @@ public sealed record ReviewModel(IChatClient Chat, string Deployment)
             Version = Environment.GetEnvironmentVariable(VersionVariable)?.Trim(),
         };
         return TokenPacer.ParseBudget(Environment.GetEnvironmentVariable(TokensPerMinuteVariable)) is { } budget
-            ? model with { TokensPerMinute = budget }
+            ? model with
+            {
+                TokensPerMinute = budget,
+            }
             : model;
     }
 }
@@ -103,7 +107,8 @@ public sealed class ReviewRunner(
     ReferencePlacement placement = ReferencePlacement.Finding,
     IAnswerStore? answers = null,
     ReviewTimeLimits? timeLimits = null,
-    TimeProvider? time = null)
+    TimeProvider? time = null
+)
 {
     /// <summary>
     /// Each agent's share for references, apart from its standards' cap, so they can't push a rule out (D42). About
@@ -130,7 +135,8 @@ public sealed class ReviewRunner(
         string commit,
         CancellationToken cancellationToken = default,
         string? lockFile = null,
-        string? repositoryId = null)
+        string? repositoryId = null
+    )
     {
         if (new PlanRedactor().Redact(redactedPlan) is not Redacted redacted)
         {
@@ -190,40 +196,88 @@ public sealed class ReviewRunner(
                 : ([], null);
 
             // It decides only an order, so it can start alongside the agents and fail without costing them anything.
-            var ranking = chat is null || plan.Changes().Count == 0
-                ? Task.FromResult(new RiskRanking(RiskOrchestrator.ByRules(plan), [], null))
-                : new RiskOrchestrator(chat).RankAsync(plan, cancellationToken);
+            var ranking =
+                chat is null || plan.Changes().Count == 0
+                    ? Task.FromResult(new RiskRanking(RiskOrchestrator.ByRules(plan), [], null))
+                    : new RiskOrchestrator(chat).RankAsync(plan, cancellationToken);
 
-            var referenceQuery = config.References && references is not null ? new ReferenceContext(LockFile.AzurermVersion(lockFile)) : null;
+            var referenceQuery =
+                config.References && references is not null
+                    ? new ReferenceContext(LockFile.AzurermVersion(lockFile))
+                    : null;
             var agentReferences = placement == ReferencePlacement.Agent ? referenceQuery : null;
 
             // A failed scan already says that scope wasn't reviewed, and a cost agent without figures has nothing to judge.
             var passes = await Task.WhenAll(
                 Enabled(config, AgentProfile.Conventions)
-                    ? RunAgentAsync(chat, AgentProfile.Conventions, plan, policyFindings, corpus, null, agentReferences, cancellationToken)
+                    ? RunAgentAsync(
+                        chat,
+                        AgentProfile.Conventions,
+                        plan,
+                        policyFindings,
+                        corpus,
+                        null,
+                        agentReferences,
+                        cancellationToken
+                    )
                     : Task.FromResult(AgentPass.Skipped),
                 Enabled(config, AgentProfile.Security)
-                    ? RunAgentAsync(chat, AgentProfile.Security, plan, policyFindings, corpus, null, agentReferences, cancellationToken)
+                    ? RunAgentAsync(
+                        chat,
+                        AgentProfile.Security,
+                        plan,
+                        policyFindings,
+                        corpus,
+                        null,
+                        agentReferences,
+                        cancellationToken
+                    )
                     : Task.FromResult(AgentPass.Skipped),
                 cost is { } && cost.Resources.Any(resource => resource.Priced && resource.AfterUsd > resource.BeforeUsd)
-                    ? RunAgentAsync(chat, AgentProfile.Cost, plan, [], corpus, cost.Resources, agentReferences, cancellationToken)
-                    : Task.FromResult(AgentPass.Skipped));
+                    ? RunAgentAsync(
+                        chat,
+                        AgentProfile.Cost,
+                        plan,
+                        [],
+                        corpus,
+                        cost.Resources,
+                        agentReferences,
+                        cancellationToken
+                    )
+                    : Task.FromResult(AgentPass.Skipped)
+            );
 
             // Each agent's findings are checked against the documents in its own prompt, not everyone's.
             var scanners = EvidenceChecker.Check([.. policyFindings, .. checkovFindings], plan, []);
-            var checks = passes.Select(pass => EvidenceChecker.Check(pass.Findings, pass.Plan ?? plan, pass.Docs)).Prepend(scanners).ToList();
+            var checks = passes
+                .Select(pass => EvidenceChecker.Check(pass.Findings, pass.Plan ?? plan, pass.Docs))
+                .Prepend(scanners)
+                .ToList();
 
             var risk = await ranking;
             Log(RiskOrchestrator.Name, risk.PromptVersion, risk.Calls);
             var arbitration = await arbitrator.ArbitrateAsync(
-                [.. checks.SelectMany(check => check.Kept)], plan, [.. risk.Order.Select(item => item.ResourceAddress)], cancellationToken);
+                [.. checks.SelectMany(check => check.Kept)],
+                plan,
+                [.. risk.Order.Select(item => item.ResourceAddress)],
+                cancellationToken
+            );
             Log(LlmArbiter.Name, arbitration.PromptVersion, arbitration.Calls);
 
             // After the arbiter, so each problem is searched once, and before the result, which the comment renders.
-            var suggestions = placement == ReferencePlacement.Finding && referenceQuery is not null && chat is not null && corpus is not null
-                ? await new ReferenceSuggester(references!, chat)
-                    .SuggestAsync(arbitration.Findings, plan, corpus.Docs, referenceQuery.ProviderVersion, cancellationToken)
-                : null;
+            var suggestions =
+                placement == ReferencePlacement.Finding
+                && referenceQuery is not null
+                && chat is not null
+                && corpus is not null
+                    ? await new ReferenceSuggester(references!, chat).SuggestAsync(
+                        arbitration.Findings,
+                        plan,
+                        corpus.Docs,
+                        referenceQuery.ProviderVersion,
+                        cancellationToken
+                    )
+                    : null;
             if (suggestions is not null)
             {
                 Log(ReferenceSuggester.Name, suggestions.PromptVersion, suggestions.Calls);
@@ -235,12 +289,17 @@ public sealed class ReviewRunner(
             // beside what its cap left out. Each keeps its reason and resources (BUG-8, MNT-13).
             IReadOnlyList<NotReviewed> notReviewed =
             [
-                .. new[] { checkovFailure, costFailure }.OfType<NotReviewed>()
+                .. new[] { checkovFailure, costFailure }
+                    .OfType<NotReviewed>()
                     .Concat(passes.SelectMany(pass => pass.NotReviewed))
                     .DistinctBy(missing => (missing.Scope, missing.Reason, missing.Resources is null))
                     .OrderBy(missing => missing.Scope),
             ];
-            var omitted = passes.SelectMany(pass => pass.Omitted).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
+            var omitted = passes
+                .SelectMany(pass => pass.Omitted)
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal)
+                .ToList();
 
             var drops = MergeDrops(checks);
             var retracted = passes.Sum(pass => pass.Retracted);
@@ -259,8 +318,15 @@ public sealed class ReviewRunner(
                 StandardsRepository = config.Repository,
                 DocPaths = DocPaths(findings, corpus),
                 OmittedDocs = omitted.Count == 0 ? null : omitted,
-                Usage = Usage([.. passes.SelectMany(pass => pass.Calls), .. risk.Calls, .. arbitration.Calls, .. suggestions?.Calls ?? []]),
-                References = referenceQuery is null ? null : ReferenceUseOf([.. passes.Select(pass => pass.References), .. suggestions?.Retrievals ?? []]),
+                Usage = Usage([
+                    .. passes.SelectMany(pass => pass.Calls),
+                    .. risk.Calls,
+                    .. arbitration.Calls,
+                    .. suggestions?.Calls ?? [],
+                ]),
+                References = referenceQuery is null
+                    ? null
+                    : ReferenceUseOf([.. passes.Select(pass => pass.References), .. suggestions?.Retrievals ?? []]),
             };
         }
         catch (StandardsFetchException)
@@ -278,7 +344,11 @@ public sealed class ReviewRunner(
     /// allowlisted scanner reported as high itself. It's judged on those findings before any merge, because a merged row
     /// takes the highest severity of everything merged into it, which can include a model's.
     /// </summary>
-    private static IReadOnlyList<Finding> Gate(TfReviewConfig config, IReadOnlyList<Finding> findings, IReadOnlyList<Finding> deterministic)
+    private static IReadOnlyList<Finding> Gate(
+        TfReviewConfig config,
+        IReadOnlyList<Finding> findings,
+        IReadOnlyList<Finding> deterministic
+    )
     {
         if (!config.Blocking)
         {
@@ -292,14 +362,22 @@ public sealed class ReviewRunner(
 
         return
         [
-            .. findings.Select(finding => finding.Deterministic
-                && new[] { finding.Rule }.Concat(finding.RelatedRules ?? []).Any(rule => high.Contains((finding.ResourceAddress, rule)))
-                    ? finding with { Blocking = true }
-                    : finding),
+            .. findings.Select(finding =>
+                finding.Deterministic
+                && new[] { finding.Rule }
+                    .Concat(finding.RelatedRules ?? [])
+                    .Any(rule => high.Contains((finding.ResourceAddress, rule)))
+                    ? finding with
+                    {
+                        Blocking = true,
+                    }
+                    : finding
+            ),
         ];
     }
 
-    private static bool Enabled(TfReviewConfig config, AgentProfile profile) => config.Agents.Contains(profile.Name, StringComparer.Ordinal);
+    private static bool Enabled(TfReviewConfig config, AgentProfile profile) =>
+        config.Agents.Contains(profile.Name, StringComparer.Ordinal);
 
     private static Dictionary<string, int> MergeDrops(IEnumerable<EvidenceCheck> checks)
     {
@@ -325,7 +403,10 @@ public sealed class ReviewRunner(
         }
     }
 
-    private static IReadOnlyDictionary<string, string>? DocPaths(IReadOnlyList<Finding> findings, StandardsCorpus? corpus)
+    private static IReadOnlyDictionary<string, string>? DocPaths(
+        IReadOnlyList<Finding> findings,
+        StandardsCorpus? corpus
+    )
     {
         var paths = findings
             .Select(finding => finding.Rule)
@@ -339,7 +420,10 @@ public sealed class ReviewRunner(
 
     // A failed scan isn't a clean one, and it doesn't undo the rest of the review.
     private async Task<(IReadOnlyList<Finding> Findings, NotReviewed? Failure)> RunCheckovAsync(
-        RedactedPlan redacted, CondensedPlan plan, CancellationToken cancellationToken)
+        RedactedPlan redacted,
+        CondensedPlan plan,
+        CancellationToken cancellationToken
+    )
     {
         if (checkov is null)
         {
@@ -357,7 +441,10 @@ public sealed class ReviewRunner(
     }
 
     // A cost failure stays separate: the policies and the conventions agent still count without it.
-    private async Task<(CostSummary? Cost, NotReviewed? Failure)> RunCostAsync(RedactedPlan plan, CancellationToken cancellationToken)
+    private async Task<(CostSummary? Cost, NotReviewed? Failure)> RunCostAsync(
+        RedactedPlan plan,
+        CancellationToken cancellationToken
+    )
     {
         if (infracost is null)
         {
@@ -376,8 +463,17 @@ public sealed class ReviewRunner(
             new CostSummary(
                 priced.Sum(cost => cost.Before),
                 priced.Sum(cost => cost.After),
-                [.. ran.Costs.Select(cost => new ResourceCostChange(cost.Address, cost.Before, cost.After, cost.Priced))]),
-            null);
+                [
+                    .. ran.Costs.Select(cost => new ResourceCostChange(
+                        cost.Address,
+                        cost.Before,
+                        cost.After,
+                        cost.Priced
+                    )),
+                ]
+            ),
+            null
+        );
     }
 
     private async Task<AgentPass> RunAgentAsync(
@@ -388,7 +484,8 @@ public sealed class ReviewRunner(
         StandardsCorpus? corpus,
         IReadOnlyList<ResourceCostChange>? costs,
         ReferenceContext? referenceContext,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         if (corpus is null)
         {
@@ -401,18 +498,27 @@ public sealed class ReviewRunner(
         }
 
         var retrieval = await new FileRetriever(corpus).RetrieveAsync(
-            new RetrievalQuery(profile.Topics, plan.ResourceTypes()), cancellationToken);
+            new RetrievalQuery(profile.Topics, plan.ResourceTypes()),
+            cancellationToken
+        );
 
         // Code routes (D35): an agent sees the resources its standards cover, so coverage can't depend on a model.
         var slice = plan.OnlyTypes(type => retrieval.Docs.Any(doc => doc.AppliesToType(type)));
 
         // Only when an agent has standards to judge by, because without them it isn't called at all.
-        var (referenceDocs, referenceCalls) = retrieval.Docs.Count > 0 && referenceContext is not null
-            ? await this.RetrieveReferencesAsync(chat, profile, slice, referenceContext, cancellationToken)
-            : (null, []);
+        var (referenceDocs, referenceCalls) =
+            retrieval.Docs.Count > 0 && referenceContext is not null
+                ? await this.RetrieveReferencesAsync(chat, profile, slice, referenceContext, cancellationToken)
+                : (null, []);
 
         var outcome = await new ReviewAgent(chat, profile).ReviewAsync(
-            slice, retrieval.Docs, policyFindings, costs, cancellationToken, referenceDocs?.Docs);
+            slice,
+            retrieval.Docs,
+            policyFindings,
+            costs,
+            cancellationToken,
+            referenceDocs?.Docs
+        );
         Log(profile.Name, outcome.PromptVersion, outcome.Calls);
 
         return new AgentPass(
@@ -422,10 +528,17 @@ public sealed class ReviewRunner(
             outcome switch
             {
                 AgentFailed failed => [new NotReviewed(profile.Scope, failed.Reason)],
-                AgentReviewed { Skipped: var skipped } => [.. skipped.Select(part => new NotReviewed(profile.Scope, part.Reason) { Resources = part.Resources })],
+                AgentReviewed { Skipped: var skipped } =>
+                [
+                    .. skipped.Select(part => new NotReviewed(profile.Scope, part.Reason)
+                    {
+                        Resources = part.Resources,
+                    }),
+                ],
                 _ => [],
             },
-            [.. referenceCalls, .. outcome.Calls])
+            [.. referenceCalls, .. outcome.Calls]
+        )
         {
             Plan = slice,
             Retracted = outcome is AgentReviewed { Retracted: var count } ? count : 0,
@@ -438,30 +551,45 @@ public sealed class ReviewRunner(
     /// values. Public so the retrieval evals measure the same query reviews send.
     /// </summary>
     public static ReferenceQuery ReferenceQueryFor(
-        AgentProfile profile, CondensedPlan slice, string? providerVersion, ReferenceRanking ranking = ReferenceRanking.Hybrid)
+        AgentProfile profile,
+        CondensedPlan slice,
+        string? providerVersion,
+        ReferenceRanking ranking = ReferenceRanking.Hybrid
+    )
     {
         var types = slice.ResourceTypes();
 
         // Nearly every resource sets these, so they only blur what a change is about.
-        var attributes = slice.ChangedAttributeNames().Where(name => !CommonAttributes.Contains(name, StringComparer.Ordinal));
+        var attributes = slice
+            .ChangedAttributeNames()
+            .Where(name => !CommonAttributes.Contains(name, StringComparer.Ordinal));
         return new ReferenceQuery(
             $"{string.Join(", ", profile.Topics)}. Resource types: {string.Join(", ", types)}. Changed attributes: {string.Join(", ", attributes)}.",
             types,
             providerVersion,
             ReferenceTokenBudget,
-            ranking);
+            ranking
+        );
     }
 
     // A failed search costs the agent its references, not its review: they can't create a finding anyway. With a model,
     // it re-ranks the search's candidates (D49).
     private async Task<(ReferenceRetrieval Retrieval, IReadOnlyList<AgentCall> Calls)> RetrieveReferencesAsync(
         IChatClient chat,
-        AgentProfile profile, CondensedPlan slice, ReferenceContext context, CancellationToken cancellationToken)
+        AgentProfile profile,
+        CondensedPlan slice,
+        ReferenceContext context,
+        CancellationToken cancellationToken
+    )
     {
         try
         {
-            var selection = await new ReferenceSelector(references!, chat)
-                .SelectAsync(ReferenceQueryFor(profile, slice, context.ProviderVersion), profile.Topics, slice, cancellationToken);
+            var selection = await new ReferenceSelector(references!, chat).SelectAsync(
+                ReferenceQueryFor(profile, slice, context.ProviderVersion),
+                profile.Topics,
+                slice,
+                cancellationToken
+            );
             Log(ReferenceSelector.Name, selection.PromptVersion, selection.Calls);
             return (selection.Retrieval, selection.Calls);
         }
@@ -478,7 +606,13 @@ public sealed class ReviewRunner(
         return new ReferenceUse(
             used.Select(retrieval => retrieval.CorpusVersion).OfType<string>().FirstOrDefault(),
             used.Any(retrieval => retrieval.ProviderDocsMissing),
-            [.. used.SelectMany(retrieval => retrieval.Docs).Select(doc => doc.Attribution).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)]);
+            [
+                .. used.SelectMany(retrieval => retrieval.Docs)
+                    .Select(doc => doc.Attribution)
+                    .Distinct(StringComparer.Ordinal)
+                    .Order(StringComparer.Ordinal),
+            ]
+        );
     }
 
     private sealed record ReferenceContext(string? ProviderVersion);
@@ -488,11 +622,20 @@ public sealed class ReviewRunner(
         foreach (var call in calls)
         {
             ReviewMetrics.RecordCall(
-                name, promptVersion, model?.Deployment, call.Finish, call.InputTokens, call.CachedInputTokens, call.OutputTokens, call.Latency);
+                name,
+                promptVersion,
+                model?.Deployment,
+                call.Finish,
+                call.InputTokens,
+                call.CachedInputTokens,
+                call.OutputTokens,
+                call.Latency
+            );
             log?.Invoke(
                 $"{name}: prompt v{promptVersion}, model {model?.Deployment}, attempt {call.Attempt}, "
-                + $"finish {call.Finish}, {call.InputTokens} in ({call.CachedInputTokens} cached), {call.OutputTokens} out, "
-                + $"{(long)call.Latency.TotalMilliseconds} ms.");
+                    + $"finish {call.Finish}, {call.InputTokens} in ({call.CachedInputTokens} cached), {call.OutputTokens} out, "
+                    + $"{(long)call.Latency.TotalMilliseconds} ms."
+            );
         }
     }
 
@@ -520,7 +663,8 @@ public sealed class ReviewRunner(
         IReadOnlyList<StandardsDoc> Docs,
         IReadOnlyList<string> Omitted,
         IReadOnlyList<NotReviewed> NotReviewed,
-        IReadOnlyList<AgentCall> Calls)
+        IReadOnlyList<AgentCall> Calls
+    )
     {
         /// <summary>What this agent was shown, which its findings have to point into.</summary>
         public CondensedPlan? Plan { get; init; }

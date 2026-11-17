@@ -14,13 +14,17 @@ public class EvidenceCheckerTests
 
     private static readonly CondensedPlan Plan = TestPlans.Condensed(
         TestPlans.Create(Vnet, "azurerm_virtual_network", """{"name":"BadName","tags":null}"""),
-        TestPlans.Create(Subnet, "azurerm_subnet", """{"name":"snet"}"""));
+        TestPlans.Create(Subnet, "azurerm_subnet", """{"name":"snet"}""")
+    );
 
-    private static readonly CondensedPlan UpdatePlan = TestPlans.Condensed(TestPlans.Update(
-        Updated,
-        "azurerm_virtual_network",
-        """{"name":"BadName","tags":{"environment":"prod"}}""",
-        """{"name":"BadName","tags":{"environment":"production"}}"""));
+    private static readonly CondensedPlan UpdatePlan = TestPlans.Condensed(
+        TestPlans.Update(
+            Updated,
+            "azurerm_virtual_network",
+            """{"name":"BadName","tags":{"environment":"prod"}}""",
+            """{"name":"BadName","tags":{"environment":"production"}}"""
+        )
+    );
 
     [Test]
     public async Task Keeps_a_model_finding_with_valid_evidence()
@@ -47,7 +51,10 @@ public class EvidenceCheckerTests
     public async Task Drops_a_model_finding_on_an_attribute_the_plan_doesnt_change()
     {
         var check = EvidenceChecker.Check(
-            [ModelFinding(Updated, "ADR-001", CondensedPlan.PointerTo(Updated, "change", "after", "name"))], UpdatePlan, [Naming]);
+            [ModelFinding(Updated, "ADR-001", CondensedPlan.PointerTo(Updated, "change", "after", "name"))],
+            UpdatePlan,
+            [Naming]
+        );
 
         await Assert.That(check.Kept).IsEmpty();
         await Assert.That(check.Drops[EvidenceChecker.AttributeUnchanged]).IsEqualTo(1);
@@ -58,7 +65,10 @@ public class EvidenceCheckerTests
     public async Task Keeps_a_model_finding_on_an_attribute_the_plan_changes()
     {
         var check = EvidenceChecker.Check(
-            [ModelFinding(Updated, "ADR-002", CondensedPlan.PointerTo(Updated, "change", "after", "tags"))], UpdatePlan, [Tagging]);
+            [ModelFinding(Updated, "ADR-002", CondensedPlan.PointerTo(Updated, "change", "after", "tags"))],
+            UpdatePlan,
+            [Tagging]
+        );
 
         await Assert.That(check.Kept.Count).IsEqualTo(1);
     }
@@ -67,7 +77,14 @@ public class EvidenceCheckerTests
     public async Task A_policy_can_still_report_an_old_problem()
     {
         Finding finding = new(
-            Updated, "ADR-001", Severity.Low, Reporter.Scanner, true, "t", [new PlanEvidence(CondensedPlan.PointerTo(Updated, "change", "after", "name"))]);
+            Updated,
+            "ADR-001",
+            Severity.Low,
+            Reporter.Scanner,
+            true,
+            "t",
+            [new PlanEvidence(CondensedPlan.PointerTo(Updated, "change", "after", "name"))]
+        );
 
         var check = EvidenceChecker.Check([finding], UpdatePlan, [Naming]);
 
@@ -96,7 +113,10 @@ public class EvidenceCheckerTests
     {
         const string Invented = "azurerm_virtual_network.invented";
 
-        await AssertDropped(ModelFinding(Invented, "ADR-001", CondensedPlan.PointerTo(Invented, "change", "after")), EvidenceChecker.PointerUnresolved);
+        await AssertDropped(
+            ModelFinding(Invented, "ADR-001", CondensedPlan.PointerTo(Invented, "change", "after")),
+            EvidenceChecker.PointerUnresolved
+        );
     }
 
     [Test]
@@ -111,7 +131,14 @@ public class EvidenceCheckerTests
     public async Task Drops_a_model_finding_with_no_doc()
     {
         var finding = new Finding(
-            Vnet, "ADR-001", Severity.Low, Reporter.Conventions, false, "t", [new PlanEvidence(CondensedPlan.PointerTo(Vnet, "change", "after"))]);
+            Vnet,
+            "ADR-001",
+            Severity.Low,
+            Reporter.Conventions,
+            false,
+            "t",
+            [new PlanEvidence(CondensedPlan.PointerTo(Vnet, "change", "after"))]
+        );
 
         await AssertDropped(finding, EvidenceChecker.NoDocument);
     }
@@ -138,7 +165,14 @@ public class EvidenceCheckerTests
     public async Task A_scanner_finding_only_needs_its_pointer()
     {
         Finding finding = new(
-            Vnet, "POL-001", Severity.High, Reporter.Scanner, true, "t", [new PlanEvidence(CondensedPlan.PointerTo(Vnet, "change", "after"))]);
+            Vnet,
+            "POL-001",
+            Severity.High,
+            Reporter.Scanner,
+            true,
+            "t",
+            [new PlanEvidence(CondensedPlan.PointerTo(Vnet, "change", "after"))]
+        );
 
         await Assert.That(Check(finding).Kept.Count).IsEqualTo(1);
     }
@@ -147,7 +181,14 @@ public class EvidenceCheckerTests
     public async Task A_scanner_finding_with_a_bad_pointer_is_dropped_too()
     {
         Finding finding = new(
-            Vnet, "POL-001", Severity.High, Reporter.Scanner, true, "t", [new PlanEvidence(CondensedPlan.PointerTo(Vnet, "change", "after", "nope"))]);
+            Vnet,
+            "POL-001",
+            Severity.High,
+            Reporter.Scanner,
+            true,
+            "t",
+            [new PlanEvidence(CondensedPlan.PointerTo(Vnet, "change", "after", "nope"))]
+        );
 
         await AssertDropped(finding, EvidenceChecker.PointerUnresolved);
     }
@@ -171,7 +212,8 @@ public class EvidenceCheckerTests
         var check = Check(
             ModelFinding(Vnet, "POL-001", CondensedPlan.PointerTo(Vnet, "change", "after")),
             ModelFinding(Vnet, "POL-002", CondensedPlan.PointerTo(Vnet, "change", "after")),
-            ModelFinding(Vnet, "ADR-001", null));
+            ModelFinding(Vnet, "ADR-001", null)
+        );
 
         await Assert.That(check.Kept).IsEmpty();
         await Assert.That(check.Drops[EvidenceChecker.DocumentNotRetrieved]).IsEqualTo(2);
@@ -183,11 +225,17 @@ public class EvidenceCheckerTests
     public async Task Drops_a_model_finding_that_cites_a_reference_chunk()
     {
         await AssertDropped(
-            ModelFinding("azurerm_virtual_network.main", "REF-0123456789abcdef0123456789abcdef", "/resource_changes/azurerm_virtual_network.main/change/after/name"),
-            EvidenceChecker.ReferenceCited);
+            ModelFinding(
+                "azurerm_virtual_network.main",
+                "REF-0123456789abcdef0123456789abcdef",
+                "/resource_changes/azurerm_virtual_network.main/change/after/name"
+            ),
+            EvidenceChecker.ReferenceCited
+        );
     }
 
-    private static EvidenceCheck Check(params Finding[] findings) => EvidenceChecker.Check(findings, Plan, [Naming, Tagging]);
+    private static EvidenceCheck Check(params Finding[] findings) =>
+        EvidenceChecker.Check(findings, Plan, [Naming, Tagging]);
 
     private static async Task AssertDropped(Finding finding, string reason)
     {

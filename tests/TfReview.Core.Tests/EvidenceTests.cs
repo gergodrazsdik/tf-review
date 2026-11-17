@@ -21,7 +21,8 @@ public class EvidenceTests
     [Test]
     public async Task Rejects_evidence_of_an_unknown_shape()
     {
-        await Assert.That(() => JsonSerializer.Deserialize<Evidence>("""{"url":"https://example.com"}"""))
+        await Assert
+            .That(() => JsonSerializer.Deserialize<Evidence>("""{"url":"https://example.com"}"""))
             .Throws<JsonException>();
     }
 }

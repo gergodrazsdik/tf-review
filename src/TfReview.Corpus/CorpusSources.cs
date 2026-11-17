@@ -18,7 +18,8 @@ public sealed record SourcePin(
     string License,
     string Attribution,
     IReadOnlyList<string> Include,
-    string? ProviderVersion)
+    string? ProviderVersion
+)
 {
     /// <summary>Paths under an include to leave out.</summary>
     public IReadOnlyList<string> Exclude { get; init; } = [];
@@ -60,7 +61,9 @@ public sealed partial class CorpusSources
             var inputs = new StringBuilder().AppendLine(this.EmbeddingModel).AppendLine(ChunkerVersion);
             foreach (var pin in this.Pins)
             {
-                inputs.AppendLine($"{pin.Id} {pin.Repository} {pin.Commit} {pin.ProviderVersion} {string.Join(',', pin.Include)} {string.Join(',', pin.Exclude)}");
+                inputs.AppendLine(
+                    $"{pin.Id} {pin.Repository} {pin.Commit} {pin.ProviderVersion} {string.Join(',', pin.Include)} {string.Join(',', pin.Exclude)}"
+                );
             }
 
             return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(inputs.ToString())))[..16];
@@ -124,7 +127,10 @@ public sealed partial class CorpusSources
             throw new SourcesException($"{id} has no valid repository.");
         }
 
-        if (entry.Include is not { Count: > 0 } include || include.Any(path => !PathFormat().IsMatch(path) || path.Split('/').Contains("..")))
+        if (
+            entry.Include is not { Count: > 0 } include
+            || include.Any(path => !PathFormat().IsMatch(path) || path.Split('/').Contains(".."))
+        )
         {
             throw new SourcesException($"{id} needs include paths inside its repo.");
         }
@@ -138,12 +144,16 @@ public sealed partial class CorpusSources
         var isProvider = id == "azurerm-docs";
         if (isProvider == entry.Versions is null || isProvider == entry.Commit is not null)
         {
-            throw new SourcesException($"{id} needs {(isProvider ? "versions and no commit" : "a commit and no versions")}.");
+            throw new SourcesException(
+                $"{id} needs {(isProvider ? "versions and no commit" : "a commit and no versions")}."
+            );
         }
 
-        foreach (var (commit, version) in isProvider
-            ? entry.Versions!.Select(item => (item.Commit, (string?)item.Version))
-            : [(entry.Commit, null)])
+        foreach (
+            var (commit, version) in isProvider
+                ? entry.Versions!.Select(item => (item.Commit, (string?)item.Version))
+                : [(entry.Commit, null)]
+        )
         {
             if (commit is null || !CommitFormat().IsMatch(commit))
             {
@@ -155,7 +165,18 @@ public sealed partial class CorpusSources
                 throw new SourcesException($"{id} has an invalid version.");
             }
 
-            yield return new SourcePin(id, entry.Repository, commit, entry.License!, entry.Attribution, include, version) { Exclude = exclude };
+            yield return new SourcePin(
+                id,
+                entry.Repository,
+                commit,
+                entry.License!,
+                entry.Attribution,
+                include,
+                version
+            )
+            {
+                Exclude = exclude,
+            };
         }
     }
 

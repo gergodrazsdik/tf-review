@@ -12,15 +12,30 @@ public static class ReviewMetrics
     public const string MeterName = "TfReview";
 
     private static readonly Meter Meter = new(MeterName);
-    private static readonly Counter<long> InputTokens = Meter.CreateCounter<long>("tfreview.llm.input_tokens", "{token}");
-    private static readonly Counter<long> CachedInputTokens = Meter.CreateCounter<long>("tfreview.llm.cached_input_tokens", "{token}");
-    private static readonly Counter<long> OutputTokens = Meter.CreateCounter<long>("tfreview.llm.output_tokens", "{token}");
+    private static readonly Counter<long> InputTokens = Meter.CreateCounter<long>(
+        "tfreview.llm.input_tokens",
+        "{token}"
+    );
+    private static readonly Counter<long> CachedInputTokens = Meter.CreateCounter<long>(
+        "tfreview.llm.cached_input_tokens",
+        "{token}"
+    );
+    private static readonly Counter<long> OutputTokens = Meter.CreateCounter<long>(
+        "tfreview.llm.output_tokens",
+        "{token}"
+    );
     private static readonly Counter<double> Cost = Meter.CreateCounter<double>("tfreview.llm.cost", "USD");
     private static readonly Histogram<double> Latency = Meter.CreateHistogram<double>("tfreview.llm.latency", "ms");
     private static readonly Counter<long> Reviews = Meter.CreateCounter<long>("tfreview.reviews", "{review}");
     private static readonly Counter<long> Findings = Meter.CreateCounter<long>("tfreview.findings", "{finding}");
-    private static readonly Counter<long> EvidenceDrops = Meter.CreateCounter<long>("tfreview.evidence_drops", "{finding}");
-    private static readonly Counter<long> NotReviewedScopes = Meter.CreateCounter<long>("tfreview.not_reviewed", "{scope}");
+    private static readonly Counter<long> EvidenceDrops = Meter.CreateCounter<long>(
+        "tfreview.evidence_drops",
+        "{finding}"
+    );
+    private static readonly Counter<long> NotReviewedScopes = Meter.CreateCounter<long>(
+        "tfreview.not_reviewed",
+        "{scope}"
+    );
     private static readonly Counter<long> Dismissals = Meter.CreateCounter<long>("tfreview.dismissals", "{finding}");
     private static readonly Counter<long> GiveUps = Meter.CreateCounter<long>("tfreview.give_ups", "{review}");
 
@@ -29,7 +44,15 @@ public static class ReviewMetrics
     /// exception's type name, and posted says whether the PR was told.
     /// </summary>
     public static void RecordGiveUp(string repository, string cause, bool posted) =>
-        GiveUps.Add(1, new TagList { { "repository", repository }, { "cause", cause }, { "posted", posted } });
+        GiveUps.Add(
+            1,
+            new TagList
+            {
+                { "repository", repository },
+                { "cause", cause },
+                { "posted", posted },
+            }
+        );
 
     /// <summary>A finding a reviewer ticked as wrong (D56), by rule only: never the resource or any plan text.</summary>
     public static void RecordDismissal(string? rule, string repository) =>
@@ -37,7 +60,15 @@ public static class ReviewMetrics
 
     /// <summary>One model call. A model with no known price reports its tokens and no cost.</summary>
     public static void RecordCall(
-        string agent, int? promptVersion, string? model, string finish, long inputTokens, long cachedInputTokens, long outputTokens, TimeSpan latency)
+        string agent,
+        int? promptVersion,
+        string? model,
+        string finish,
+        long inputTokens,
+        long cachedInputTokens,
+        long outputTokens,
+        TimeSpan latency
+    )
     {
         var tags = new TagList
         {
@@ -64,7 +95,10 @@ public static class ReviewMetrics
 
         foreach (var finding in result.Findings)
         {
-            Findings.Add(1, new TagList { { "agent", finding.Agent.ToString() }, { "severity", finding.Severity.ToString() } });
+            Findings.Add(
+                1,
+                new TagList { { "agent", finding.Agent.ToString() }, { "severity", finding.Severity.ToString() } }
+            );
         }
 
         foreach (var (reason, count) in result.EvidenceDrops)
@@ -74,7 +108,10 @@ public static class ReviewMetrics
 
         foreach (var missing in result.NotReviewed)
         {
-            NotReviewedScopes.Add(1, new TagList { { "scope", missing.Scope.ToString() }, { "reason", missing.Reason.ToString() } });
+            NotReviewedScopes.Add(
+                1,
+                new TagList { { "scope", missing.Scope.ToString() }, { "reason", missing.Reason.ToString() } }
+            );
         }
     }
 }

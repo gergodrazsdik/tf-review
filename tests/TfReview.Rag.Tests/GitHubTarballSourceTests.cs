@@ -27,7 +27,8 @@ public class GitHubTarballSourceTests
     {
         using var target = new TargetDirectory();
 
-        await Source(Tarball(("top/adr/ADR-001.md", "doc"), ("top/policies/POL-001.rego", "package x"))).FetchAsync(Config, target.Path);
+        await Source(Tarball(("top/adr/ADR-001.md", "doc"), ("top/policies/POL-001.rego", "package x")))
+            .FetchAsync(Config, target.Path);
 
         await Assert.That(await File.ReadAllTextAsync(Path.Combine(target.Path, "adr", "ADR-001.md"))).IsEqualTo("doc");
         await Assert.That(File.Exists(Path.Combine(target.Path, "policies", "POL-001.rego"))).IsTrue();
@@ -38,7 +39,8 @@ public class GitHubTarballSourceTests
     {
         using var target = new TargetDirectory();
 
-        await Source(Tarball(("top/run.sh", "evil"), ("top/.github/x.yml", "y"), ("top/keep.md", "doc"))).FetchAsync(Config, target.Path);
+        await Source(Tarball(("top/run.sh", "evil"), ("top/.github/x.yml", "y"), ("top/keep.md", "doc")))
+            .FetchAsync(Config, target.Path);
 
         await Assert.That(Directory.GetFiles(target.Path, "*", SearchOption.AllDirectories).Length).IsEqualTo(1);
     }
@@ -52,7 +54,8 @@ public class GitHubTarballSourceTests
     {
         using var target = new TargetDirectory();
 
-        await Assert.That(() => Source(Tarball((name, "evil"))).FetchAsync(Config, target.Path))
+        await Assert
+            .That(() => Source(Tarball((name, "evil"))).FetchAsync(Config, target.Path))
             .Throws<StandardsFetchException>();
         await Assert.That(File.Exists(Path.Combine(target.Path, "..", "evil.md"))).IsFalse();
     }
@@ -80,7 +83,8 @@ public class GitHubTarballSourceTests
         using var target = new TargetDirectory();
         var tooBig = new string('a', 51 * 1024 * 1024);
 
-        await Assert.That(() => Source(Tarball(("top/big.md", tooBig))).FetchAsync(Config, target.Path))
+        await Assert
+            .That(() => Source(Tarball(("top/big.md", tooBig))).FetchAsync(Config, target.Path))
             .Throws<StandardsFetchException>();
     }
 
@@ -113,7 +117,8 @@ public class GitHubTarballSourceTests
     {
         using var target = new TargetDirectory();
 
-        await Assert.That(() => Source(Encoding.UTF8.GetBytes("<html>not a tarball</html>")).FetchAsync(Config, target.Path))
+        await Assert
+            .That(() => Source(Encoding.UTF8.GetBytes("<html>not a tarball</html>")).FetchAsync(Config, target.Path))
             .Throws<StandardsFetchException>();
     }
 
@@ -132,11 +137,17 @@ public class GitHubTarballSourceTests
     [Arguments(HttpStatusCode.ServiceUnavailable, 2, true)]
     [Arguments(HttpStatusCode.TooManyRequests, 2, true)]
     [Arguments(HttpStatusCode.NotFound, 1, false)]
-    public async Task Tries_once_more_after_a_server_error_or_a_rate_limit(HttpStatusCode first, int calls, bool fetched)
+    public async Task Tries_once_more_after_a_server_error_or_a_rate_limit(
+        HttpStatusCode first,
+        int calls,
+        bool fetched
+    )
     {
         var handler = new StatusOnceHandler(first, Tarball(("top/adr/ADR-001.md", "doc")));
         using var target = new TargetDirectory();
-        var source = new GitHubTarballSource(new HttpClient(handler) { BaseAddress = new Uri("https://codeload.example.test/") });
+        var source = new GitHubTarballSource(
+            new HttpClient(handler) { BaseAddress = new Uri("https://codeload.example.test/") }
+        );
 
         if (fetched)
         {
@@ -154,10 +165,16 @@ public class GitHubTarballSourceTests
     [Test]
     public async Task Tries_once_more_after_a_timeout()
     {
-        var handler = new FailingHandler(failures: 1, new TaskCanceledException("Timed out."), Tarball(("top/adr/ADR-001.md", "doc")));
+        var handler = new FailingHandler(
+            failures: 1,
+            new TaskCanceledException("Timed out."),
+            Tarball(("top/adr/ADR-001.md", "doc"))
+        );
         using var target = new TargetDirectory();
 
-        await new GitHubTarballSource(new HttpClient(handler) { BaseAddress = new Uri("https://codeload.example.test/") }).FetchAsync(Config, target.Path);
+        await new GitHubTarballSource(
+            new HttpClient(handler) { BaseAddress = new Uri("https://codeload.example.test/") }
+        ).FetchAsync(Config, target.Path);
 
         await Assert.That(handler.Calls).IsEqualTo(2);
         await Assert.That(File.Exists(Path.Combine(target.Path, "adr/ADR-001.md"))).IsTrue();
@@ -188,18 +205,32 @@ public class GitHubTarballSourceTests
         await cancelled.CancelAsync();
         using var target = new TargetDirectory();
         var handler = new FailingHandler(failures: 2, new TaskCanceledException("Cancelled."), []);
-        var source = new GitHubTarballSource(new HttpClient(handler) { BaseAddress = new Uri("https://codeload.example.test/") });
+        var source = new GitHubTarballSource(
+            new HttpClient(handler) { BaseAddress = new Uri("https://codeload.example.test/") }
+        );
 
-        await Assert.That(async () => { await source.FetchAsync(Config, target.Path, cancelled.Token); }).Throws<OperationCanceledException>();
+        await Assert
+            .That(async () =>
+            {
+                await source.FetchAsync(Config, target.Path, cancelled.Token);
+            })
+            .Throws<OperationCanceledException>();
     }
 
     private static async Task AssertFailedFetch(Exception failure)
     {
         var handler = new FailingHandler(failures: 2, failure, []);
         using var target = new TargetDirectory();
-        var source = new GitHubTarballSource(new HttpClient(handler) { BaseAddress = new Uri("https://codeload.example.test/") });
+        var source = new GitHubTarballSource(
+            new HttpClient(handler) { BaseAddress = new Uri("https://codeload.example.test/") }
+        );
 
-        await Assert.That(async () => { await source.FetchAsync(Config, target.Path); }).Throws<StandardsFetchException>();
+        await Assert
+            .That(async () =>
+            {
+                await source.FetchAsync(Config, target.Path);
+            })
+            .Throws<StandardsFetchException>();
         await Assert.That(handler.Calls).IsEqualTo(2);
     }
 
@@ -208,19 +239,22 @@ public class GitHubTarballSourceTests
     private static GitHubTarballSource Source(FakeHandler handler) =>
         new(new HttpClient(handler) { BaseAddress = new Uri("https://codeload.example.test/") });
 
-    private static byte[] Tarball(params (string Name, string Content)[] files) => Archive(writer =>
-    {
-        foreach (var (name, content) in files)
+    private static byte[] Tarball(params (string Name, string Content)[] files) =>
+        Archive(writer =>
         {
-            Add(writer, name, content);
-        }
-    });
+            foreach (var (name, content) in files)
+            {
+                Add(writer, name, content);
+            }
+        });
 
     private static void Add(TarWriter writer, string name, string content) =>
-        writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, name)
-        {
-            DataStream = new MemoryStream(Encoding.UTF8.GetBytes(content)),
-        });
+        writer.WriteEntry(
+            new PaxTarEntry(TarEntryType.RegularFile, name)
+            {
+                DataStream = new MemoryStream(Encoding.UTF8.GetBytes(content)),
+            }
+        );
 
     private static byte[] Archive(Action<TarWriter> write)
     {
@@ -238,7 +272,10 @@ public class GitHubTarballSourceTests
     {
         public int Calls { get; private set; }
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken
+        )
         {
             Calls++;
             return Calls <= failures
@@ -251,12 +288,17 @@ public class GitHubTarballSourceTests
     {
         public int Calls { get; private set; }
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken
+        )
         {
             Calls++;
-            return Task.FromResult(Calls == 1
-                ? new HttpResponseMessage(first)
-                : new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(body) });
+            return Task.FromResult(
+                Calls == 1
+                    ? new HttpResponseMessage(first)
+                    : new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(body) }
+            );
         }
     }
 
@@ -266,7 +308,10 @@ public class GitHubTarballSourceTests
 
         public Uri? Requested { get; private set; }
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken
+        )
         {
             Requested = request.RequestUri;
             return Task.FromResult(new HttpResponseMessage(Status) { Content = new ByteArrayContent(body) });

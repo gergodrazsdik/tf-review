@@ -10,7 +10,8 @@ namespace TfReview.Core;
 public sealed record ReferenceUse(
     [property: JsonPropertyName("corpus_version")] string? CorpusVersion,
     [property: JsonPropertyName("provider_docs_missing")] bool ProviderDocsMissing,
-    [property: JsonPropertyName("attributions")] IReadOnlyList<string> Attributions);
+    [property: JsonPropertyName("attributions")] IReadOnlyList<string> Attributions
+);
 
 [JsonConverter(typeof(JsonStringEnumConverter<Verdict>))]
 public enum Verdict
@@ -139,7 +140,8 @@ public sealed record Finding(
     [property: JsonPropertyName("agent")] Reporter Agent,
     [property: JsonPropertyName("deterministic")] bool Deterministic,
     [property: JsonPropertyName("title")] string Title,
-    [property: JsonPropertyName("evidence")] IReadOnlyList<Evidence> Evidence)
+    [property: JsonPropertyName("evidence")] IReadOnlyList<Evidence> Evidence
+)
 {
     [JsonPropertyName("suggestion")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -165,7 +167,8 @@ public sealed record Finding(
 
 public sealed record NotReviewed(
     [property: JsonPropertyName("scope")] ReviewScope Scope,
-    [property: JsonPropertyName("reason")] NotReviewedReason Reason)
+    [property: JsonPropertyName("reason")] NotReviewedReason Reason
+)
 {
     /// <summary>
     /// The resources left out, by address, when the scope was reviewed only in part: a large plan's batches stop at a cap
@@ -178,7 +181,8 @@ public sealed record NotReviewed(
 
 public sealed record TokenUsage(
     [property: JsonPropertyName("input_tokens")] long InputTokens,
-    [property: JsonPropertyName("output_tokens")] long OutputTokens)
+    [property: JsonPropertyName("output_tokens")] long OutputTokens
+)
 {
     [JsonPropertyName("cached_input_tokens")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -210,13 +214,15 @@ public sealed record ResourceCostChange(
     [property: JsonPropertyName("resource_address")] string ResourceAddress,
     [property: JsonPropertyName("before_usd")] decimal BeforeUsd,
     [property: JsonPropertyName("after_usd")] decimal AfterUsd,
-    [property: JsonPropertyName("priced")] bool Priced);
+    [property: JsonPropertyName("priced")] bool Priced
+);
 
 /// <summary>The plan's cost. Totals count only what could be priced, so check for unpriced resources too.</summary>
 public sealed record CostSummary(
     [property: JsonPropertyName("before_usd")] decimal BeforeUsd,
     [property: JsonPropertyName("after_usd")] decimal AfterUsd,
-    [property: JsonPropertyName("resources")] IReadOnlyList<ResourceCostChange> Resources);
+    [property: JsonPropertyName("resources")] IReadOnlyList<ResourceCostChange> Resources
+);
 
 /// <summary>The outcome of one review, as docs/contracts/review-result.schema.json defines it.</summary>
 public sealed record ReviewResult(
@@ -225,7 +231,8 @@ public sealed record ReviewResult(
     [property: JsonPropertyName("verdict")] Verdict Verdict,
     [property: JsonPropertyName("findings")] IReadOnlyList<Finding> Findings,
     [property: JsonPropertyName("not_reviewed")] IReadOnlyList<NotReviewed> NotReviewed,
-    [property: JsonPropertyName("evidence_drops")] IReadOnlyDictionary<string, int> EvidenceDrops)
+    [property: JsonPropertyName("evidence_drops")] IReadOnlyDictionary<string, int> EvidenceDrops
+)
 {
     /// <summary>The repo's gate, from its config. Absent when the review failed before reading it.</summary>
     [JsonPropertyName("gate")]

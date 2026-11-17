@@ -7,7 +7,13 @@ public class InfracostRunnerTests
 {
     private const string Vm = "azurerm_linux_virtual_machine.main";
 
-    private static readonly string Update = Change(Vm, "azurerm_linux_virtual_machine", "update", """{"size":"Standard_B2s"}""", """{"size":"Standard_D4s_v5"}""");
+    private static readonly string Update = Change(
+        Vm,
+        "azurerm_linux_virtual_machine",
+        "update",
+        """{"size":"Standard_B2s"}""",
+        """{"size":"Standard_D4s_v5"}"""
+    );
 
     [Test]
     public async Task Works_out_the_monthly_change_from_two_scans()
@@ -42,7 +48,9 @@ public class InfracostRunnerTests
     {
         var delete = Change("a.old", "a", "delete", "{}", "null");
 
-        var outcome = await new InfracostRunner(new FakeProcesses(before: Scan("a.old", 10m, 0m))).RunAsync(Plan(delete));
+        var outcome = await new InfracostRunner(new FakeProcesses(before: Scan("a.old", 10m, 0m))).RunAsync(
+            Plan(delete)
+        );
 
         await Assert.That(((InfracostRan)outcome).TotalDelta).IsEqualTo(-10m);
     }
@@ -113,7 +121,10 @@ public class InfracostRunnerTests
     [Arguments("", InfracostFailure.NoJson)]
     [Arguments("""{"currency":"USD"}""", InfracostFailure.MalformedResult)]
     [Arguments("""[1,2]""", InfracostFailure.MalformedResult)]
-    [Arguments("""{"projects":[{"resources":[{"name":"a.b","is_supported":true,"cost_components":[{"total_monthly_cost":"lots"}]}]}]}""", InfracostFailure.MalformedResult)]
+    [Arguments(
+        """{"projects":[{"resources":[{"name":"a.b","is_supported":true,"cost_components":[{"total_monthly_cost":"lots"}]}]}]}""",
+        InfracostFailure.MalformedResult
+    )]
     [Arguments("""{"projects":[{"resources":[{"name":"a.b"}]}]}""", InfracostFailure.MalformedResult)]
     public async Task Reports_output_it_cant_read(string output, InfracostFailure expected)
     {
@@ -159,23 +170,31 @@ public class InfracostRunnerTests
         new InfracostRunner(new FakeProcesses(before, after)).RunAsync(plan);
 
     private static RedactedPlan Plan(params string[] changes) =>
-        ((Redacted)new PlanRedactor().Redact(
-            $$"""{"format_version":"1.2","resource_changes":[{{string.Join(',', changes)}}]}""")).Plan;
+        (
+            (Redacted)
+                new PlanRedactor().Redact(
+                    $$"""{"format_version":"1.2","resource_changes":[{{string.Join(',', changes)}}]}"""
+                )
+        ).Plan;
 
-    private static string Change(string address, string type, string action, string before, string after) => $$"""
-        {"address":"{{address}}","type":"{{type}}","mode":"managed","name":"main","change":{"actions":["{{action}}"],"before":{{before}},"after":{{after}},"after_unknown":{},"before_sensitive":{{(before == "null" ? "false" : "{}")}},"after_sensitive":{{(after == "null" ? "false" : "{}")}} } }
-        """;
+    private static string Change(string address, string type, string action, string before, string after) =>
+        $$"""
+            {"address":"{{address}}","type":"{{type}}","mode":"managed","name":"main","change":{"actions":["{{action}}"],"before":{{before}},"after":{{after}},"after_unknown":{},"before_sensitive":{{(
+                before == "null" ? "false" : "{}"
+            )}},"after_sensitive":{{(after == "null" ? "false" : "{}")}} } }
+            """;
 
     // The shape recorded in the spike, including the tagging policy the runner has to ignore.
-    private static string Scan(string address, decimal instance, decimal disk) => $$"""
-        {"currency":"USD","summary":{"projects":1,"resources":1,"costed_resources":1},
-        "projects":[{"project_name":"p","finops_results":[],
-        "tagging_results":[{"policy_name":"FinOps tags","failing_resources":[{"address":"{{address}}"}]}],
-        "resources":[{"name":"{{address}}","type":"t","is_supported":true,"is_free":false,
-        "cost_components":[{"name":"Instance usage","price":"0.1","quantity":"730","total_monthly_cost":"{{instance}}"}],
-        "subresources":[{"name":"os_disk","is_supported":false,"cost_components":[
-        {"name":"Storage","total_monthly_cost":"{{disk}}"},{"name":"Disk operations","total_monthly_cost":"0","usage_based":true}]}]}]}]}
-        """;
+    private static string Scan(string address, decimal instance, decimal disk) =>
+        $$"""
+            {"currency":"USD","summary":{"projects":1,"resources":1,"costed_resources":1},
+            "projects":[{"project_name":"p","finops_results":[],
+            "tagging_results":[{"policy_name":"FinOps tags","failing_resources":[{"address":"{{address}}"}]}],
+            "resources":[{"name":"{{address}}","type":"t","is_supported":true,"is_free":false,
+            "cost_components":[{"name":"Instance usage","price":"0.1","quantity":"730","total_monthly_cost":"{{instance}}"}],
+            "subresources":[{"name":"os_disk","is_supported":false,"cost_components":[
+            {"name":"Storage","total_monthly_cost":"{{disk}}"},{"name":"Disk operations","total_monthly_cost":"0","usage_based":true}]}]}]}]}
+            """;
 
     private sealed class FakeProcesses(string? before = null, string? after = null, bool fail = false) : IProcessRunner
     {
@@ -188,7 +207,11 @@ public class InfracostRunnerTests
         public string? LastPlan { get; private set; }
 
         public async Task<ProcessResult?> RunAsync(
-            string program, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken = default)
+            string program,
+            IReadOnlyList<string> arguments,
+            TimeSpan timeout,
+            CancellationToken cancellationToken = default
+        )
         {
             Scans++;
             Arguments = arguments;
@@ -199,7 +222,10 @@ public class InfracostRunnerTests
                 return null;
             }
 
-            return new ProcessResult(0, Path.EndsWith("before.json", StringComparison.Ordinal) ? before ?? "{}" : after ?? "{}");
+            return new ProcessResult(
+                0,
+                Path.EndsWith("before.json", StringComparison.Ordinal) ? before ?? "{}" : after ?? "{}"
+            );
         }
     }
 }

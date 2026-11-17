@@ -18,7 +18,11 @@ public sealed class GitHubTarballSource(HttpClient http) : IStandardsSource
 
     private static readonly string[] KeptExtensions = [".md", ".rego"];
 
-    public async Task FetchAsync(TfReviewConfig config, string targetDirectory, CancellationToken cancellationToken = default)
+    public async Task FetchAsync(
+        TfReviewConfig config,
+        string targetDirectory,
+        CancellationToken cancellationToken = default
+    )
     {
         using var archive = await DownloadWithRetryAsync(config, cancellationToken);
         await UnpackAsync(archive, targetDirectory, cancellationToken);
@@ -111,12 +115,18 @@ public sealed class GitHubTarballSource(HttpClient http) : IStandardsSource
         // A 5xx or a 429 from codeload is usually gone a moment later, so it gets the retry (BUG-19). Anything else won't change.
         if ((int)response.StatusCode >= 500 || response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
         {
-            throw new HttpRequestException($"Downloading the standards failed with HTTP {(int)response.StatusCode}.", null, response.StatusCode);
+            throw new HttpRequestException(
+                $"Downloading the standards failed with HTTP {(int)response.StatusCode}.",
+                null,
+                response.StatusCode
+            );
         }
 
         if (!response.IsSuccessStatusCode)
         {
-            throw new StandardsFetchException($"Downloading the standards failed with HTTP {(int)response.StatusCode}.");
+            throw new StandardsFetchException(
+                $"Downloading the standards failed with HTTP {(int)response.StatusCode}."
+            );
         }
 
         await using var body = await response.Content.ReadAsStreamAsync(cancellationToken);

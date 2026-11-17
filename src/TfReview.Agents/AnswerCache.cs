@@ -24,8 +24,13 @@ public interface IAnswerStore
 /// <param name="scope">The repo's ID, which partitions the store.</param>
 /// <param name="deployment">The model deployment, with its version when known, which is part of the key.</param>
 /// <param name="log">Receives a line when the store fails, holding no prompt or answer text.</param>
-public sealed class AnswerCache(IChatClient inner, IAnswerStore store, string scope, string deployment, Action<string>? log = null)
-    : DelegatingChatClient(inner)
+public sealed class AnswerCache(
+    IChatClient inner,
+    IAnswerStore store,
+    string scope,
+    string deployment,
+    Action<string>? log = null
+) : DelegatingChatClient(inner)
 {
     /// <summary>The finish reported for a call answered from the cache, which tags its metrics.</summary>
     public const string Finish = "cached";

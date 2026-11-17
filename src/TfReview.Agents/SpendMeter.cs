@@ -11,14 +11,26 @@ namespace TfReview.Agents;
 /// <param name="inner">The model.</param>
 /// <param name="deployment">The deployment, which prices are keyed by.</param>
 /// <param name="spent">Receives each call's estimated cost in US dollars.</param>
-public sealed class SpendMeter(IChatClient inner, string deployment, Action<decimal> spent) : DelegatingChatClient(inner)
+public sealed class SpendMeter(IChatClient inner, string deployment, Action<decimal> spent)
+    : DelegatingChatClient(inner)
 {
     public override async Task<ChatResponse> GetResponseAsync(
-        IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default
+    )
     {
         var response = await base.GetResponseAsync(messages, options, cancellationToken);
-        if (response.Usage is { } usage
-            && ModelPrices.Estimate(deployment, usage.InputTokenCount ?? 0, usage.CachedInputTokenCount ?? 0, usage.OutputTokenCount ?? 0) is { } cost)
+        if (
+            response.Usage is { } usage
+            && ModelPrices.Estimate(
+                deployment,
+                usage.InputTokenCount ?? 0,
+                usage.CachedInputTokenCount ?? 0,
+                usage.OutputTokenCount ?? 0
+            )
+                is { } cost
+        )
         {
             spent(cost);
         }

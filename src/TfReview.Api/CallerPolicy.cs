@@ -40,12 +40,18 @@ public static partial class CallerPolicy
             return Refuse(CallerRefusal.WrongEnvironment);
         }
 
-        if (claims.GetValueOrDefault("repository_id") is not { } repositoryId || !options.AllowedRepositoryIds.Contains(repositoryId))
+        if (
+            claims.GetValueOrDefault("repository_id") is not { } repositoryId
+            || !options.AllowedRepositoryIds.Contains(repositoryId)
+        )
         {
             return Refuse(CallerRefusal.RepositoryNotAllowed);
         }
 
-        if (claims.GetValueOrDefault("job_workflow_ref") is not { } workflow || !workflow.StartsWith(Workflow, StringComparison.Ordinal))
+        if (
+            claims.GetValueOrDefault("job_workflow_ref") is not { } workflow
+            || !workflow.StartsWith(Workflow, StringComparison.Ordinal)
+        )
         {
             return Refuse(CallerRefusal.WrongWorkflow);
         }
@@ -63,7 +69,8 @@ public static partial class CallerPolicy
             return Refuse(CallerRefusal.NotAPullRequest);
         }
 
-        return claims.GetValueOrDefault("repository") is { } repository
+        return
+            claims.GetValueOrDefault("repository") is { } repository
             && claims.GetValueOrDefault("run_id") is { } runId
             && claims.GetValueOrDefault("run_attempt") is { } runAttempt
             ? new CallerDecision(new Caller(repositoryId, repository, number, runId, runAttempt), null)

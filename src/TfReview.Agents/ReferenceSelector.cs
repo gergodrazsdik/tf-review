@@ -8,7 +8,11 @@ using TfReview.Rag;
 namespace TfReview.Agents;
 
 /// <summary>An agent's references, and the model calls it took to choose them.</summary>
-public sealed record ReferenceSelection(ReferenceRetrieval Retrieval, IReadOnlyList<AgentCall> Calls, int? PromptVersion);
+public sealed record ReferenceSelection(
+    ReferenceRetrieval Retrieval,
+    IReadOnlyList<AgentCall> Calls,
+    int? PromptVersion
+);
 
 /// <summary>
 /// Chooses an agent's reference material (D49). Search finds the relevant docs, but often not first: offline, about
@@ -17,7 +21,11 @@ public sealed record ReferenceSelection(ReferenceRetrieval Retrieval, IReadOnlyL
 /// order. The model only orders background, which can't create a finding (D42), and if it fails the search's own
 /// order stands.
 /// </summary>
-public sealed partial class ReferenceSelector(IReferenceRetriever retriever, IChatClient? chat, TimeSpan? attemptTimeout = null)
+public sealed partial class ReferenceSelector(
+    IReferenceRetriever retriever,
+    IChatClient? chat,
+    TimeSpan? attemptTimeout = null
+)
 {
     public const string Name = "reranker";
 
@@ -41,7 +49,11 @@ public sealed partial class ReferenceSelector(IReferenceRetriever retriever, ICh
     // Where a PR's own words live, or what every resource sets.
     private static readonly HashSet<string> HiddenAttributes = new(StringComparer.Ordinal)
     {
-        "name", "tags", "description", "location", "resource_group_name",
+        "name",
+        "tags",
+        "description",
+        "location",
+        "resource_group_name",
     };
 
     private readonly TimeSpan timeout = attemptTimeout ?? TimeSpan.FromSeconds(45);
@@ -51,30 +63,43 @@ public sealed partial class ReferenceSelector(IReferenceRetriever retriever, ICh
     /// <param name="slice">The changes it reviews, which the model sees only as facts.</param>
     /// <param name="cancellationToken">Stops the selection.</param>
     public async Task<ReferenceSelection> SelectAsync(
-        ReferenceQuery query, IReadOnlyList<string> topics, CondensedPlan slice, CancellationToken cancellationToken = default)
+        ReferenceQuery query,
+        IReadOnlyList<string> topics,
+        CondensedPlan slice,
+        CancellationToken cancellationToken = default
+    )
     {
         if (chat is null)
         {
             return new ReferenceSelection(await retriever.RetrieveAsync(query, cancellationToken), [], null);
         }
 
-        var pool = await retriever.RetrieveAsync(query with { TokenBudget = int.MaxValue, Candidates = Pool }, cancellationToken);
+        var pool = await retriever.RetrieveAsync(
+            query with
+            {
+                TokenBudget = int.MaxValue,
+                Candidates = Pool,
+            },
+            cancellationToken
+        );
         if (pool.Docs.Count == 0)
         {
             return new ReferenceSelection(pool, [], null);
         }
 
         var prompt = Prompts.Load(Name);
-        var candidates = new JsonArray(
-        [
-            .. pool.Docs.Select(doc => (JsonNode)new JsonObject
-            {
-                ["id"] = doc.Id,
-                ["source"] = doc.Source,
-                ["title"] = doc.Title,
-                ["heading"] = doc.Heading,
-                ["opening"] = doc.Text.Length > OpeningCharacters ? doc.Text[..OpeningCharacters] : doc.Text,
-            }),
+        var candidates = new JsonArray([
+            .. pool.Docs.Select(doc =>
+                (JsonNode)
+                    new JsonObject
+                    {
+                        ["id"] = doc.Id,
+                        ["source"] = doc.Source,
+                        ["title"] = doc.Title,
+                        ["heading"] = doc.Heading,
+                        ["opening"] = doc.Text.Length > OpeningCharacters ? doc.Text[..OpeningCharacters] : doc.Text,
+                    }
+            ),
         ]);
         var user = $"""
             <review_topics>
@@ -91,15 +116,35 @@ public sealed partial class ReferenceSelector(IReferenceRetriever retriever, ICh
             """;
 
         var result = await StructuredCall.RunAsync(
-            chat, Name, prompt.Body, user, Schema, StructuredCall.ParseWire<WireOutput>, timeout, cancellationToken);
+            chat,
+            Name,
+            prompt.Body,
+            user,
+            Schema,
+            StructuredCall.ParseWire<WireOutput>,
+            timeout,
+            cancellationToken
+        );
 
         // Only what was offered, each once. What the model leaves out still follows, in the search's order, so a short
         // or empty answer still fills the budget.
         var byId = pool.Docs.ToDictionary(doc => doc.Id, StringComparer.Ordinal);
-        var picked = (result.Value?.Ids ?? []).Where(byId.ContainsKey).Distinct(StringComparer.Ordinal).Take(MaxPicks).Select(id => byId[id]).ToList();
+        var picked = (result.Value?.Ids ?? [])
+            .Where(byId.ContainsKey)
+            .Distinct(StringComparer.Ordinal)
+            .Take(MaxPicks)
+            .Select(id => byId[id])
+            .ToList();
         var order = picked.Concat(pool.Docs.Where(doc => !picked.Contains(doc))).ToList();
 
-        return new ReferenceSelection(pool with { Docs = Fill(order, query.TokenBudget) }, result.Calls, prompt.Version);
+        return new ReferenceSelection(
+            pool with
+            {
+                Docs = Fill(order, query.TokenBudget),
+            },
+            result.Calls,
+            prompt.Version
+        );
     }
 
     /// <summary>Takes docs in order while they fit, skipping any too big for what's left.</summary>
@@ -138,30 +183,36 @@ public sealed partial class ReferenceSelector(IReferenceRetriever retriever, ICh
                     if (!HiddenAttributes.Contains(name) && IsSet(value))
                     {
                         // Short scalars carry the meaning, such as a port or a role. Anything else is only named.
-                        set[name] = value is JsonValue scalar && ShortValue().IsMatch(scalar.ToString()) ? scalar.DeepClone() : null;
+                        set[name] =
+                            value is JsonValue scalar && ShortValue().IsMatch(scalar.ToString())
+                                ? scalar.DeepClone()
+                                : null;
                     }
                 }
             }
 
-            facts.Add(new JsonObject
-            {
-                ["type"] = resource["type"]?.GetValue<string>(),
-                ["actions"] = resource["change"]?["actions"]?.DeepClone(),
-                ["attributes"] = set,
-            });
+            facts.Add(
+                new JsonObject
+                {
+                    ["type"] = resource["type"]?.GetValue<string>(),
+                    ["actions"] = resource["change"]?["actions"]?.DeepClone(),
+                    ["attributes"] = set,
+                }
+            );
         }
 
         return facts;
     }
 
-    private static bool IsSet(JsonNode? value) => value switch
-    {
-        null => false,
-        JsonArray array => array.Count > 0,
-        JsonObject item => item.Count > 0,
-        JsonValue scalar => scalar.ToString() is { Length: > 0 } text && text != "false",
-        _ => false,
-    };
+    private static bool IsSet(JsonNode? value) =>
+        value switch
+        {
+            null => false,
+            JsonArray array => array.Count > 0,
+            JsonObject item => item.Count > 0,
+            JsonValue scalar => scalar.ToString() is { Length: > 0 } text && text != "false",
+            _ => false,
+        };
 
     // Up to 32 characters, of the kind ports, SKUs, roles and flags use.
     [GeneratedRegex("^[A-Za-z0-9_.:/ *-]{1,32}$")]

@@ -38,24 +38,44 @@ public class DryRunTests
         await Assert.That(text).DoesNotContain("CANARY");
     }
 
-    private static CorpusSources Sources() => CorpusSources.Parse($"""
-        version: 1
-        embedding_model: test-model
-        sources:
-          - id: azure-policy
-            repository: a/b
-            commit: {NewCommit}
-            license: MIT
-            attribution: Someone, MIT
-            include: [docs]
-        """);
+    private static CorpusSources Sources() =>
+        CorpusSources.Parse(
+            $"""
+            version: 1
+            embedding_model: test-model
+            sources:
+              - id: azure-policy
+                repository: a/b
+                commit: {NewCommit}
+                license: MIT
+                attribution: Someone, MIT
+                include: [docs]
+            """
+        );
 
     private static ImportReport Report(string commit, params (string Path, string Text)[] docs)
     {
         var pin = new SourcePin("azure-policy", "a/b", commit, "MIT", "Someone, MIT", ["docs"], null);
-        var chunks = docs.Select((doc, index) => new ReferenceChunk(
-            $"REF-{index:x32}", "0123456789abcdef", pin.Id, pin.Repository, commit, doc.Path, "https://github.com/a/b/blob/0/x",
-            pin.License, pin.Attribution, "Title", string.Empty, [], doc.Text, ("h" + doc.Text).PadRight(64, '0'))).ToList();
+        var chunks = docs.Select(
+                (doc, index) =>
+                    new ReferenceChunk(
+                        $"REF-{index:x32}",
+                        "0123456789abcdef",
+                        pin.Id,
+                        pin.Repository,
+                        commit,
+                        doc.Path,
+                        "https://github.com/a/b/blob/0/x",
+                        pin.License,
+                        pin.Attribution,
+                        "Title",
+                        string.Empty,
+                        [],
+                        doc.Text,
+                        ("h" + doc.Text).PadRight(64, '0')
+                    )
+            )
+            .ToList();
         return new ImportReport(pin, docs.Length, 0, 0, chunks);
     }
 }

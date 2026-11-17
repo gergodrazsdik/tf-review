@@ -73,7 +73,13 @@ public class DailyBudgetTests
         public Task<double> ReadAsync(string partition, string id, CancellationToken cancellationToken = default) =>
             Task.FromResult(this.values.GetValueOrDefault((partition, id)));
 
-        public Task<double> AddAsync(string partition, string id, double amount, TimeSpan timeToLive, CancellationToken cancellationToken = default)
+        public Task<double> AddAsync(
+            string partition,
+            string id,
+            double amount,
+            TimeSpan timeToLive,
+            CancellationToken cancellationToken = default
+        )
         {
             this.Adds++;
             var value = this.values.GetValueOrDefault((partition, id)) + amount;
@@ -85,17 +91,19 @@ public class DailyBudgetTests
     private sealed class OneAnswer(ChatResponse response) : IChatClient
     {
         public Task<ChatResponse> GetResponseAsync(
-            IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
-            Task.FromResult(response);
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default
+        ) => Task.FromResult(response);
 
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
-            IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default
+        ) => throw new NotSupportedException();
 
         public object? GetService(Type serviceType, object? serviceKey = null) => null;
 
-        public void Dispose()
-        {
-        }
+        public void Dispose() { }
     }
 }

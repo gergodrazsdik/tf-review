@@ -63,7 +63,8 @@ public class PlanRedactorTests
     {
         var root = JsonNode.Parse(RedactOk(RealPlan))!.AsObject();
 
-        await Assert.That(root.Select(field => field.Key).Order(StringComparer.Ordinal).ToArray())
+        await Assert
+            .That(root.Select(field => field.Key).Order(StringComparer.Ordinal).ToArray())
             .IsEquivalentTo(["format_version", "output_changes", "resource_changes"]);
     }
 
@@ -98,10 +99,12 @@ public class PlanRedactorTests
         var plan = JsonNode.Parse(RealPlan)!;
         var before = Resource(RedactOk(RealPlan), "terraform_data.partly_marked");
 
-        var extra = JsonNode.Parse("""
+        var extra = JsonNode.Parse(
+            """
             {"address":"a.first","change":{"actions":["create"],"before":null,"after":{"password":"another-secret-value"},
             "after_unknown":{},"before_sensitive":false,"after_sensitive":{}}}
-            """);
+            """
+        );
         plan["resource_changes"]!.AsArray().Insert(0, extra);
 
         await Assert.That(Resource(RedactOk(plan.ToJsonString()), "terraform_data.partly_marked")).IsEqualTo(before);
@@ -113,7 +116,8 @@ public class PlanRedactorTests
         var after = JsonNode.Parse(RedactOk(Update("same-secret-value", "same-secret-value")))!;
         var change = after["resource_changes"]![0]!["change"]!;
 
-        await Assert.That(change["before"]!["value"]!.GetValue<string>())
+        await Assert
+            .That(change["before"]!["value"]!.GetValue<string>())
             .IsEqualTo(change["after"]!["value"]!.GetValue<string>());
     }
 
@@ -123,14 +127,16 @@ public class PlanRedactorTests
         var after = JsonNode.Parse(RedactOk(Update("first-secret-value", "second-secret-value")))!;
         var change = after["resource_changes"]![0]!["change"]!;
 
-        await Assert.That(change["before"]!["value"]!.GetValue<string>())
+        await Assert
+            .That(change["before"]!["value"]!.GetValue<string>())
             .IsNotEqualTo(change["after"]!["value"]!.GetValue<string>());
     }
 
     [Test]
     public async Task Redacts_the_before_side_too()
     {
-        await Assert.That(RedactOk(Update("first-secret-value", "second-secret-value")))
+        await Assert
+            .That(RedactOk(Update("first-secret-value", "second-secret-value")))
             .DoesNotContain("first-secret-value");
     }
 
@@ -143,7 +149,8 @@ public class PlanRedactorTests
             $$"""
             {"secret":"{{Secret}}","encoded":"{{base64}}","url":"https://x.test/?k={{Uri.EscapeDataString(Secret)}}"}
             """,
-            """{"secret":true}""");
+            """{"secret":true}"""
+        );
 
         var json = RedactOk(plan);
 
@@ -163,10 +170,12 @@ public class PlanRedactorTests
     public async Task Sweeps_values_harvested_from_dropped_sections()
     {
         var plan = JsonNode.Parse(Plan("""{"note":"uses dropped-section-secret here"}""", "{}"))!;
-        plan["planned_values"] = JsonNode.Parse("""
+        plan["planned_values"] = JsonNode.Parse(
+            """
             {"root_module":{"child_modules":[{"resources":[
               {"values":{"key":"dropped-section-secret"},"sensitive_values":{"key":true}}]}]}}
-            """);
+            """
+        );
 
         await Assert.That(RedactOk(plan.ToJsonString())).DoesNotContain("dropped-section-secret");
     }
@@ -175,13 +184,17 @@ public class PlanRedactorTests
     public async Task Sweeps_values_from_resource_drift_and_module_configuration()
     {
         var plan = JsonNode.Parse(Plan("""{"a":"drifted-secret-value","b":"module-default-secret"}""", "{}"))!;
-        plan["resource_drift"] = JsonNode.Parse("""
+        plan["resource_drift"] = JsonNode.Parse(
+            """
             [{"change":{"before":"drifted-secret-value","before_sensitive":true,"after":null,"after_sensitive":false}}]
-            """);
-        plan["configuration"] = JsonNode.Parse("""
+            """
+        );
+        plan["configuration"] = JsonNode.Parse(
+            """
             {"root_module":{"module_calls":{"m":{"module":{"variables":{
               "v":{"sensitive":true,"default":"module-default-secret"}}}}}}}
-            """);
+            """
+        );
 
         var json = RedactOk(plan.ToJsonString());
 
@@ -336,7 +349,9 @@ public class PlanRedactorTests
 
         var outcome = new PlanRedactor().Redact(plan.ToJsonString());
 
-        await Assert.That(outcome is Refused { Rule: RefusalRule.MalformedPlan, Location: "/resource_changes/1" }).IsTrue();
+        await Assert
+            .That(outcome is Refused { Rule: RefusalRule.MalformedPlan, Location: "/resource_changes/1" })
+            .IsTrue();
     }
 
     [Test]
@@ -354,7 +369,9 @@ public class PlanRedactorTests
     [Test]
     public async Task A_refusal_never_names_an_attribute()
     {
-        var outcome = new PlanRedactor().Redact(Plan("""{"my-secret-map-key":"value"}""", """{"my-secret-map-key":"bad"}"""));
+        var outcome = new PlanRedactor().Redact(
+            Plan("""{"my-secret-map-key":"value"}""", """{"my-secret-map-key":"bad"}""")
+        );
 
         await Assert.That(((Refused)outcome).Location).IsEqualTo("/resource_changes/0");
     }
@@ -383,12 +400,13 @@ public class PlanRedactorTests
 
     private const string SubscriptionId = "12345678-90ab-cdef-1234-567890abcdef";
 
-    private static string PlanWithId(string address = "a.b", string before = "null") => $$"""
-        {"address":"{{address}}","type":"a","change":{"actions":["update"],
-        "before":{{before}},
-        "after":{"id":"/subscriptions/{{SubscriptionId}}/resourceGroups/rg/x","tenant_id":"AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE","name":"keep-me"},
-        "after_unknown":{},"before_sensitive":{},"after_sensitive":{} } }
-        """;
+    private static string PlanWithId(string address = "a.b", string before = "null") =>
+        $$"""
+            {"address":"{{address}}","type":"a","change":{"actions":["update"],
+            "before":{{before}},
+            "after":{"id":"/subscriptions/{{SubscriptionId}}/resourceGroups/rg/x","tenant_id":"AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE","name":"keep-me"},
+            "after_unknown":{},"before_sensitive":{},"after_sensitive":{} } }
+            """;
 
     private static string PlanOf(params string[] resources) =>
         $$"""{"format_version":"1.2","resource_changes":[{{string.Join(',', resources)}}]}""";
@@ -434,19 +452,25 @@ public class PlanRedactorTests
     {
         var before = $$"""{"id":"/subscriptions/{{SubscriptionId}}/resourceGroups/rg/x"}""";
 
-        var change = JsonNode.Parse(RedactedJson(PlanOf(PlanWithId(before: before))))!["resource_changes"]![0]!["change"]!;
+        var change = JsonNode.Parse(RedactedJson(PlanOf(PlanWithId(before: before))))!["resource_changes"]![0]![
+            "change"
+        ]!;
 
-        await Assert.That(change["before"]!["id"]!.GetValue<string>()).IsEqualTo(change["after"]!["id"]!.GetValue<string>());
+        await Assert
+            .That(change["before"]!["id"]!.GetValue<string>())
+            .IsEqualTo(change["after"]!["id"]!.GetValue<string>());
     }
 
     [Test]
     public async Task Masks_a_map_key_and_its_marks_alike()
     {
-        var plan = PlanOf($$"""
+        var plan = PlanOf(
+            $$"""
             {"address":"a.b","type":"a","change":{"actions":["create"],"before":null,
             "after":{"map":{"{{SubscriptionId}}":"secret-value"} },"after_unknown":{},
             "before_sensitive":false,"after_sensitive":{"map":{"{{SubscriptionId}}":true} } } }
-            """);
+            """
+        );
 
         var json = RedactedJson(plan);
 
@@ -492,32 +516,40 @@ public class PlanRedactorTests
         await Assert.That(outcome.FieldsDropped).IsGreaterThan(0);
     }
 
-    private static string RedactOk(string plan) => new PlanRedactor().Redact(plan) switch
-    {
-        Redacted redacted => redacted.Plan.ToCanonicalJson(),
-        Refused refused => throw new InvalidOperationException($"Refused: {refused.Rule} at {refused.Location}"),
-    };
+    private static string RedactOk(string plan) =>
+        new PlanRedactor().Redact(plan) switch
+        {
+            Redacted redacted => redacted.Plan.ToCanonicalJson(),
+            Refused refused => throw new InvalidOperationException($"Refused: {refused.Rule} at {refused.Location}"),
+        };
 
-    private static string Resource(string json, string address) => JsonNode.Parse(json)!["resource_changes"]!.AsArray()
-        .Single(change => change!["address"]!.GetValue<string>() == address)!.ToJsonString();
+    private static string Resource(string json, string address) =>
+        JsonNode.Parse(json)!["resource_changes"]!
+            .AsArray()
+            .Single(change => change!["address"]!.GetValue<string>() == address)!
+            .ToJsonString();
 
-    private static string Plan(string after, string afterSensitive) => $$$"""
-        {"format_version":"1.2","resource_changes":[{"address":"a.b","type":"a","name":"b","change":{
-        "actions":["update"],"before":null,"after":{{{after}}},"after_unknown":{},
-        "before_sensitive":false,"after_sensitive":{{{afterSensitive}}} }}]}
-        """;
+    private static string Plan(string after, string afterSensitive) =>
+        $$$"""
+            {"format_version":"1.2","resource_changes":[{"address":"a.b","type":"a","name":"b","change":{
+            "actions":["update"],"before":null,"after":{{{after}}},"after_unknown":{},
+            "before_sensitive":false,"after_sensitive":{{{afterSensitive}}} }}]}
+            """;
 
-    private static string Update(string before, string after) => $$$"""
-        {"format_version":"1.2","resource_changes":[{"address":"a.b","change":{"actions":["update"],
-        "before":{"value":"{{{before}}}"},"after":{"value":"{{{after}}}"},"after_unknown":{},
-        "before_sensitive":{"value":true},"after_sensitive":{"value":true} }}]}
-        """;
+    private static string Update(string before, string after) =>
+        $$$"""
+            {"format_version":"1.2","resource_changes":[{"address":"a.b","change":{"actions":["update"],
+            "before":{"value":"{{{before}}}"},"after":{"value":"{{{after}}}"},"after_unknown":{},
+            "before_sensitive":{"value":true},"after_sensitive":{"value":true} }}]}
+            """;
 
-    private static JsonNode? Reverse(JsonNode? node) => node switch
-    {
-        JsonObject value => new JsonObject(value.Reverse()
-            .Select(field => KeyValuePair.Create(field.Key, Reverse(field.Value?.DeepClone())))),
-        JsonArray value => new JsonArray(value.Select(child => Reverse(child?.DeepClone())).ToArray()),
-        _ => node?.DeepClone(),
-    };
+    private static JsonNode? Reverse(JsonNode? node) =>
+        node switch
+        {
+            JsonObject value => new JsonObject(
+                value.Reverse().Select(field => KeyValuePair.Create(field.Key, Reverse(field.Value?.DeepClone())))
+            ),
+            JsonArray value => new JsonArray(value.Select(child => Reverse(child?.DeepClone())).ToArray()),
+            _ => node?.DeepClone(),
+        };
 }

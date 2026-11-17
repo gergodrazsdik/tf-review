@@ -31,7 +31,8 @@ public static partial class CommentRenderer
     private const int RowStep = 5;
 
     /// <summary>A comment with nothing carried over from an earlier one.</summary>
-    public static string Render(ReviewResult result, PlanCounts? counts) => Rewrite(result, counts, null, record: false).Body;
+    public static string Render(ReviewResult result, PlanCounts? counts) =>
+        Rewrite(result, counts, null, record: false).Body;
 
     /// <summary>
     /// The comment that replaces <paramref name="previous"/>, carrying over every tick and count on it (D56). With
@@ -45,7 +46,9 @@ public static partial class CommentRenderer
     public static RenderedComment Rewrite(ReviewResult result, PlanCounts? counts, string? previous, bool record)
     {
         // A repo can keep low findings out of its comment (MNT-5). They still count in the headline and the check run.
-        var visible = result.Findings.Where(finding => result.CommentMinSeverity is not { } min || finding.Severity >= min).ToList();
+        var visible = result
+            .Findings.Where(finding => result.CommentMinSeverity is not { } min || finding.Severity >= min)
+            .ToList();
         var rows = Math.Min(MaxRows, visible.Count);
         var rendered = Build(result, visible, counts, previous, record, rows, trimmed: false);
         while (rendered.Body.Length > MaxLength && rows > 0)
@@ -58,7 +61,14 @@ public static partial class CommentRenderer
     }
 
     private static RenderedComment Build(
-        ReviewResult result, IReadOnlyList<Finding> visible, PlanCounts? counts, string? previous, bool record, int rows, bool trimmed)
+        ReviewResult result,
+        IReadOnlyList<Finding> visible,
+        PlanCounts? counts,
+        string? previous,
+        bool record,
+        int rows,
+        bool trimmed
+    )
     {
         var shown = visible.Take(rows).ToList();
         var dismissals = Dismissals.Plan(shown, previous, record, MaxRows);
@@ -91,14 +101,20 @@ public static partial class CommentRenderer
 
         foreach (var missing in result.NotReviewed)
         {
-            comment.AppendLine().AppendLine(missing.Resources is { Count: > 0 } resources
-                ? $"Not reviewed by {Name(missing.Scope)} ({Name(missing.Reason)}): {Listed(resources)}."
-                : $"Not reviewed: {Name(missing.Scope)} ({Name(missing.Reason)}).");
+            comment
+                .AppendLine()
+                .AppendLine(
+                    missing.Resources is { Count: > 0 } resources
+                        ? $"Not reviewed by {Name(missing.Scope)} ({Name(missing.Reason)}): {Listed(resources)}."
+                        : $"Not reviewed: {Name(missing.Scope)} ({Name(missing.Reason)})."
+                );
         }
 
         if (result.OmittedDocs is { Count: > 0 } omitted)
         {
-            comment.AppendLine().AppendLine($"Not checked, too large for the prompt: {string.Join(", ", omitted.Select(Code))}.");
+            comment
+                .AppendLine()
+                .AppendLine($"Not checked, too large for the prompt: {string.Join(", ", omitted.Select(Code))}.");
         }
 
         // Suggestions can draw on licensed text, and CC-BY asks for credit wherever that happens (D41).
@@ -111,15 +127,21 @@ public static partial class CommentRenderer
 
             if (references.ProviderDocsMissing)
             {
-                comment.AppendLine().AppendLine("No azurerm docs were used: the project's lock file names no azurerm version, or one that isn't indexed.");
+                comment
+                    .AppendLine()
+                    .AppendLine(
+                        "No azurerm docs were used: the project's lock file names no azurerm version, or one that isn't indexed."
+                    );
             }
         }
 
         comment
             .AppendLine()
-            .AppendLine(result.Gate == GateMode.Blocking
-                ? "This repo blocks merges only on high findings a policy or scanner reported itself, marked blocking above; the rest of this review is advisory, and finding nothing doesn't mean a change is approved."
-                : "This review is advisory, and finding nothing doesn't mean a change is approved.");
+            .AppendLine(
+                result.Gate == GateMode.Blocking
+                    ? "This repo blocks merges only on high findings a policy or scanner reported itself, marked blocking above; the rest of this review is advisory, and finding nothing doesn't mean a change is approved."
+                    : "This review is advisory, and finding nothing doesn't mean a change is approved."
+            );
 
         // Ticks and counts for findings not shown this time, hidden, so they come back with the finding (D56).
         if (dismissals.Hidden.Count > 0)
@@ -157,10 +179,15 @@ public static partial class CommentRenderer
         {
             // Control and format characters can break out of a table row or disguise text.
             var category = Rune.GetUnicodeCategory(runes.Current);
-            builder.Append(category is UnicodeCategory.Control or UnicodeCategory.Format
-                or UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator
-                ? new Rune(' ')
-                : runes.Current);
+            builder.Append(
+                category
+                    is UnicodeCategory.Control
+                        or UnicodeCategory.Format
+                        or UnicodeCategory.LineSeparator
+                        or UnicodeCategory.ParagraphSeparator
+                    ? new Rune(' ')
+                    : runes.Current
+            );
 
             // Only when something was really cut (MNT-28).
             if (builder.Length >= MaxTextLength)
@@ -205,12 +232,19 @@ public static partial class CommentRenderer
     private static void AppendCost(StringBuilder comment, CostSummary cost)
     {
         var delta = cost.AfterUsd - cost.BeforeUsd;
-        comment.AppendLine().AppendLine(delta == 0
-            ? "Monthly cost: no change at list prices, without usage-based charges."
-            : $"Monthly cost: **{Signed(delta)}** (from {Money(cost.BeforeUsd)} to {Money(cost.AfterUsd)}), at list prices, without usage-based charges.");
+        comment
+            .AppendLine()
+            .AppendLine(
+                delta == 0
+                    ? "Monthly cost: no change at list prices, without usage-based charges."
+                    : $"Monthly cost: **{Signed(delta)}** (from {Money(cost.BeforeUsd)} to {Money(cost.AfterUsd)}), at list prices, without usage-based charges."
+            );
 
         // A resource that couldn't be priced isn't free, and the line above would otherwise suggest it.
-        var unpriced = cost.Resources.Where(resource => !resource.Priced).Select(resource => resource.ResourceAddress).ToList();
+        var unpriced = cost
+            .Resources.Where(resource => !resource.Priced)
+            .Select(resource => resource.ResourceAddress)
+            .ToList();
         if (unpriced.Count > 0)
         {
             var shown = string.Join(", ", unpriced.Take(MaxUnpriced).Select(Code));
@@ -226,16 +260,26 @@ public static partial class CommentRenderer
     // One box per shown finding, so a reviewer can say which one is wrong; reactions only rate a whole comment (D56).
     private static void AppendDismissals(StringBuilder comment, IReadOnlyList<Finding> shown, DismissPlan dismissals)
     {
-        comment.AppendLine().AppendLine("Wrong? Tick a finding to dismiss it, which helps tune the reviewer:").AppendLine();
+        comment
+            .AppendLine()
+            .AppendLine("Wrong? Tick a finding to dismiss it, which helps tune the reviewer:")
+            .AppendLine();
         foreach (var finding in shown)
         {
             var (ticked, marker) = dismissals.Shown[finding];
-            comment.AppendLine($"- [{(ticked ? "x" : " ")}] Dismiss {Code(finding.ResourceAddress)} ({Code(finding.Rule)}) {marker}");
+            comment.AppendLine(
+                $"- [{(ticked ? "x" : " ")}] Dismiss {Code(finding.ResourceAddress)} ({Code(finding.Rule)}) {marker}"
+            );
         }
     }
 
     private static void AppendFindings(
-        StringBuilder comment, ReviewResult result, IReadOnlyList<Finding> visible, IReadOnlyList<Finding> shown, bool trimmed)
+        StringBuilder comment,
+        ReviewResult result,
+        IReadOnlyList<Finding> visible,
+        IReadOnlyList<Finding> shown,
+        bool trimmed
+    )
     {
         if (shown.Count > 0)
         {
@@ -246,23 +290,31 @@ public static partial class CommentRenderer
             {
                 var suggestion = finding.Suggestion is null ? string.Empty : Code(finding.Suggestion, inTable: true);
                 comment.AppendLine(
-                    $"| {Name(finding.Severity)}{(finding.Blocking ? ", **blocking**" : string.Empty)} | {Code(finding.ResourceAddress, inTable: true)} | {Rules(finding, result)} | {Code(finding.Title, inTable: true)} | {suggestion} | {Source(finding)} |");
+                    $"| {Name(finding.Severity)}{(finding.Blocking ? ", **blocking**" : string.Empty)} | {Code(finding.ResourceAddress, inTable: true)} | {Rules(finding, result)} | {Code(finding.Title, inTable: true)} | {suggestion} | {Source(finding)} |"
+                );
             }
         }
 
         var hidden = visible.Count - shown.Count;
         if (hidden > 0)
         {
-            comment.AppendLine().AppendLine(trimmed
-                ? $"{hidden} more finding(s) aren't shown, to keep this comment under GitHub's size limit."
-                : $"{hidden} more finding(s) aren't shown.");
+            comment
+                .AppendLine()
+                .AppendLine(
+                    trimmed
+                        ? $"{hidden} more finding(s) aren't shown, to keep this comment under GitHub's size limit."
+                        : $"{hidden} more finding(s) aren't shown."
+                );
         }
 
         var below = result.Findings.Count - visible.Count;
         if (below > 0 && result.CommentMinSeverity is { } min)
         {
-            comment.AppendLine().AppendLine(
-                $"{below} finding(s) below {Name(min)} aren't shown, as this repo's `thresholds.comment_min_severity` asks. They still count in the check run.");
+            comment
+                .AppendLine()
+                .AppendLine(
+                    $"{below} finding(s) below {Name(min)} aren't shown, as this repo's `thresholds.comment_min_severity` asks. They still count in the check run."
+                );
         }
     }
 
@@ -272,10 +324,16 @@ public static partial class CommentRenderer
     /// </summary>
     private static string Rule(Finding finding, ReviewResult result)
     {
-        if (DocId().IsMatch(finding.Rule)
-            && result.StandardsRepository is { } repository && Repository().IsMatch(repository)
-            && result.StandardsCommit is { } commit && CommitSha().IsMatch(commit)
-            && result.DocPaths?.GetValueOrDefault(finding.Rule) is { } path && DocPath().IsMatch(path) && !path.Contains("..", StringComparison.Ordinal))
+        if (
+            DocId().IsMatch(finding.Rule)
+            && result.StandardsRepository is { } repository
+            && Repository().IsMatch(repository)
+            && result.StandardsCommit is { } commit
+            && CommitSha().IsMatch(commit)
+            && result.DocPaths?.GetValueOrDefault(finding.Rule) is { } path
+            && DocPath().IsMatch(path)
+            && !path.Contains("..", StringComparison.Ordinal)
+        )
         {
             return $"[{finding.Rule}](https://github.com/{repository}/blob/{commit}/{path})";
         }
@@ -291,66 +349,69 @@ public static partial class CommentRenderer
             : rule;
     }
 
-    private static string Headline(ReviewResult result) => result.Verdict switch
-    {
-        Verdict.NoFindings => "**No findings**",
-        Verdict.Findings => $"**{result.Findings.Count} finding(s)**",
-        Verdict.NotReviewed => "**Not reviewed**",
-        _ => throw new ArgumentOutOfRangeException(nameof(result)),
-    };
+    private static string Headline(ReviewResult result) =>
+        result.Verdict switch
+        {
+            Verdict.NoFindings => "**No findings**",
+            Verdict.Findings => $"**{result.Findings.Count} finding(s)**",
+            Verdict.NotReviewed => "**Not reviewed**",
+            _ => throw new ArgumentOutOfRangeException(nameof(result)),
+        };
 
     private static string ShortCommit(string commit) => commit.Length >= 7 ? commit[..7] : commit;
 
     private static string Summarize(PlanCounts counts)
     {
-        var actions = counts.Actions
-            .Where(action => action.Value > 0)
-            .Select(action => $"{action.Value} {action.Key}");
+        var actions = counts.Actions.Where(action => action.Value > 0).Select(action => $"{action.Value} {action.Key}");
         return $"Plan: {counts.ResourceChanges} resource change(s) ({string.Join(", ", actions)}).";
     }
 
-    private static string Source(Finding finding) => finding switch
-    {
-        { Deterministic: false } => "model",
-        _ when !DocId().IsMatch(finding.Rule) => "scanner",
-        { Agent: Reporter.Scanner } => "policy",
-        _ => "policy and model",
-    };
+    private static string Source(Finding finding) =>
+        finding switch
+        {
+            { Deterministic: false } => "model",
+            _ when !DocId().IsMatch(finding.Rule) => "scanner",
+            { Agent: Reporter.Scanner } => "policy",
+            _ => "policy and model",
+        };
 
-    private static string Name(Severity severity) => severity switch
-    {
-        Severity.Low => "low",
-        Severity.Medium => "medium",
-        Severity.High => "high",
-        _ => throw new ArgumentOutOfRangeException(nameof(severity)),
-    };
+    private static string Name(Severity severity) =>
+        severity switch
+        {
+            Severity.Low => "low",
+            Severity.Medium => "medium",
+            Severity.High => "high",
+            _ => throw new ArgumentOutOfRangeException(nameof(severity)),
+        };
 
-    private static string Name(ReviewScope scope) => scope switch
-    {
-        ReviewScope.Plan => "the whole plan",
-        ReviewScope.Conventions => "conventions",
-        ReviewScope.Security => "security",
-        ReviewScope.Cost => "cost",
-        _ => throw new ArgumentOutOfRangeException(nameof(scope)),
-    };
+    private static string Name(ReviewScope scope) =>
+        scope switch
+        {
+            ReviewScope.Plan => "the whole plan",
+            ReviewScope.Conventions => "conventions",
+            ReviewScope.Security => "security",
+            ReviewScope.Cost => "cost",
+            _ => throw new ArgumentOutOfRangeException(nameof(scope)),
+        };
 
-    private static string Name(NotReviewedReason reason) => reason switch
-    {
-        NotReviewedReason.RedactionRefused => "redaction refused the plan",
-        NotReviewedReason.InvalidOutput => "the model's output was invalid",
-        NotReviewedReason.Refused => "the model refused",
-        NotReviewedReason.Truncated => "the model's output was cut off",
-        NotReviewedReason.ContentFilter => "a content filter blocked it",
-        NotReviewedReason.RateLimited => "rate limited",
-        NotReviewedReason.Unavailable => "unavailable",
-        NotReviewedReason.Timeout => "timed out",
-        NotReviewedReason.InvalidConfig => "the config is invalid",
-        NotReviewedReason.StandardsUnavailable => "the standards couldn't be fetched",
-        NotReviewedReason.ScannerFailed => "a scanner failed to run",
-        NotReviewedReason.PlanTooLarge => "the plan is too large",
-        NotReviewedReason.BudgetReached => "the daily model budget was reached",
-        _ => throw new ArgumentOutOfRangeException(nameof(reason)),
-    };
+    private static string Name(NotReviewedReason reason) =>
+        reason switch
+        {
+            NotReviewedReason.RedactionRefused => "redaction refused the plan",
+            NotReviewedReason.InvalidOutput => "the model's output was invalid",
+            NotReviewedReason.Refused => "the model refused",
+            NotReviewedReason.Truncated => "the model's output was cut off",
+            NotReviewedReason.ContentFilter => "a content filter blocked it",
+            NotReviewedReason.RateLimited => "rate limited",
+            NotReviewedReason.Unavailable => "unavailable",
+            NotReviewedReason.Timeout => "timed out",
+            NotReviewedReason.InvalidConfig => "the config is invalid",
+            NotReviewedReason.StandardsUnavailable => "the standards couldn't be fetched",
+            NotReviewedReason.ScannerFailed => "a scanner failed to run",
+            NotReviewedReason.PlanTooLarge => "the plan is too large",
+            NotReviewedReason.BudgetReached => "the daily model budget was reached",
+            _ => throw new ArgumentOutOfRangeException(nameof(reason)),
+        };
 
     private static int LongestRun(string text, char character)
     {

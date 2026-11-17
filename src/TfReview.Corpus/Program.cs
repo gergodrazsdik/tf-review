@@ -26,11 +26,23 @@ try
         ["index", var sources] => await Index(sources, rebuild: false),
         ["index", var sources, "--rebuild"] => await Index(sources, rebuild: true),
         ["search", var text, var types, var version] => await Search(text, types, version, ReferenceRanking.Hybrid),
-        ["search", var text, var types, var version, var ranking] => await Search(text, types, version, Enum.Parse<ReferenceRanking>(ranking, ignoreCase: true)),
+        ["search", var text, var types, var version, var ranking] => await Search(
+            text,
+            types,
+            version,
+            Enum.Parse<ReferenceRanking>(ranking, ignoreCase: true)
+        ),
         _ => Fail(),
     };
 }
-catch (Exception e) when (e is SourcesException or ArchiveException or LicenseMismatchException or HttpRequestException or IndexIncompleteException)
+catch (Exception e)
+    when (e
+            is SourcesException
+                or ArchiveException
+                or LicenseMismatchException
+                or HttpRequestException
+                or IndexIncompleteException
+    )
 {
     Console.Error.WriteLine($"Failed: {e.Message}");
     return 1;
@@ -58,21 +70,29 @@ static async Task<int> Import(string sourcesPath, string outputPath, string? arc
 
         totalTokens += report.Chunks.Sum(chunk => (long)TokenEstimate.Of(chunk.ToEmbed));
         var characters = report.Chunks.Sum(chunk => (long)chunk.Text.Length);
-        Console.WriteLine(string.Create(
-            CultureInfo.InvariantCulture,
-            $"{Name(report.Pin)}: {report.Documents} docs, {report.Chunks.Count} chunks, {characters / 1_000_000m:0.0} MB of text, {report.Skipped} skipped, {report.TooLarge} too large."));
+        Console.WriteLine(
+            string.Create(
+                CultureInfo.InvariantCulture,
+                $"{Name(report.Pin)}: {report.Documents} docs, {report.Chunks.Count} chunks, {characters / 1_000_000m:0.0} MB of text, {report.Skipped} skipped, {report.TooLarge} too large."
+            )
+        );
     }
 
-    Console.WriteLine(string.Create(
-        CultureInfo.InvariantCulture,
-        $"Total: at most {totalTokens} tokens, at most ${totalTokens * DryRun.EmbeddingUsdPerToken:0.00} to embed from nothing."));
+    Console.WriteLine(
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"Total: at most {totalTokens} tokens, at most ${totalTokens * DryRun.EmbeddingUsdPerToken:0.00} to embed from nothing."
+        )
+    );
     return 0;
 }
 
 static async Task<int> DryRunAsync(string baseSourcesPath, string sourcesPath, string reportPath)
 {
     var after = CorpusSources.Parse(await File.ReadAllTextAsync(sourcesPath));
-    var before = File.Exists(baseSourcesPath) ? CorpusSources.Parse(await File.ReadAllTextAsync(baseSourcesPath)) : null;
+    var before = File.Exists(baseSourcesPath)
+        ? CorpusSources.Parse(await File.ReadAllTextAsync(baseSourcesPath))
+        : null;
 
     var afterReports = await ImportAll(after, null);
 
@@ -80,8 +100,10 @@ static async Task<int> DryRunAsync(string baseSourcesPath, string sourcesPath, s
     var beforeReports = new List<ImportReport>();
     foreach (var pin in before?.Pins ?? [])
     {
-        beforeReports.Add(afterReports.FirstOrDefault(report => report.Pin == pin && before!.EmbeddingModel == after.EmbeddingModel)
-            ?? await ImportOne(pin, before!, null));
+        beforeReports.Add(
+            afterReports.FirstOrDefault(report => report.Pin == pin && before!.EmbeddingModel == after.EmbeddingModel)
+                ?? await ImportOne(pin, before!, null)
+        );
     }
 
     var report = DryRun.Report(before, beforeReports, after, afterReports);
@@ -98,12 +120,21 @@ static async Task<int> Index(string sourcesPath, bool rebuild)
 
     var credential = IndexCredential.Create();
     var store = CosmosReferenceStore.Create(Required("TF_REVIEW_COSMOS_ENDPOINT"), credential);
-    var embedder = AzureEmbedder.Create(new Uri(Required("TF_REVIEW_OPENAI_ENDPOINT")), sources.EmbeddingModel, credential);
+    var embedder = AzureEmbedder.Create(
+        new Uri(Required("TF_REVIEW_OPENAI_ENDPOINT")),
+        sources.EmbeddingModel,
+        credential
+    );
 
-    var outcome = await new Indexer(store, embedder, Console.WriteLine).RunAsync(chunks, sources.CorpusVersion, rebuild);
+    var outcome = await new Indexer(store, embedder, Console.WriteLine).RunAsync(
+        chunks,
+        sources.CorpusVersion,
+        rebuild
+    );
     Console.WriteLine(
         $"Version {outcome.Version}: {outcome.Chunks} chunks, {outcome.Reused} reused, {outcome.Embedded} embedded, "
-        + $"{(outcome.Switched ? "now in use" : "already in use")}, {outcome.Deleted.Count} old version(s) deleted.");
+            + $"{(outcome.Switched ? "now in use" : "already in use")}, {outcome.Deleted.Count} old version(s) deleted."
+    );
     return 0;
 }
 
@@ -112,13 +143,29 @@ static async Task<int> Search(string text, string types, string version, Referen
 {
     var credential = IndexCredential.Create();
     var container = new Microsoft.Azure.Cosmos.CosmosClient(
-            Required("TF_REVIEW_COSMOS_ENDPOINT"), credential, new Microsoft.Azure.Cosmos.CosmosClientOptions { ConnectionMode = Microsoft.Azure.Cosmos.ConnectionMode.Gateway })
-        .GetContainer("tfreview", "references");
-    var embedder = TfReview.Service.AzureQueryEmbedder.Create(new Uri(Required("TF_REVIEW_OPENAI_ENDPOINT")), "text-embedding-3-small", credential);
+        Required("TF_REVIEW_COSMOS_ENDPOINT"),
+        credential,
+        new Microsoft.Azure.Cosmos.CosmosClientOptions
+        {
+            ConnectionMode = Microsoft.Azure.Cosmos.ConnectionMode.Gateway,
+        }
+    ).GetContainer("tfreview", "references");
+    var embedder = TfReview.Service.AzureQueryEmbedder.Create(
+        new Uri(Required("TF_REVIEW_OPENAI_ENDPOINT")),
+        "text-embedding-3-small",
+        credential
+    );
     var retriever = new TfReview.Service.CosmosReferenceRetriever(container, embedder);
 
-    var result = await retriever.RetrieveAsync(new ReferenceQuery(
-        text, types.Split(',', StringSplitOptions.RemoveEmptyEntries), version == "-" ? null : version, TokenBudget: 3_000, ranking));
+    var result = await retriever.RetrieveAsync(
+        new ReferenceQuery(
+            text,
+            types.Split(',', StringSplitOptions.RemoveEmptyEntries),
+            version == "-" ? null : version,
+            TokenBudget: 3_000,
+            ranking
+        )
+    );
     Console.WriteLine($"Corpus version {result.CorpusVersion}, provider docs missing: {result.ProviderDocsMissing}.");
     foreach (var doc in result.Docs)
     {
@@ -155,13 +202,17 @@ static async Task<Stream> Open(SourcePin pin, string? directory)
     // Public repos, so no token: the dry run runs PR code and holds no credentials at all.
     var http = new HttpClient { Timeout = TimeSpan.FromMinutes(20) };
     http.DefaultRequestHeaders.UserAgent.ParseAdd("tf-review-corpus");
-    var response = await http.GetAsync(new Uri($"https://codeload.github.com/{pin.Repository}/tar.gz/{pin.Commit}"), HttpCompletionOption.ResponseHeadersRead);
+    var response = await http.GetAsync(
+        new Uri($"https://codeload.github.com/{pin.Repository}/tar.gz/{pin.Commit}"),
+        HttpCompletionOption.ResponseHeadersRead
+    );
     response.EnsureSuccessStatusCode();
     return await response.Content.ReadAsStreamAsync();
 }
 
 static string Name(SourcePin pin) => pin.ProviderVersion is { } version ? $"{pin.Id}@{version}" : pin.Id;
 
-static string Required(string name) => Environment.GetEnvironmentVariable(name) is { Length: > 0 } value
-    ? value
-    : throw new SourcesException($"{name} isn't set.");
+static string Required(string name) =>
+    Environment.GetEnvironmentVariable(name) is { Length: > 0 } value
+        ? value
+        : throw new SourcesException($"{name} isn't set.");

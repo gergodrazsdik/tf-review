@@ -15,9 +15,15 @@ public sealed class GitHubApp(HttpClient http, string clientId, string privateKe
     private readonly TimeProvider time = time ?? TimeProvider.System;
 
     /// <summary>Opens a repo for one review. The token is revoked when it's disposed.</summary>
-    public async Task<RepositorySession> OpenAsync(string repository, Uri apiUrl, CancellationToken cancellationToken = default)
+    public async Task<RepositorySession> OpenAsync(
+        string repository,
+        Uri apiUrl,
+        CancellationToken cancellationToken = default
+    )
     {
-        var name = repository.Split('/') is [_, var repo] ? repo : throw new GitHubAppException("The repository isn't owner/name.");
+        var name = repository.Split('/') is [_, var repo]
+            ? repo
+            : throw new GitHubAppException("The repository isn't owner/name.");
         var jwt = this.CreateJwt();
 
         using var lookup = new HttpRequestMessage(HttpMethod.Get, $"repos/{repository}/installation");
@@ -30,13 +36,23 @@ public sealed class GitHubApp(HttpClient http, string clientId, string privateKe
         }
 
         var installation = await found.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
-        using var mint = new HttpRequestMessage(HttpMethod.Post, $"app/installations/{installation.GetProperty("id").GetInt64()}/access_tokens")
+        using var mint = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"app/installations/{installation.GetProperty("id").GetInt64()}/access_tokens"
+        )
         {
-            Content = JsonContent.Create(new
-            {
-                repositories = new[] { name },
-                permissions = new { contents = "read", pull_requests = "write", checks = "write" },
-            }),
+            Content = JsonContent.Create(
+                new
+                {
+                    repositories = new[] { name },
+                    permissions = new
+                    {
+                        contents = "read",
+                        pull_requests = "write",
+                        checks = "write",
+                    },
+                }
+            ),
         };
         mint.Headers.Authorization = new("Bearer", jwt);
         using var minted = await http.SendAsync(mint, cancellationToken);
@@ -45,7 +61,9 @@ public sealed class GitHubApp(HttpClient http, string clientId, string privateKe
             throw new GitHubAppException($"Getting a token returned {(int)minted.StatusCode}.");
         }
 
-        var token = (await minted.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).GetProperty("token").GetString()
+        var token = (await minted.Content.ReadFromJsonAsync<JsonElement>(cancellationToken))
+            .GetProperty("token")
+            .GetString()
             ?? throw new GitHubAppException("GitHub returned no token.");
         return new RepositorySession(StickyComment.CreateClient(apiUrl, token), repository);
     }
@@ -57,13 +75,27 @@ public sealed class GitHubApp(HttpClient http, string clientId, string privateKe
 
         // A minute back for clock drift, and GitHub refuses anything over ten minutes ahead.
         var header = Encode("""{"alg":"RS256","typ":"JWT"}"""u8);
-        var payload = Encode(JsonSerializer.SerializeToUtf8Bytes(new { iat = now - 60, exp = now + 540, iss = clientId }));
+        var payload = Encode(
+            JsonSerializer.SerializeToUtf8Bytes(
+                new
+                {
+                    iat = now - 60,
+                    exp = now + 540,
+                    iss = clientId,
+                }
+            )
+        );
 
         using var rsa = RSA.Create();
         rsa.ImportFromPem(privateKeyPem);
-        var signature = rsa.SignData(Encoding.ASCII.GetBytes($"{header}.{payload}"), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        var signature = rsa.SignData(
+            Encoding.ASCII.GetBytes($"{header}.{payload}"),
+            HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pkcs1
+        );
         return $"{header}.{payload}.{Encode(signature)}";
     }
 
-    private static string Encode(ReadOnlySpan<byte> bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    private static string Encode(ReadOnlySpan<byte> bytes) =>
+        Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 }

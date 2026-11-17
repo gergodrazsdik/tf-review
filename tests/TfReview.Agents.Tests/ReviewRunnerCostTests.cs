@@ -27,7 +27,8 @@ public class ReviewRunnerCostTests
         """;
 
     private static readonly string Plan = TestPlans.Json(
-        TestPlans.Update(Vm, "azurerm_linux_virtual_machine", """{"size":"small"}""", """{"size":"large"}"""));
+        TestPlans.Update(Vm, "azurerm_linux_virtual_machine", """{"size":"small"}""", """{"size":"large"}""")
+    );
 
     [Test]
     public async Task Reports_the_plans_monthly_cost()
@@ -46,7 +47,9 @@ public class ReviewRunnerCostTests
         var result = await Run(WithCost, new FakeScans(Scan(1m), Scan(2m)));
 
         await Assert.That(result.Cost!.AfterUsd).IsEqualTo(2m);
-        await Assert.That(result.NotReviewed.Single()).IsEqualTo(new NotReviewed(ReviewScope.Cost, NotReviewedReason.Unavailable));
+        await Assert
+            .That(result.NotReviewed.Single())
+            .IsEqualTo(new NotReviewed(ReviewScope.Cost, NotReviewedReason.Unavailable));
     }
 
     // Nothing to judge, so there's nothing to say wasn't reviewed.
@@ -73,10 +76,15 @@ public class ReviewRunnerCostTests
     [Test]
     public async Task No_token_is_reported_as_not_reviewed()
     {
-        var result = await new ReviewRunner(new EmptySource(), new ConftestRunner(new FakeProcesses(NoViolations))).RunAsync(Plan, WithCost, Commit);
+        var result = await new ReviewRunner(
+            new EmptySource(),
+            new ConftestRunner(new FakeProcesses(NoViolations))
+        ).RunAsync(Plan, WithCost, Commit);
 
         await Assert.That(result.Cost).IsNull();
-        await Assert.That(result.NotReviewed.Single()).IsEqualTo(new NotReviewed(ReviewScope.Cost, NotReviewedReason.Unavailable));
+        await Assert
+            .That(result.NotReviewed.Single())
+            .IsEqualTo(new NotReviewed(ReviewScope.Cost, NotReviewedReason.Unavailable));
     }
 
     // A failed scan isn't a plan that costs nothing, and it doesn't undo the rest of the review.
@@ -87,13 +95,19 @@ public class ReviewRunnerCostTests
             [{"namespace":"adr002","failures":[{"msg":"m","metadata":{"details":
             {"address":"azurerm_linux_virtual_machine.main","doc_id":"ADR-002","severity":"medium"}}}]}]
             """;
-        var runner = new ReviewRunner(new EmptySource(), new ConftestRunner(new FakeProcesses(Violation)), infracost: new InfracostRunner(new FakeScans("not json", "not json")));
+        var runner = new ReviewRunner(
+            new EmptySource(),
+            new ConftestRunner(new FakeProcesses(Violation)),
+            infracost: new InfracostRunner(new FakeScans("not json", "not json"))
+        );
 
         var result = await runner.RunAsync(Plan, WithCost, Commit);
 
         await Assert.That(result.Cost).IsNull();
         await Assert.That(result.Findings.Count).IsEqualTo(1);
-        await Assert.That(result.NotReviewed.Single()).IsEqualTo(new NotReviewed(ReviewScope.Cost, NotReviewedReason.ScannerFailed));
+        await Assert
+            .That(result.NotReviewed.Single())
+            .IsEqualTo(new NotReviewed(ReviewScope.Cost, NotReviewedReason.ScannerFailed));
     }
 
     // The comment can only say a scanner failed, so the log has to say how, and it holds nothing from the plan.
@@ -101,17 +115,25 @@ public class ReviewRunnerCostTests
     public async Task A_failed_scan_logs_why()
     {
         var log = new List<string>();
-        var runner = new ReviewRunner(new EmptySource(), new ConftestRunner(new FakeProcesses(NoViolations)), log: log.Add, infracost: new InfracostRunner(new FakeScans("not json", "not json")));
+        var runner = new ReviewRunner(
+            new EmptySource(),
+            new ConftestRunner(new FakeProcesses(NoViolations)),
+            log: log.Add,
+            infracost: new InfracostRunner(new FakeScans("not json", "not json"))
+        );
 
         await runner.RunAsync(Plan, WithCost, Commit);
 
-        await Assert.That(log.Single(line => line.StartsWith("infracost:", StringComparison.Ordinal))).Matches("^infracost: [A-Za-z]+\\.$");
+        await Assert
+            .That(log.Single(line => line.StartsWith("infracost:", StringComparison.Ordinal)))
+            .Matches("^infracost: [A-Za-z]+\\.$");
     }
 
     [Test]
     public async Task An_unpriced_resource_isnt_counted_as_free()
     {
-        const string Unsupported = """{"projects":[{"resources":[{"name":"azurerm_linux_virtual_machine.main","is_supported":false}]}]}""";
+        const string Unsupported =
+            """{"projects":[{"resources":[{"name":"azurerm_linux_virtual_machine.main","is_supported":false}]}]}""";
 
         var result = await Run(WithCost, new FakeScans(Unsupported, Unsupported));
 
@@ -154,7 +176,9 @@ public class ReviewRunnerCostTests
         var result = await RunSecurity(new FakeProcesses("""{"passed":0,"failed":0,"resource_count":0}"""));
 
         await Assert.That(result.Verdict).IsEqualTo(Verdict.NoFindings);
-        await Assert.That(result.NotReviewed[0]).IsEqualTo(new NotReviewed(ReviewScope.Security, NotReviewedReason.ScannerFailed));
+        await Assert
+            .That(result.NotReviewed[0])
+            .IsEqualTo(new NotReviewed(ReviewScope.Security, NotReviewedReason.ScannerFailed));
     }
 
     // MNT-13: a failed scanner sits beside the security agent's own entry rather than hiding it, here no model to call.
@@ -171,19 +195,32 @@ public class ReviewRunnerCostTests
     private static Task<ReviewResult> RunSecurity(FakeProcesses checkov)
     {
         var config = WithoutCost.Replace("agents: []", "agents: [security]", StringComparison.Ordinal);
-        return new ReviewRunner(new EmptySource(), new ConftestRunner(new FakeProcesses(NoViolations)), checkov: new CheckovRunner(checkov)).RunAsync(Plan, config, Commit);
+        return new ReviewRunner(
+            new EmptySource(),
+            new ConftestRunner(new FakeProcesses(NoViolations)),
+            checkov: new CheckovRunner(checkov)
+        ).RunAsync(Plan, config, Commit);
     }
 
     private static Task<ReviewResult> Run(string config, FakeScans scans) =>
-        new ReviewRunner(new EmptySource(), new ConftestRunner(new FakeProcesses(NoViolations)), infracost: new InfracostRunner(scans)).RunAsync(Plan, config, Commit);
+        new ReviewRunner(
+            new EmptySource(),
+            new ConftestRunner(new FakeProcesses(NoViolations)),
+            infracost: new InfracostRunner(scans)
+        ).RunAsync(Plan, config, Commit);
 
-    private static string Scan(decimal cost) => $$"""
-        {"projects":[{"resources":[{"name":"{{Vm}}","is_supported":true,"cost_components":[{"total_monthly_cost":"{{cost}}"}]}]}]}
-        """;
+    private static string Scan(decimal cost) =>
+        $$"""
+            {"projects":[{"resources":[{"name":"{{Vm}}","is_supported":true,"cost_components":[{"total_monthly_cost":"{{cost}}"}]}]}]}
+            """;
 
     private sealed class EmptySource : IStandardsSource
     {
-        public Task FetchAsync(TfReviewConfig config, string targetDirectory, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task FetchAsync(
+            TfReviewConfig config,
+            string targetDirectory,
+            CancellationToken cancellationToken = default
+        ) => Task.CompletedTask;
     }
 
     private sealed class FakeScans(string before, string after) : IProcessRunner
@@ -191,7 +228,11 @@ public class ReviewRunnerCostTests
         public int Calls { get; private set; }
 
         public Task<ProcessResult?> RunAsync(
-            string program, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken = default)
+            string program,
+            IReadOnlyList<string> arguments,
+            TimeSpan timeout,
+            CancellationToken cancellationToken = default
+        )
         {
             Calls++;
             var output = arguments[1].EndsWith("before.json", StringComparison.Ordinal) ? before : after;

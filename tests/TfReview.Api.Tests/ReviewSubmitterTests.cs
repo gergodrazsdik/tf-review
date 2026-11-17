@@ -53,7 +53,8 @@ public class ReviewSubmitterTests
         var run = new Run(
             _ => throw new HttpRequestException("refused"),
             _ => throw new TaskCanceledException("timed out"),
-            Accepted());
+            Accepted()
+        );
 
         await Assert.That(await run.SubmitAsync()).IsTrue();
 
@@ -110,12 +111,14 @@ public class ReviewSubmitterTests
         await Assert.That(run.Waited.Count).IsEqualTo(1);
     }
 
-    private static Func<HttpRequestMessage, HttpResponseMessage> Status(HttpStatusCode status) => _ => new HttpResponseMessage(status);
+    private static Func<HttpRequestMessage, HttpResponseMessage> Status(HttpStatusCode status) =>
+        _ => new HttpResponseMessage(status);
 
-    private static Func<HttpRequestMessage, HttpResponseMessage> Accepted() => _ => new HttpResponseMessage(HttpStatusCode.Accepted)
-    {
-        Content = new StringContent("""{"id":"abc"}""", Encoding.UTF8, "application/json"),
-    };
+    private static Func<HttpRequestMessage, HttpResponseMessage> Accepted() =>
+        _ => new HttpResponseMessage(HttpStatusCode.Accepted)
+        {
+            Content = new StringContent("""{"id":"abc"}""", Encoding.UTF8, "application/json"),
+        };
 
     private sealed class Run(params Func<HttpRequestMessage, HttpResponseMessage>[] answers)
     {
@@ -146,7 +149,8 @@ public class ReviewSubmitterTests
                     this.Waited.Add(wait);
                     return Task.CompletedTask;
                 },
-                this.Log.Add);
+                this.Log.Add
+            );
             return submitter.SubmitAsync("the plan", Commit, ".tf-review.yml");
         }
     }
@@ -161,7 +165,10 @@ public class ReviewSubmitterTests
 
         public List<string> Bodies { get; } = [];
 
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken
+        )
         {
             this.Paths.Add(request.RequestUri!.AbsolutePath);
             this.Bearers.Add(request.Headers.Authorization!.Parameter!);

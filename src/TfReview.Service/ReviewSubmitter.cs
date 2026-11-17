@@ -10,9 +10,17 @@ namespace TfReview.Service;
 public static class ActionsIdToken
 {
     public static async Task<string> GetAsync(
-        HttpClient http, string requestUrl, string requestToken, string audience, CancellationToken cancellationToken = default)
+        HttpClient http,
+        string requestUrl,
+        string requestToken,
+        string audience,
+        CancellationToken cancellationToken = default
+    )
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"{requestUrl}&audience={Uri.EscapeDataString(audience)}");
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"{requestUrl}&audience={Uri.EscapeDataString(audience)}"
+        );
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", requestToken);
         using var response = await http.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
@@ -30,7 +38,8 @@ public sealed class ReviewSubmitter(
     HttpClient api,
     Func<CancellationToken, Task<string>> token,
     Func<TimeSpan, CancellationToken, Task> delay,
-    Action<string> log)
+    Action<string> log
+)
 {
     public const string Audience = "tf-review-api";
 
@@ -48,11 +57,19 @@ public sealed class ReviewSubmitter(
 
     /// <summary>Whether the API accepted the review. Why it didn't is logged, with nothing from the plan.</summary>
     public async Task<bool> SubmitAsync(
-        string plan, string commit, string configPath, string? workingDirectory = null, CancellationToken cancellationToken = default)
+        string plan,
+        string commit,
+        string configPath,
+        string? workingDirectory = null,
+        CancellationToken cancellationToken = default
+    )
     {
         for (var attempt = 0; ; attempt++)
         {
-            var outcome = await this.TryAsync(new SubmitBody(commit, configPath, plan, workingDirectory), cancellationToken);
+            var outcome = await this.TryAsync(
+                new SubmitBody(commit, configPath, plan, workingDirectory),
+                cancellationToken
+            );
             if (outcome is Outcome.Accepted or Outcome.Refused)
             {
                 return outcome == Outcome.Accepted;
@@ -87,10 +104,15 @@ public sealed class ReviewSubmitter(
                 return Outcome.Accepted;
             }
 
-            log($"The review API answered {(int)response.StatusCode}: {await ReasonAsync(response, cancellationToken)}");
+            log(
+                $"The review API answered {(int)response.StatusCode}: {await ReasonAsync(response, cancellationToken)}"
+            );
             return (int)response.StatusCode >= 500 ? Outcome.TryAgain : Outcome.Refused;
         }
-        catch (Exception e) when (e is HttpRequestException or JsonException || (e is TaskCanceledException && !cancellationToken.IsCancellationRequested))
+        catch (Exception e)
+            when (e is HttpRequestException or JsonException
+                || (e is TaskCanceledException && !cancellationToken.IsCancellationRequested)
+            )
         {
             log($"Couldn't reach the review API: {e.GetType().Name}.");
             return Outcome.TryAgain;
@@ -122,5 +144,7 @@ public sealed class ReviewSubmitter(
         [property: JsonPropertyName("commit")] string Commit,
         [property: JsonPropertyName("config_path")] string ConfigPath,
         [property: JsonPropertyName("plan")] string Plan,
-        [property: JsonPropertyName("working_directory"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? WorkingDirectory);
+        [property: JsonPropertyName("working_directory"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            string? WorkingDirectory
+    );
 }

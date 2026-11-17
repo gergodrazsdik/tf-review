@@ -25,22 +25,38 @@ const string Config = $"""
     agents: [conventions, security, cost]
     """;
 
-string[] profiles = [AgentProfile.Conventions.Name, AgentProfile.Security.Name, AgentProfile.Cost.Name, RiskOrchestrator.Name, LlmArbiter.Name, ReferenceSuggester.Name];
+string[] profiles =
+[
+    AgentProfile.Conventions.Name,
+    AgentProfile.Security.Name,
+    AgentProfile.Cost.Name,
+    RiskOrchestrator.Name,
+    LlmArbiter.Name,
+    ReferenceSuggester.Name,
+];
 
 // Relaxed escaping keeps recorded answers readable in a diff. These files are never rendered as HTML.
-JsonSerializerOptions fileOptions = new() { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+JsonSerializerOptions fileOptions = new()
+{
+    WriteIndented = true,
+    Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+};
 
 // Every result, replayed or live, has to match the contract other repos read.
 var contracts = new TfReview.Eval.Contracts("docs/contracts");
 
 // Only directories with a plan, so a stray one such as a tool's own can't fail the run.
-var cases = Directory.GetDirectories(CasesDirectory)
+var cases = Directory
+    .GetDirectories(CasesDirectory)
     .Where(directory => File.Exists(Path.Combine(directory, "plan.json")))
     .Order(StringComparer.Ordinal)
     .ToArray();
+
 // Rescoring saved runs reads no standards, so only the commands that review need it.
-var standardsDirectory = args is ["rescore", ..] ? string.Empty : Environment.GetEnvironmentVariable("TF_STANDARDS_DIR")
-    ?? throw new InvalidOperationException("TF_STANDARDS_DIR isn't set.");
+var standardsDirectory = args is ["rescore", ..]
+    ? string.Empty
+    : Environment.GetEnvironmentVariable("TF_STANDARDS_DIR")
+        ?? throw new InvalidOperationException("TF_STANDARDS_DIR isn't set.");
 
 return args switch
 {
@@ -48,18 +64,34 @@ return args switch
     ["rescore", .. var saved] when saved.Length > 0 => Rescore(saved),
     ["record-scans", .. var names] => await RecordScans(names),
     ["live", "--runs", var runs, .. var options] => await Live(
-        int.Parse(runs, CultureInfo.InvariantCulture), Option(options, "--record"), options.Contains("--references"), Option(options, "--suggestions"),
+        int.Parse(runs, CultureInfo.InvariantCulture),
+        Option(options, "--record"),
+        options.Contains("--references"),
+        Option(options, "--suggestions"),
         Option(options, "--cases")?.Split(','),
         Option(options, "--placement") is "agent" ? ReferencePlacement.Agent : ReferencePlacement.Finding,
-        options.Contains("--show-answers")),
-    ["retrieval", var labels] => await TfReview.Eval.RetrievalEval.RunAsync(labels, CasesDirectory, standardsDirectory, null),
-    ["retrieval", var labels, "--report", var report] => await TfReview.Eval.RetrievalEval.RunAsync(labels, CasesDirectory, standardsDirectory, report),
+        options.Contains("--show-answers")
+    ),
+    ["retrieval", var labels] => await TfReview.Eval.RetrievalEval.RunAsync(
+        labels,
+        CasesDirectory,
+        standardsDirectory,
+        null
+    ),
+    ["retrieval", var labels, "--report", var report] => await TfReview.Eval.RetrievalEval.RunAsync(
+        labels,
+        CasesDirectory,
+        standardsDirectory,
+        report
+    ),
     _ => Usage(),
 };
 
 static int Usage()
 {
-    Console.Error.WriteLine("usage: eval replay\n       eval record-scans [case...]\n       eval live --runs <n> [--record <dir>] [--references] [--suggestions <dir>] [--cases <name,...>] [--placement agent|finding] [--show-answers]\n       eval rescore <suggestions dir>...\n       eval retrieval <labels.yml> [--report <file.md>]");
+    Console.Error.WriteLine(
+        "usage: eval replay\n       eval record-scans [case...]\n       eval live --runs <n> [--record <dir>] [--references] [--suggestions <dir>] [--cases <name,...>] [--placement agent|finding] [--show-answers]\n       eval rescore <suggestions dir>...\n       eval retrieval <labels.yml> [--report <file.md>]"
+    );
     return 2;
 }
 
@@ -79,7 +111,9 @@ async Task<int> Replay()
                 var version = Prompts.Load(profile).Version;
                 if (answer.PromptVersion != version)
                 {
-                    stale.Add($"{profile} was recorded with prompt v{answer.PromptVersion}, and the prompt is v{version}: re-record it with the live run");
+                    stale.Add(
+                        $"{profile} was recorded with prompt v{answer.PromptVersion}, and the prompt is v{version}: re-record it with the live run"
+                    );
                 }
 
                 answers[profile] = answer.Text;
@@ -88,7 +122,11 @@ async Task<int> Replay()
 
         var chat = new ReplayChat(answers, profiles);
         var result = await Review(directory, chat);
-        failures += Report(Path.GetFileName(directory), 1, [.. stale, .. chat.Missing, .. Problems(directory, result), .. contracts.Problems(result)]);
+        failures += Report(
+            Path.GetFileName(directory),
+            1,
+            [.. stale, .. chat.Missing, .. Problems(directory, result), .. contracts.Problems(result)]
+        );
 
         // Production's default with references: per finding, through the suggester (D50).
         if (TfReview.Eval.ReplayReferences.Load(directory) is { } references)
@@ -98,7 +136,14 @@ async Task<int> Replay()
             failures += Report(
                 $"{Path.GetFileName(directory)} with references",
                 1,
-                [.. stale, .. withChat.Missing, .. Problems(directory, withReferences), .. contracts.Problems(withReferences), .. references.Problems(result, withReferences)]);
+                [
+                    .. stale,
+                    .. withChat.Missing,
+                    .. Problems(directory, withReferences),
+                    .. contracts.Problems(withReferences),
+                    .. references.Problems(result, withReferences),
+                ]
+            );
         }
     }
 
@@ -110,7 +155,11 @@ async Task<int> Replay()
 // Checkov on PATH and the Infracost token.
 async Task<int> RecordScans(string[] names)
 {
-    foreach (var directory in cases.Where(directory => names.Length == 0 || names.Contains(Path.GetFileName(directory), StringComparer.Ordinal)))
+    foreach (
+        var directory in cases.Where(directory =>
+            names.Length == 0 || names.Contains(Path.GetFileName(directory), StringComparer.Ordinal)
+        )
+    )
     {
         foreach (var stale in Directory.GetFiles(directory, "*.scan"))
         {
@@ -136,14 +185,18 @@ async Task<int> RecordScans(string[] names)
     return 0;
 }
 
-static string Describe(object outcome) => outcome switch
-{
-    CheckovRan ran => $"Checkov {ran.Violations.Count} on the allowlist",
-    CheckovFailed failed => $"Checkov FAILED {failed.Reason}",
-    InfracostRan ran => string.Create(CultureInfo.InvariantCulture, $"Infracost {ran.TotalDelta:+0.00;-0.00;0.00} a month"),
-    InfracostFailed failed => $"Infracost FAILED {failed.Reason}",
-    _ => "unknown",
-};
+static string Describe(object outcome) =>
+    outcome switch
+    {
+        CheckovRan ran => $"Checkov {ran.Violations.Count} on the allowlist",
+        CheckovFailed failed => $"Checkov FAILED {failed.Reason}",
+        InfracostRan ran => string.Create(
+            CultureInfo.InvariantCulture,
+            $"Infracost {ran.TotalDelta:+0.00;-0.00;0.00} a month"
+        ),
+        InfracostFailed failed => $"Infracost FAILED {failed.Reason}",
+        _ => "unknown",
+    };
 
 static string? Option(string[] options, string name) =>
     Array.IndexOf(options, name) is var index and >= 0 && index + 1 < options.Length ? options[index + 1] : null;
@@ -151,9 +204,19 @@ static string? Option(string[] options, string name) =>
 // With --references the config turns reference material on, and agents read the real index with the lock file below.
 // The baseline has to hold with it, and --suggestions saves what each run suggested, to read against a run without.
 // Cases with a suggestions.json also score their suggestions, which is reported and never fails a run.
-async Task<int> Live(int runs, string? recordDirectory, bool withReferences, string? suggestionsDirectory, string[]? only, ReferencePlacement placement, bool showAnswers)
+async Task<int> Live(
+    int runs,
+    string? recordDirectory,
+    bool withReferences,
+    string? suggestionsDirectory,
+    string[]? only,
+    ReferencePlacement placement,
+    bool showAnswers
+)
 {
-    var selected = only is null ? cases : cases.Where(directory => only.Contains(Path.GetFileName(directory), StringComparer.Ordinal)).ToArray();
+    var selected = only is null
+        ? cases
+        : cases.Where(directory => only.Contains(Path.GetFileName(directory), StringComparer.Ordinal)).ToArray();
     if (only is not null && selected.Length != only.Length)
     {
         Console.Error.WriteLine($"No such case among: {string.Join(", ", only)}");
@@ -166,11 +229,19 @@ async Task<int> Live(int runs, string? recordDirectory, bool withReferences, str
     var references = withReferences
         ? new TfReview.Service.CosmosReferenceRetriever(
             new Microsoft.Azure.Cosmos.CosmosClient(
-                    Required("TF_REVIEW_COSMOS_ENDPOINT"),
-                    new Azure.Identity.DefaultAzureCredential(),
-                    new Microsoft.Azure.Cosmos.CosmosClientOptions { ConnectionMode = Microsoft.Azure.Cosmos.ConnectionMode.Gateway })
-                .GetContainer("tfreview", "references"),
-            TfReview.Service.AzureQueryEmbedder.Create(endpoint, "text-embedding-3-small", new Azure.Identity.DefaultAzureCredential()))
+                Required("TF_REVIEW_COSMOS_ENDPOINT"),
+                new Azure.Identity.DefaultAzureCredential(),
+                new Microsoft.Azure.Cosmos.CosmosClientOptions
+                {
+                    ConnectionMode = Microsoft.Azure.Cosmos.ConnectionMode.Gateway,
+                }
+            ).GetContainer("tfreview", "references"),
+            TfReview.Service.AzureQueryEmbedder.Create(
+                endpoint,
+                "text-embedding-3-small",
+                new Azure.Identity.DefaultAzureCredential()
+            )
+        )
         : null;
 
     var failures = 0;
@@ -199,10 +270,18 @@ async Task<int> Live(int runs, string? recordDirectory, bool withReferences, str
                     JsonSerializer.Serialize(
                         new
                         {
-                            findings = result.Findings.Select(finding => new { finding.ResourceAddress, finding.Rule, finding.Title, finding.Suggestion }),
+                            findings = result.Findings.Select(finding => new
+                            {
+                                finding.ResourceAddress,
+                                finding.Rule,
+                                finding.Title,
+                                finding.Suggestion,
+                            }),
                             references = result.References,
                         },
-                        fileOptions) + "\n");
+                        fileOptions
+                    ) + "\n"
+                );
             }
 
             List<string> problems = [.. Problems(directory, result), .. contracts.Problems(result)];
@@ -248,7 +327,9 @@ async Task<int> Live(int runs, string? recordDirectory, bool withReferences, str
                         Directory.CreateDirectory(target);
                         await File.WriteAllTextAsync(
                             Path.Combine(target, $"{agent}.json"),
-                            JsonSerializer.Serialize(new RecordedAnswer(Prompts.Load(agent).Version, text), fileOptions) + "\n");
+                            JsonSerializer.Serialize(new RecordedAnswer(Prompts.Load(agent).Version, text), fileOptions)
+                                + "\n"
+                        );
                     }
                 }
             }
@@ -256,23 +337,38 @@ async Task<int> Live(int runs, string? recordDirectory, bool withReferences, str
 
         var heldOut = ExpectedCase.Load(directory).HeldOut;
         var label = heldOut ? " (held out)" : string.Empty;
-        Console.WriteLine(scoring is null ? $"{name}{label}: {passes} of {runs}" : $"{name}{label}: {passes} of {runs}, suggestion concepts {caseFound} of {caseAsked}");
+        Console.WriteLine(
+            scoring is null
+                ? $"{name}{label}: {passes} of {runs}"
+                : $"{name}{label}: {passes} of {runs}, suggestion concepts {caseFound} of {caseAsked}"
+        );
         conceptsFound += caseFound;
         conceptsAsked += caseAsked;
         tally.Add(heldOut, passes, runs, caseFound, caseAsked);
     }
 
     var versions = string.Join(", ", profiles.Select(profile => $"{profile} v{Prompts.Load(profile).Version}"));
-    Console.WriteLine(!withReferences
-        ? "Without reference material."
+    Console.WriteLine(
+        !withReferences ? "Without reference material."
         : placement == ReferencePlacement.Finding
             ? $"With reference material per finding, added by {ReferenceSuggester.Name} v{Prompts.Load(ReferenceSuggester.Name).Version}."
-            : $"With reference material, re-ranked by {ReferenceSelector.Name} v{Prompts.Load(ReferenceSelector.Name).Version}.");
-    Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"Prompts {versions}, model {deployment}, estimated cost ~${totalCost:0.0000}."));
+        : $"With reference material, re-ranked by {ReferenceSelector.Name} v{Prompts.Load(ReferenceSelector.Name).Version}."
+    );
+    Console.WriteLine(
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"Prompts {versions}, model {deployment}, estimated cost ~${totalCost:0.0000}."
+        )
+    );
     Console.WriteLine($"Input tokens: {inputTokens}, of which cached: {cachedTokens}.");
     if (conceptsAsked > 0)
     {
-        Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"Suggestion concepts: {conceptsFound} of {conceptsAsked} ({100.0 * conceptsFound / conceptsAsked:0}%)."));
+        Console.WriteLine(
+            string.Create(
+                CultureInfo.InvariantCulture,
+                $"Suggestion concepts: {conceptsFound} of {conceptsAsked} ({100.0 * conceptsFound / conceptsAsked:0}%)."
+            )
+        );
     }
 
     foreach (var line in tally.Lines())
@@ -280,12 +376,19 @@ async Task<int> Live(int runs, string? recordDirectory, bool withReferences, str
         Console.WriteLine(line);
     }
 
-    Console.WriteLine(failures == 0 ? $"PASS: {selected.Length} case(s), {runs} run(s) each." : $"FAIL: {failures} failed run(s).");
+    Console.WriteLine(
+        failures == 0 ? $"PASS: {selected.Length} case(s), {runs} run(s) each." : $"FAIL: {failures} failed run(s)."
+    );
     return failures == 0 ? 0 : 1;
 }
 
 async Task<ReviewResult> Review(
-    string directory, IChatClient chat, string deployment = "replay", IReferenceRetriever? references = null, ReferencePlacement placement = ReferencePlacement.Finding)
+    string directory,
+    IChatClient chat,
+    string deployment = "replay",
+    IReferenceRetriever? references = null,
+    ReferencePlacement placement = ReferencePlacement.Finding
+)
 {
     var scans = new RecordedScans(directory);
     var runner = new ReviewRunner(
@@ -295,7 +398,8 @@ async Task<ReviewResult> Review(
         infracost: new InfracostRunner(scans),
         checkov: new CheckovRunner(scans),
         references: references,
-        placement: placement);
+        placement: placement
+    );
 
     // The demo's provider version, which is what the index holds docs for.
     const string LockFile = "provider \"registry.opentofu.org/hashicorp/azurerm\" {\n  version = \"5.12.0\"\n}\n";
@@ -303,7 +407,8 @@ async Task<ReviewResult> Review(
         await File.ReadAllTextAsync(Path.Combine(directory, "plan.json")),
         references is null ? Config : Config + "\nreferences: true\n",
         Commit,
-        lockFile: references is null ? null : LockFile);
+        lockFile: references is null ? null : LockFile
+    );
 }
 
 List<string> Problems(string directory, ReviewResult result) => Judge.Problems(ExpectedCase.Load(directory), result);
@@ -383,8 +488,16 @@ static Dictionary<string, List<List<ScoredFinding>>>? SavedRuns(string saved)
     {
         runs[Path.GetFileName(directory)] =
         [
-            .. Directory.GetFiles(directory, "run-*.json").Order(StringComparer.Ordinal).Select(file =>
-                JsonDocument.Parse(File.ReadAllText(file)).RootElement.GetProperty("findings").Deserialize<List<ScoredFinding>>() ?? []),
+            .. Directory
+                .GetFiles(directory, "run-*.json")
+                .Order(StringComparer.Ordinal)
+                .Select(file =>
+                    JsonDocument
+                        .Parse(File.ReadAllText(file))
+                        .RootElement.GetProperty("findings")
+                        .Deserialize<List<ScoredFinding>>()
+                    ?? []
+                ),
         ];
     }
 
@@ -401,12 +514,13 @@ static int Report(string name, int run, IReadOnlyList<string> problems)
     return problems.Count == 0 ? 0 : 1;
 }
 
-static string Required(string name) => Environment.GetEnvironmentVariable(name)
-    ?? throw new InvalidOperationException($"{name} isn't set.");
+static string Required(string name) =>
+    Environment.GetEnvironmentVariable(name) ?? throw new InvalidOperationException($"{name} isn't set.");
 
 internal sealed record RecordedAnswer(
     [property: JsonPropertyName("prompt_version")] int PromptVersion,
-    [property: JsonPropertyName("text")] string Text);
+    [property: JsonPropertyName("text")] string Text
+);
 
 /// <summary>Which scan a scanner run is, and so which file holds its output.</summary>
 internal static class ScanFile
@@ -418,7 +532,9 @@ internal static class ScanFile
             return "checkov.scan";
         }
 
-        return arguments[1].EndsWith("before.json", StringComparison.Ordinal) ? "infracost-before.scan" : "infracost-after.scan";
+        return arguments[1].EndsWith("before.json", StringComparison.Ordinal)
+            ? "infracost-before.scan"
+            : "infracost-after.scan";
     }
 }
 
@@ -426,7 +542,11 @@ internal static class ScanFile
 internal sealed class RecordedScans(string directory) : IProcessRunner
 {
     public async Task<ProcessResult?> RunAsync(
-        string program, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken = default)
+        string program,
+        IReadOnlyList<string> arguments,
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default
+    )
     {
         var path = Path.Combine(directory, ScanFile.Name(program, arguments));
         return File.Exists(path) ? new ProcessResult(0, await File.ReadAllTextAsync(path, cancellationToken)) : null;
@@ -437,13 +557,21 @@ internal sealed class RecordedScans(string directory) : IProcessRunner
 internal sealed partial class RecordingScans(IProcessRunner inner, string directory) : IProcessRunner
 {
     public async Task<ProcessResult?> RunAsync(
-        string program, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken = default)
+        string program,
+        IReadOnlyList<string> arguments,
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default
+    )
     {
         var result = await inner.RunAsync(program, arguments, timeout, cancellationToken);
         if (result is not null)
         {
             var clean = Guid().Replace(result.Output, "00000000-0000-0000-0000-000000000000");
-            await File.WriteAllTextAsync(Path.Combine(directory, ScanFile.Name(program, arguments)), clean, cancellationToken);
+            await File.WriteAllTextAsync(
+                Path.Combine(directory, ScanFile.Name(program, arguments)),
+                clean,
+                cancellationToken
+            );
         }
 
         return result;
@@ -457,11 +585,14 @@ internal sealed partial class RecordingScans(IProcessRunner inner, string direct
 internal static class AgentOf
 {
     public static string? Request(ChatOptions? options, IEnumerable<string> profiles) =>
-        profiles.FirstOrDefault(profile => options?.Instructions?.StartsWith(Prompts.Load(profile).Body, StringComparison.Ordinal) == true);
+        profiles.FirstOrDefault(profile =>
+            options?.Instructions?.StartsWith(Prompts.Load(profile).Body, StringComparison.Ordinal) == true
+        );
 }
 
 /// <summary>Gives each agent its recorded answer, for runs that mustn't reach the model. No answer is a failure.</summary>
-internal sealed class ReplayChat(IReadOnlyDictionary<string, string> answers, IEnumerable<string> profiles) : IChatClient
+internal sealed class ReplayChat(IReadOnlyDictionary<string, string> answers, IEnumerable<string> profiles)
+    : IChatClient
 {
     private readonly System.Collections.Concurrent.ConcurrentQueue<string> missing = new();
 
@@ -472,7 +603,10 @@ internal sealed class ReplayChat(IReadOnlyDictionary<string, string> answers, IE
     public IReadOnlyList<string> Missing => [.. missing.Distinct(StringComparer.Ordinal)];
 
     public Task<ChatResponse> GetResponseAsync(
-        IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default
+    )
     {
         var agent = AgentOf.Request(options, profiles);
         if (agent is null || !answers.TryGetValue(agent, out var text))
@@ -481,29 +615,36 @@ internal sealed class ReplayChat(IReadOnlyDictionary<string, string> answers, IE
             throw new InvalidOperationException($"There's no recorded answer for {agent ?? "this request"}.");
         }
 
-        return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, text)) { FinishReason = ChatFinishReason.Stop });
+        return Task.FromResult(
+            new ChatResponse(new ChatMessage(ChatRole.Assistant, text)) { FinishReason = ChatFinishReason.Stop }
+        );
     }
 
     public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
-        IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException();
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default
+    ) => throw new NotSupportedException();
 
     public object? GetService(Type serviceType, object? serviceKey = null) => null;
 
-    public void Dispose()
-    {
-    }
+    public void Dispose() { }
 }
 
 /// <summary>Keeps each agent's last answer, so a passing run can become a replay.</summary>
 internal sealed class RecordingChat(IChatClient inner, IEnumerable<string> profiles) : DelegatingChatClient(inner)
 {
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> answers = new(StringComparer.Ordinal);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> answers = new(
+        StringComparer.Ordinal
+    );
 
     public IReadOnlyDictionary<string, string> Answers => answers;
 
     public override async Task<ChatResponse> GetResponseAsync(
-        IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default
+    )
     {
         var response = await base.GetResponseAsync(messages, options, cancellationToken);
         if (AgentOf.Request(options, profiles) is { } agent)
@@ -515,7 +656,5 @@ internal sealed class RecordingChat(IChatClient inner, IEnumerable<string> profi
     }
 
     // The client is shared across runs, so disposing one run's wrapper mustn't dispose it.
-    protected override void Dispose(bool disposing)
-    {
-    }
+    protected override void Dispose(bool disposing) { }
 }

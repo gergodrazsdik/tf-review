@@ -27,7 +27,11 @@ public static class EvidenceChecker
     /// <param name="findings">Findings to check, from scanners and agents.</param>
     /// <param name="plan">The plan the pointers must resolve in.</param>
     /// <param name="retrieved">The documents that were in the prompt. The retriever only returns accepted ones.</param>
-    public static EvidenceCheck Check(IEnumerable<Finding> findings, CondensedPlan plan, IReadOnlyCollection<StandardsDoc> retrieved)
+    public static EvidenceCheck Check(
+        IEnumerable<Finding> findings,
+        CondensedPlan plan,
+        IReadOnlyCollection<StandardsDoc> retrieved
+    )
     {
         var kept = new List<Finding>();
         var drops = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -83,7 +87,11 @@ public static class EvidenceChecker
             : DocumentDropReason(finding, plan, retrieved);
     }
 
-    private static string? DocumentDropReason(Finding finding, CondensedPlan plan, IReadOnlyCollection<StandardsDoc> retrieved)
+    private static string? DocumentDropReason(
+        Finding finding,
+        CondensedPlan plan,
+        IReadOnlyCollection<StandardsDoc> retrieved
+    )
     {
         var documents = finding.Evidence.Select(item => item.Value).OfType<DocEvidence>().ToList();
         if (documents.Count == 0)

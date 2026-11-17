@@ -29,7 +29,11 @@ public static class UpstreamArchive
     /// <param name="archive">A gzipped tar from GitHub, whose entries sit under one top-level directory.</param>
     /// <param name="wanted">Whether to keep a file, by its path in the repo.</param>
     /// <param name="cancellationToken">Stops the read.</param>
-    public static async Task<Contents> ReadAsync(Stream archive, Func<string, bool> wanted, CancellationToken cancellationToken = default)
+    public static async Task<Contents> ReadAsync(
+        Stream archive,
+        Func<string, bool> wanted,
+        CancellationToken cancellationToken = default
+    )
     {
         var files = new List<UpstreamFile>();
         string? license = null;
@@ -52,7 +56,10 @@ public static class UpstreamArchive
                 }
 
                 // Links are skipped, not followed, and nothing here touches the disk.
-                if (entry.EntryType is not (TarEntryType.RegularFile or TarEntryType.V7RegularFile) || entry.DataStream is null)
+                if (
+                    entry.EntryType is not (TarEntryType.RegularFile or TarEntryType.V7RegularFile)
+                    || entry.DataStream is null
+                )
                 {
                     continue;
                 }

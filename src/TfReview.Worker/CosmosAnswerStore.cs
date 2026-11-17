@@ -21,7 +21,11 @@ public sealed class CosmosAnswerStore(Container container) : IAnswerStore
 
     public async Task<string?> ReadAsync(string scope, string key, CancellationToken cancellationToken)
     {
-        using var response = await container.ReadItemStreamAsync(Prefix + key, new PartitionKey(scope), cancellationToken: cancellationToken);
+        using var response = await container.ReadItemStreamAsync(
+            Prefix + key,
+            new PartitionKey(scope),
+            cancellationToken: cancellationToken
+        );
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
@@ -32,7 +36,13 @@ public sealed class CosmosAnswerStore(Container container) : IAnswerStore
         return document?["kind"]?.GetValue<string>() == "answer" ? document["answer"]?.GetValue<string>() : null;
     }
 
-    public async Task WriteAsync(string scope, string key, string role, string answer, CancellationToken cancellationToken)
+    public async Task WriteAsync(
+        string scope,
+        string key,
+        string role,
+        string answer,
+        CancellationToken cancellationToken
+    )
     {
         var document = new JsonObject
         {
@@ -45,7 +55,11 @@ public sealed class CosmosAnswerStore(Container container) : IAnswerStore
         };
 
         using var content = new MemoryStream(Encoding.UTF8.GetBytes(document.ToJsonString()));
-        using var response = await container.UpsertItemStreamAsync(content, new PartitionKey(scope), cancellationToken: cancellationToken);
+        using var response = await container.UpsertItemStreamAsync(
+            content,
+            new PartitionKey(scope),
+            cancellationToken: cancellationToken
+        );
         response.EnsureSuccessStatusCode();
     }
 }

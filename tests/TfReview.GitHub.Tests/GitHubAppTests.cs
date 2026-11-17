@@ -27,7 +27,11 @@ public class GitHubAppTests
         await Assert.That(lifetime).IsLessThanOrEqualTo(600);
 
         var verified = Key.VerifyData(
-            Encoding.ASCII.GetBytes($"{parts[0]}.{parts[1]}"), Decode(parts[2]), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            Encoding.ASCII.GetBytes($"{parts[0]}.{parts[1]}"),
+            Decode(parts[2]),
+            HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pkcs1
+        );
         await Assert.That(verified).IsTrue();
     }
 
@@ -52,16 +56,20 @@ public class GitHubAppTests
     {
         var github = new FakeGitHub { Installed = false };
 
-        await Assert.ThrowsAsync<GitHubAppException>(() => App(github).OpenAsync("owner/repo", new Uri("https://api.example.test/")));
+        await Assert.ThrowsAsync<GitHubAppException>(() =>
+            App(github).OpenAsync("owner/repo", new Uri("https://api.example.test/"))
+        );
 
         await Assert.That(github.MintBody).IsNull();
     }
 
-    private static GitHubApp App(FakeGitHub github) => new(
-        new HttpClient(github) { BaseAddress = new Uri("https://api.example.test/") },
-        ClientId,
-        Key.ExportRSAPrivateKeyPem(),
-        new FixedTime());
+    private static GitHubApp App(FakeGitHub github) =>
+        new(
+            new HttpClient(github) { BaseAddress = new Uri("https://api.example.test/") },
+            ClientId,
+            Key.ExportRSAPrivateKeyPem(),
+            new FixedTime()
+        );
 
     private static byte[] Decode(string part)
     {
@@ -80,7 +88,10 @@ public class GitHubAppTests
 
         public string? MintBody { get; private set; }
 
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken
+        )
         {
             if (request.Method == HttpMethod.Delete)
             {
@@ -95,7 +106,10 @@ public class GitHubAppTests
             }
 
             this.MintBody = await request.Content!.ReadAsStringAsync(cancellationToken);
-            return new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent("""{"token":"test-token"}""") };
+            return new HttpResponseMessage(HttpStatusCode.Created)
+            {
+                Content = new StringContent("""{"token":"test-token"}"""),
+            };
         }
     }
 }

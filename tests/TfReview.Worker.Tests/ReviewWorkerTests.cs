@@ -16,7 +16,8 @@ public class ReviewWorkerTests
     private const string Head = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     private const string Newer = "cccccccccccccccccccccccccccccccccccccccc";
     private const string Base = "dddddddddddddddddddddddddddddddddddddddd";
-    private const string Plan = """{"format_version":"1.2","terraform_version":"1.13.2","planned_values":{"root_module":{}},"resource_changes":[],"configuration":{}}""";
+    private const string Plan =
+        """{"format_version":"1.2","terraform_version":"1.13.2","planned_values":{"root_module":{}},"resource_changes":[],"configuration":{}}""";
     private const string Config = "standards:\n  repo: a/b\n";
 
     private static readonly ReviewJob Job = new("review1", "1441359044", "owner/repo", 7, Head, ".tf-review.yml");
@@ -60,13 +61,15 @@ public class ReviewWorkerTests
                 meters.EnableMeasurementEvents(instrument);
             }
         };
-        listener.SetMeasurementEventCallback<long>((_, _, tags, _) =>
-        {
-            foreach (var tag in tags)
+        listener.SetMeasurementEventCallback<long>(
+            (_, _, tags, _) =>
             {
-                reported.Add(tag.Value?.ToString());
+                foreach (var tag in tags)
+                {
+                    reported.Add(tag.Value?.ToString());
+                }
             }
-        });
+        );
         listener.Start();
 
         await new World().RunAsync();
@@ -83,7 +86,9 @@ public class ReviewWorkerTests
 
         await Assert.That(world.Engine.Config).IsEqualTo(Config);
         await Assert.That(world.GitHub.Requests).Contains($"GET /repos/owner/repo/contents/.tf-review.yml?ref={Base}");
-        await Assert.That(world.GitHub.Requests.Any(request => request.Contains($"ref={Head}", StringComparison.Ordinal))).IsFalse();
+        await Assert
+            .That(world.GitHub.Requests.Any(request => request.Contains($"ref={Head}", StringComparison.Ordinal)))
+            .IsFalse();
     }
 
     // The result cache's scope (D53): another repo's answers must never come back.
@@ -104,7 +109,9 @@ public class ReviewWorkerTests
 
         await world.RunAsync();
 
-        await Assert.That(world.GitHub.Requests).Contains($"GET /repos/owner/repo/contents/infra/.terraform.lock.hcl?ref={Base}");
+        await Assert
+            .That(world.GitHub.Requests)
+            .Contains($"GET /repos/owner/repo/contents/infra/.terraform.lock.hcl?ref={Base}");
         await Assert.That(world.Engine.LockFile).IsEqualTo(Config);
     }
 
@@ -130,7 +137,11 @@ public class ReviewWorkerTests
 
         await world.RunAsync();
 
-        await Assert.That(world.GitHub.Requests.Any(request => request.Contains(".terraform.lock.hcl", StringComparison.Ordinal))).IsFalse();
+        await Assert
+            .That(
+                world.GitHub.Requests.Any(request => request.Contains(".terraform.lock.hcl", StringComparison.Ordinal))
+            )
+            .IsFalse();
         await Assert.That(world.Engine.LockFile).IsNull();
     }
 
@@ -246,7 +257,9 @@ public class ReviewWorkerTests
         await Assert.That(await world.RunAsync()).IsEqualTo(1);
 
         await Assert.That(world.Engine.Calls).IsEqualTo(0);
-        await Assert.That(world.GitHub.CheckRuns.Single().GetProperty("output").GetProperty("title").GetString()).IsEqualTo("Not reviewed");
+        await Assert
+            .That(world.GitHub.CheckRuns.Single().GetProperty("output").GetProperty("title").GetString())
+            .IsEqualTo("Not reviewed");
         await Assert.That(world.Completed).IsTrue();
     }
 
@@ -316,7 +329,9 @@ public class ReviewWorkerTests
 
         await Assert.That(world.GitHub.Comments.Count).IsEqualTo(1);
         await Assert.That(world.GitHub.Comments.Single()).DoesNotContain("CANARY");
-        await Assert.That(world.GitHub.CheckRuns.Single().GetProperty("output").GetProperty("title").GetString()).IsEqualTo("Not reviewed");
+        await Assert
+            .That(world.GitHub.CheckRuns.Single().GetProperty("output").GetProperty("title").GetString())
+            .IsEqualTo("Not reviewed");
         await Assert.That(world.Completed).IsTrue();
         await Assert.That(world.Statuses.Last.State).IsEqualTo(ReviewState.Failed);
     }
@@ -339,14 +354,20 @@ public class ReviewWorkerTests
     public async Task A_setup_failure_on_the_last_try_gives_up_loudly()
     {
         using var measured = new Measured("tfreview.give_ups");
-        var world = new World { Attempt = ReviewWorker.MaxAttempts, Queued = Job with { Repository = "owner/setup-fails" } };
+        var world = new World
+        {
+            Attempt = ReviewWorker.MaxAttempts,
+            Queued = Job with { Repository = "owner/setup-fails" },
+        };
         world.OpenThrows = new InvalidOperationException("Key Vault is down");
 
         await Assert.That(await world.RunAsync()).IsEqualTo(1);
 
         await Assert.That(world.Completed).IsTrue();
         await Assert.That(world.Statuses.Last.State).IsEqualTo(ReviewState.Failed);
-        await Assert.That(world.Log.Any(line => line.StartsWith("ERROR: review review1 gave up", StringComparison.Ordinal))).IsTrue();
+        await Assert
+            .That(world.Log.Any(line => line.StartsWith("ERROR: review review1 gave up", StringComparison.Ordinal)))
+            .IsTrue();
         var giveUp = measured.For("owner/setup-fails").Single();
         await Assert.That(giveUp["cause"]).IsEqualTo("InvalidOperationException");
         await Assert.That(giveUp["posted"] is false).IsTrue();
@@ -356,7 +377,11 @@ public class ReviewWorkerTests
     public async Task A_give_up_is_counted_with_its_cause()
     {
         using var measured = new Measured("tfreview.give_ups");
-        var world = new World { Attempt = ReviewWorker.MaxAttempts + 1, Queued = Job with { Repository = "owner/used-up" } };
+        var world = new World
+        {
+            Attempt = ReviewWorker.MaxAttempts + 1,
+            Queued = Job with { Repository = "owner/used-up" },
+        };
 
         await world.RunAsync();
 
@@ -484,9 +509,20 @@ public class ReviewWorkerTests
             1,
             Head,
             Verdict.Findings,
-            [new Finding("azurerm_virtual_network.a", "ADR-001", Severity.Medium, Reporter.Scanner, true, "Name", [new DocEvidence("ADR-001")])],
+            [
+                new Finding(
+                    "azurerm_virtual_network.a",
+                    "ADR-001",
+                    Severity.Medium,
+                    Reporter.Scanner,
+                    true,
+                    "Name",
+                    [new DocEvidence("ADR-001")]
+                ),
+            ],
             [],
-            new Dictionary<string, int>());
+            new Dictionary<string, int>()
+        );
 
         await world.RunAsync();
 
@@ -499,11 +535,21 @@ public class ReviewWorkerTests
     [Test]
     public async Task A_dismissal_carries_over_to_the_next_push()
     {
-        var finding = new Finding("azurerm_virtual_network.a", "ADR-001", Severity.Medium, Reporter.Scanner, true, "Name", [new DocEvidence("ADR-001")]);
+        var finding = new Finding(
+            "azurerm_virtual_network.a",
+            "ADR-001",
+            Severity.Medium,
+            Reporter.Scanner,
+            true,
+            "Name",
+            [new DocEvidence("ADR-001")]
+        );
         var result = new ReviewResult(1, Head, Verdict.Findings, [finding], [], new Dictionary<string, int>());
         var world = new World();
         world.Engine.Result = result;
-        world.GitHub.PreviousComment = CommentRenderer.Render(result, null).Replace("- [ ]", "- [x]", StringComparison.Ordinal);
+        world.GitHub.PreviousComment = CommentRenderer
+            .Render(result, null)
+            .Replace("- [ ]", "- [x]", StringComparison.Ordinal);
 
         await world.RunAsync();
 
@@ -527,24 +573,36 @@ public class ReviewWorkerTests
                 meters.EnableMeasurementEvents(instrument);
             }
         };
-        listener.SetMeasurementEventCallback<long>((_, _, tags, _) =>
-        {
-            foreach (var tag in tags)
+        listener.SetMeasurementEventCallback<long>(
+            (_, _, tags, _) =>
             {
-                if (tag.Key == "rule" && tag.Value is string value)
+                foreach (var tag in tags)
                 {
-                    counted.Add(value);
+                    if (tag.Key == "rule" && tag.Value is string value)
+                    {
+                        counted.Add(value);
+                    }
                 }
             }
-        });
+        );
         listener.Start();
 
-        var finding = new Finding("azurerm_virtual_network.a", rule, Severity.Medium, Reporter.Scanner, true, "Name", [new DocEvidence(rule)]);
+        var finding = new Finding(
+            "azurerm_virtual_network.a",
+            rule,
+            Severity.Medium,
+            Reporter.Scanner,
+            true,
+            "Name",
+            [new DocEvidence(rule)]
+        );
         var result = new ReviewResult(1, Head, Verdict.Findings, [finding], [], new Dictionary<string, int>());
         var world = new World();
         world.Engine.Result = result;
         var ticked = CommentRenderer.Render(result, null).Replace("- [ ]", "- [x]", StringComparison.Ordinal);
-        world.GitHub.PreviousComment = recorded ? CommentRenderer.Rewrite(result, null, ticked, record: true).Body : ticked;
+        world.GitHub.PreviousComment = recorded
+            ? CommentRenderer.Rewrite(result, null, ticked, record: true).Body
+            : ticked;
 
         await world.RunAsync();
 
@@ -556,11 +614,21 @@ public class ReviewWorkerTests
     public async Task A_dismissal_isnt_counted_when_the_comment_cant_be_written()
     {
         using var measured = new Measured("tfreview.dismissals");
-        var finding = new Finding("azurerm_virtual_network.a", "ADR-001", Severity.Medium, Reporter.Scanner, true, "Name", [new DocEvidence("ADR-001")]);
+        var finding = new Finding(
+            "azurerm_virtual_network.a",
+            "ADR-001",
+            Severity.Medium,
+            Reporter.Scanner,
+            true,
+            "Name",
+            [new DocEvidence("ADR-001")]
+        );
         var result = new ReviewResult(1, Head, Verdict.Findings, [finding], [], new Dictionary<string, int>());
         var world = new World { Queued = Job with { Repository = "owner/write-fails" } };
         world.Engine.Result = result;
-        world.GitHub.PreviousComment = CommentRenderer.Render(result, null).Replace("- [ ]", "- [x]", StringComparison.Ordinal);
+        world.GitHub.PreviousComment = CommentRenderer
+            .Render(result, null)
+            .Replace("- [ ]", "- [x]", StringComparison.Ordinal);
         world.GitHub.FailWrites = true;
 
         await world.RunAsync();
@@ -572,10 +640,20 @@ public class ReviewWorkerTests
     [Test]
     public async Task A_give_up_keeps_the_ticks()
     {
-        var finding = new Finding("azurerm_virtual_network.a", "ADR-001", Severity.Medium, Reporter.Scanner, true, "Name", [new DocEvidence("ADR-001")]);
+        var finding = new Finding(
+            "azurerm_virtual_network.a",
+            "ADR-001",
+            Severity.Medium,
+            Reporter.Scanner,
+            true,
+            "Name",
+            [new DocEvidence("ADR-001")]
+        );
         var result = new ReviewResult(1, Head, Verdict.Findings, [finding], [], new Dictionary<string, int>());
         var world = new World { Attempt = ReviewWorker.MaxAttempts + 1 };
-        world.GitHub.PreviousComment = CommentRenderer.Render(result, null).Replace("- [ ]", "- [x]", StringComparison.Ordinal);
+        world.GitHub.PreviousComment = CommentRenderer
+            .Render(result, null)
+            .Replace("- [ ]", "- [x]", StringComparison.Ordinal);
 
         await world.RunAsync();
 
@@ -594,18 +672,42 @@ public class ReviewWorkerTests
             Head,
             Verdict.Findings,
             [
-                new Finding("azurerm_network_security_rule.a", "POL-002", Severity.High, Reporter.Security, true, "SSH", [new DocEvidence("POL-002")]) { Blocking = true },
-                new Finding("azurerm_virtual_network.a", "ADR-001", Severity.Low, Reporter.Scanner, true, "Name", [new DocEvidence("ADR-001")]),
+                new Finding(
+                    "azurerm_network_security_rule.a",
+                    "POL-002",
+                    Severity.High,
+                    Reporter.Security,
+                    true,
+                    "SSH",
+                    [new DocEvidence("POL-002")]
+                )
+                {
+                    Blocking = true,
+                },
+                new Finding(
+                    "azurerm_virtual_network.a",
+                    "ADR-001",
+                    Severity.Low,
+                    Reporter.Scanner,
+                    true,
+                    "Name",
+                    [new DocEvidence("ADR-001")]
+                ),
             ],
             [],
-            new Dictionary<string, int>())
-        { Gate = GateMode.Blocking };
+            new Dictionary<string, int>()
+        )
+        {
+            Gate = GateMode.Blocking,
+        };
 
         await world.RunAsync();
 
         var check = world.GitHub.CheckRuns.Single();
         await Assert.That(check.GetProperty("conclusion").GetString()).IsEqualTo("failure");
-        await Assert.That(check.GetProperty("output").GetProperty("title").GetString()).IsEqualTo("2 findings, 1 blocking");
+        await Assert
+            .That(check.GetProperty("output").GetProperty("title").GetString())
+            .IsEqualTo("2 findings, 1 blocking");
     }
 
     // An outage can't block a merge, even in a repo that requires the check.
@@ -613,7 +715,10 @@ public class ReviewWorkerTests
     public async Task Not_reviewed_stays_neutral_under_a_blocking_gate()
     {
         var world = new World();
-        world.Engine.Result = ReviewResult.Failed(Head, ReviewScope.Plan, NotReviewedReason.Unavailable) with { Gate = GateMode.Blocking };
+        world.Engine.Result = ReviewResult.Failed(Head, ReviewScope.Plan, NotReviewedReason.Unavailable) with
+        {
+            Gate = GateMode.Blocking,
+        };
 
         await world.RunAsync();
 
@@ -658,15 +763,21 @@ public class ReviewWorkerTests
                 new FakeQueue(this),
                 this.Plans,
                 this.Statuses,
-                (repository, _) => this.OpenThrows is { } failure
-                    ? throw failure
-                    : Task.FromResult(new RepositorySession(
-                        new HttpClient(this.GitHub) { BaseAddress = new Uri("https://api.example.test/") }, repository)),
+                (repository, _) =>
+                    this.OpenThrows is { } failure
+                        ? throw failure
+                        : Task.FromResult(
+                            new RepositorySession(
+                                new HttpClient(this.GitHub) { BaseAddress = new Uri("https://api.example.test/") },
+                                repository
+                            )
+                        ),
                 this.Engine.RunAsync,
                 this.Log.Add,
                 new FixedTime(this.Now),
                 this.Budget,
-                this.Results);
+                this.Results
+            );
             return worker.RunOnceAsync();
         }
 
@@ -679,7 +790,12 @@ public class ReviewWorkerTests
 
         public bool Fail { get; set; }
 
-        public Task SaveAsync(string repositoryId, string reviewId, string resultJson, CancellationToken cancellationToken = default)
+        public Task SaveAsync(
+            string repositoryId,
+            string reviewId,
+            string resultJson,
+            CancellationToken cancellationToken = default
+        )
         {
             if (this.Fail)
             {
@@ -720,13 +836,12 @@ public class ReviewWorkerTests
 
         public Task<ReceivedJob?> ReceiveAsync(TimeSpan visibility, CancellationToken cancellationToken = default)
         {
-            ReceivedJob? received = world.Queued is null && !world.Unreadable
-                ? null
-                : new ReceivedJob(world.Queued, world.Attempt, _ =>
-                {
-                    world.Complete();
-                    return Task.CompletedTask;
-                });
+            ReceivedJob? received =
+                world.Queued is null && !world.Unreadable ? null : new ReceivedJob(world.Queued, world.Attempt, _ =>
+                    {
+                        world.Complete();
+                        return Task.CompletedTask;
+                    });
             return Task.FromResult(received);
         }
     }
@@ -735,7 +850,8 @@ public class ReviewWorkerTests
     {
         public ConcurrentDictionary<string, string> Saved { get; } = new() { [Job.ReviewId] = Plan };
 
-        public Task SaveAsync(string reviewId, string plan, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task SaveAsync(string reviewId, string plan, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
 
         public Task<string?> ReadAsync(string reviewId, CancellationToken cancellationToken = default) =>
             Task.FromResult(this.Saved.GetValueOrDefault(reviewId));
@@ -747,8 +863,11 @@ public class ReviewWorkerTests
 
         public ReviewStatus Last => this.status ?? throw new InvalidOperationException("No status was written.");
 
-        public Task<ReviewStatus?> ReadAsync(string repositoryId, string reviewId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(this.status);
+        public Task<ReviewStatus?> ReadAsync(
+            string repositoryId,
+            string reviewId,
+            CancellationToken cancellationToken = default
+        ) => Task.FromResult(this.status);
 
         public Task WriteAsync(ReviewStatus status, CancellationToken cancellationToken = default)
         {
@@ -769,10 +888,17 @@ public class ReviewWorkerTests
 
         public Exception? Throws { get; set; }
 
-        public ReviewResult Result { get; set; } = new(1, Head, Verdict.NoFindings, [], [], new Dictionary<string, int>());
+        public ReviewResult Result { get; set; } =
+            new(1, Head, Verdict.NoFindings, [], [], new Dictionary<string, int>());
 
         public Task<ReviewResult> RunAsync(
-            string plan, string? config, string? lockFile, string commit, string repositoryId, CancellationToken cancellationToken)
+            string plan,
+            string? config,
+            string? lockFile,
+            string commit,
+            string repositoryId,
+            CancellationToken cancellationToken
+        )
         {
             this.Calls++;
             this.RepositoryId = repositoryId;
@@ -800,7 +926,10 @@ public class ReviewWorkerTests
         /// <summary>The App's comment already on the PR, if any.</summary>
         public string? PreviousComment { get; set; }
 
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken
+        )
         {
             var path = request.RequestUri!.PathAndQuery;
             this.Requests.Add($"{request.Method} {path}");
@@ -814,22 +943,28 @@ public class ReviewWorkerTests
             {
                 return path switch
                 {
-                    _ when path.EndsWith("/pulls/7", StringComparison.Ordinal) => Json(new JsonObject
-                    {
-                        ["head"] = new JsonObject { ["sha"] = this.Heads.Count > 0 ? this.Heads.Dequeue() : Head },
-                        ["base"] = new JsonObject { ["sha"] = Base },
-                    }.ToJsonString()),
+                    _ when path.EndsWith("/pulls/7", StringComparison.Ordinal) => Json(
+                        new JsonObject
+                        {
+                            ["head"] = new JsonObject { ["sha"] = this.Heads.Count > 0 ? this.Heads.Dequeue() : Head },
+                            ["base"] = new JsonObject { ["sha"] = Base },
+                        }.ToJsonString()
+                    ),
                     _ when path.Contains("/contents/", StringComparison.Ordinal) => this.ConfigFound
                         ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(Config) }
                         : new HttpResponseMessage(HttpStatusCode.NotFound),
-                    _ when path.Contains("/comments", StringComparison.Ordinal) => Json(this.PreviousComment is null
-                        ? "[]"
-                        : new JsonArray(new JsonObject
-                        {
-                            ["id"] = 42,
-                            ["user"] = new JsonObject { ["login"] = "tf-review-gergodrazsdik[bot]" },
-                            ["body"] = this.PreviousComment,
-                        }).ToJsonString()),
+                    _ when path.Contains("/comments", StringComparison.Ordinal) => Json(
+                        this.PreviousComment is null
+                            ? "[]"
+                            : new JsonArray(
+                                new JsonObject
+                                {
+                                    ["id"] = 42,
+                                    ["user"] = new JsonObject { ["login"] = "tf-review-gergodrazsdik[bot]" },
+                                    ["body"] = this.PreviousComment,
+                                }
+                            ).ToJsonString()
+                    ),
                     _ => new HttpResponseMessage(HttpStatusCode.NotFound),
                 };
             }
@@ -839,7 +974,9 @@ public class ReviewWorkerTests
                 return new HttpResponseMessage(HttpStatusCode.BadGateway);
             }
 
-            var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken)).RootElement.Clone();
+            var body = JsonDocument
+                .Parse(await request.Content!.ReadAsStringAsync(cancellationToken))
+                .RootElement.Clone();
             if (path.Contains("/check-runs", StringComparison.Ordinal))
             {
                 this.CheckRuns.Add(body);
@@ -852,10 +989,8 @@ public class ReviewWorkerTests
             return Json("{}");
         }
 
-        private static HttpResponseMessage Json(string json) => new(HttpStatusCode.OK)
-        {
-            Content = new StringContent(json, Encoding.UTF8, "application/json"),
-        };
+        private static HttpResponseMessage Json(string json) =>
+            new(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
     }
 
     /// <summary>
@@ -875,21 +1010,27 @@ public class ReviewWorkerTests
                     meters.EnableMeasurementEvents(instrument);
                 }
             };
-            this.listener.SetMeasurementEventCallback<long>((_, value, tags, _) =>
-            {
-                var measurement = new Dictionary<string, object?>(StringComparer.Ordinal) { ["value"] = value };
-                foreach (var tag in tags)
+            this.listener.SetMeasurementEventCallback<long>(
+                (_, value, tags, _) =>
                 {
-                    measurement[tag.Key] = tag.Value;
-                }
+                    var measurement = new Dictionary<string, object?>(StringComparer.Ordinal) { ["value"] = value };
+                    foreach (var tag in tags)
+                    {
+                        measurement[tag.Key] = tag.Value;
+                    }
 
-                this.measurements.Enqueue(measurement);
-            });
+                    this.measurements.Enqueue(measurement);
+                }
+            );
             this.listener.Start();
         }
 
         public List<Dictionary<string, object?>> For(string repository) =>
-            [.. this.measurements.Where(measurement => Equals(measurement.GetValueOrDefault("repository"), repository))];
+            [
+                .. this.measurements.Where(measurement =>
+                    Equals(measurement.GetValueOrDefault("repository"), repository)
+                ),
+            ];
 
         public void Dispose() => this.listener.Dispose();
     }

@@ -29,17 +29,18 @@ public class ReviewApiTests
     private static readonly RsaSecurityKey OtherKey = new(RSA.Create(2048)) { KeyId = "test" };
 
     // What the spike saw on the demo repo's review job, the only kind of job that gets in.
-    private static Dictionary<string, object> GoodClaims() => new()
-    {
-        ["event_name"] = "pull_request",
-        ["environment"] = "review",
-        ["repository_id"] = "1441359044",
-        ["repository"] = "gergodrazsdik/tf-review-demo",
-        ["job_workflow_ref"] = $"{Workflow}@{Released}",
-        ["ref"] = "refs/pull/7/merge",
-        ["run_id"] = "100",
-        ["run_attempt"] = "1",
-    };
+    private static Dictionary<string, object> GoodClaims() =>
+        new()
+        {
+            ["event_name"] = "pull_request",
+            ["environment"] = "review",
+            ["repository_id"] = "1441359044",
+            ["repository"] = "gergodrazsdik/tf-review-demo",
+            ["job_workflow_ref"] = $"{Workflow}@{Released}",
+            ["ref"] = "refs/pull/7/merge",
+            ["run_id"] = "100",
+            ["run_attempt"] = "1",
+        };
 
     [Test]
     public async Task The_review_job_of_a_released_workflow_gets_in()
@@ -62,12 +63,36 @@ public class ReviewApiTests
     [Arguments("event_name", "pull_request_target", "WrongEvent")]
     [Arguments("environment", "prod", "WrongEnvironment")]
     [Arguments("repository_id", "999", "RepositoryNotAllowed")]
-    [Arguments("job_workflow_ref", "attacker/tf-review/.github/workflows/tf-review.yml@393013f60b4a7faea92f330eee4630bfbe3d2b18", "WrongWorkflow")]
-    [Arguments("job_workflow_ref", "gergodrazsdik/tf-review-demo/.github/workflows/plan.yml@393013f60b4a7faea92f330eee4630bfbe3d2b18", "WrongWorkflow")]
-    [Arguments("job_workflow_ref", "gergodrazsdik/tf-review/.github/workflows/e2e-live.yml@393013f60b4a7faea92f330eee4630bfbe3d2b18", "WrongWorkflow")]
-    [Arguments("job_workflow_ref", "gergodrazsdik/tf-review/.github/workflows/tf-review.yml@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "UnreleasedCommit")]
-    [Arguments("job_workflow_ref", "gergodrazsdik/tf-review/.github/workflows/tf-review.yml@refs/tags/v0.0.8", "UnreleasedCommit")]
-    [Arguments("job_workflow_ref", "gergodrazsdik/tf-review/.github/workflows/tf-review.yml@refs/heads/main", "UnreleasedCommit")]
+    [Arguments(
+        "job_workflow_ref",
+        "attacker/tf-review/.github/workflows/tf-review.yml@393013f60b4a7faea92f330eee4630bfbe3d2b18",
+        "WrongWorkflow"
+    )]
+    [Arguments(
+        "job_workflow_ref",
+        "gergodrazsdik/tf-review-demo/.github/workflows/plan.yml@393013f60b4a7faea92f330eee4630bfbe3d2b18",
+        "WrongWorkflow"
+    )]
+    [Arguments(
+        "job_workflow_ref",
+        "gergodrazsdik/tf-review/.github/workflows/e2e-live.yml@393013f60b4a7faea92f330eee4630bfbe3d2b18",
+        "WrongWorkflow"
+    )]
+    [Arguments(
+        "job_workflow_ref",
+        "gergodrazsdik/tf-review/.github/workflows/tf-review.yml@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "UnreleasedCommit"
+    )]
+    [Arguments(
+        "job_workflow_ref",
+        "gergodrazsdik/tf-review/.github/workflows/tf-review.yml@refs/tags/v0.0.8",
+        "UnreleasedCommit"
+    )]
+    [Arguments(
+        "job_workflow_ref",
+        "gergodrazsdik/tf-review/.github/workflows/tf-review.yml@refs/heads/main",
+        "UnreleasedCommit"
+    )]
     [Arguments("ref", "refs/heads/main", "NotAPullRequest")]
     [Arguments("ref", "refs/pull/7/head", "NotAPullRequest")]
     [Arguments("ref", "refs/pull/x/merge", "NotAPullRequest")]
@@ -125,7 +150,9 @@ public class ReviewApiTests
     {
         await using var api = await Api.StartAsync();
 
-        using var response = await api.SubmitAsync(Token(GoodClaims(), issuer: "https://token.actions.githubusercontent.com.evil.example"));
+        using var response = await api.SubmitAsync(
+            Token(GoodClaims(), issuer: "https://token.actions.githubusercontent.com.evil.example")
+        );
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
     }
@@ -157,13 +184,15 @@ public class ReviewApiTests
     public async Task An_unsigned_token_is_refused()
     {
         await using var api = await Api.StartAsync();
-        var unsigned = new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
-        {
-            Issuer = GitHubTokens.Issuer,
-            Audience = ApiOptions.Audience,
-            Expires = DateTime.UtcNow.AddMinutes(5),
-            Claims = GoodClaims(),
-        });
+        var unsigned = new JsonWebTokenHandler().CreateToken(
+            new SecurityTokenDescriptor
+            {
+                Issuer = GitHubTokens.Issuer,
+                Audience = ApiOptions.Audience,
+                Expires = DateTime.UtcNow.AddMinutes(5),
+                Claims = GoodClaims(),
+            }
+        );
 
         using var response = await api.SubmitAsync(unsigned);
 
@@ -187,7 +216,14 @@ public class ReviewApiTests
 
         using var response = await api.SendAsync(
             Token(GoodClaims()),
-            new { commit = Commit, config_path = ".tf-review.yml", plan = CleanPlan, pull_request = 99 });
+            new
+            {
+                commit = Commit,
+                config_path = ".tf-review.yml",
+                plan = CleanPlan,
+                pull_request = 99,
+            }
+        );
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
         await Assert.That(api.Queue.Jobs).IsEmpty();
@@ -204,7 +240,15 @@ public class ReviewApiTests
     {
         await using var api = await Api.StartAsync();
 
-        using var response = await api.SendAsync(Token(GoodClaims()), new { commit, config_path = configPath, plan = CleanPlan });
+        using var response = await api.SendAsync(
+            Token(GoodClaims()),
+            new
+            {
+                commit,
+                config_path = configPath,
+                plan = CleanPlan,
+            }
+        );
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
         await Assert.That(api.Queue.Jobs).IsEmpty();
@@ -216,7 +260,15 @@ public class ReviewApiTests
         await using var api = await Api.StartAsync();
 
         using var response = await api.SendAsync(
-            Token(GoodClaims()), new { commit = Commit, config_path = ".tf-review.yml", plan = CleanPlan, working_directory = "infra" });
+            Token(GoodClaims()),
+            new
+            {
+                commit = Commit,
+                config_path = ".tf-review.yml",
+                plan = CleanPlan,
+                working_directory = "infra",
+            }
+        );
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
         await Assert.That(api.Queue.Jobs.Single().WorkingDirectory).IsEqualTo("infra");
@@ -231,7 +283,15 @@ public class ReviewApiTests
         await using var api = await Api.StartAsync();
 
         using var response = await api.SendAsync(
-            Token(GoodClaims()), new { commit = Commit, config_path = ".tf-review.yml", plan = CleanPlan, working_directory = directory });
+            Token(GoodClaims()),
+            new
+            {
+                commit = Commit,
+                config_path = ".tf-review.yml",
+                plan = CleanPlan,
+                working_directory = directory,
+            }
+        );
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
     }
@@ -299,7 +359,9 @@ public class ReviewApiTests
     [Test]
     public async Task Too_large_a_request_is_refused_before_anything_is_stored()
     {
-        await using var api = await Api.StartAsync(new ApiOptions(Allowed, ReleasedCommits) { MaxRequestBytes = 1_000 });
+        await using var api = await Api.StartAsync(
+            new ApiOptions(Allowed, ReleasedCommits) { MaxRequestBytes = 1_000 }
+        );
 
         using var response = await api.SubmitAsync(Token(GoodClaims()), new string('x', 2_000));
 
@@ -346,7 +408,10 @@ public class ReviewApiTests
     [Test]
     public async Task A_failing_rate_count_falls_back_to_the_replicas_own()
     {
-        await using var api = await Api.StartAsync(new ApiOptions(Allowed, ReleasedCommits) { ReviewsPerHour = 1 }, new MemoryCounters { Fail = true });
+        await using var api = await Api.StartAsync(
+            new ApiOptions(Allowed, ReleasedCommits) { ReviewsPerHour = 1 },
+            new MemoryCounters { Fail = true }
+        );
 
         using var first = await api.SubmitAsync(Token(GoodClaims()));
         using var limited = await api.SubmitAsync(Token(GoodClaims()));
@@ -456,7 +521,8 @@ public class ReviewApiTests
             api.Client,
             _ => Task.FromResult(Token(GoodClaims())),
             (_, _) => Task.CompletedTask,
-            _ => { });
+            _ => { }
+        );
 
         var accepted = await submitter.SubmitAsync(CleanPlan, Commit, ".tf-review.yml");
 
@@ -485,7 +551,13 @@ public class ReviewApiTests
     private static readonly HashSet<string> Allowed = ["1441358991", "1441359044"];
     private static readonly HashSet<string> ReleasedCommits = [Released];
 
-    private static object Body(string plan = CleanPlan) => new { commit = Commit, config_path = ".tf-review.yml", plan };
+    private static object Body(string plan = CleanPlan) =>
+        new
+        {
+            commit = Commit,
+            config_path = ".tf-review.yml",
+            plan,
+        };
 
     private static async Task<string> Id(HttpResponseMessage response) =>
         (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetString()!;
@@ -495,19 +567,22 @@ public class ReviewApiTests
         SecurityKey? key = null,
         string issuer = GitHubTokens.Issuer,
         string audience = ApiOptions.Audience,
-        DateTime? expires = null)
+        DateTime? expires = null
+    )
     {
         var expiry = expires ?? DateTime.UtcNow.AddMinutes(5);
-        return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
-        {
-            Issuer = issuer,
-            Audience = audience,
-            NotBefore = expiry.AddMinutes(-10),
-            IssuedAt = expiry.AddMinutes(-10),
-            Expires = expiry,
-            Claims = claims,
-            SigningCredentials = new SigningCredentials(key ?? Key, SecurityAlgorithms.RsaSha256),
-        });
+        return new JsonWebTokenHandler().CreateToken(
+            new SecurityTokenDescriptor
+            {
+                Issuer = issuer,
+                Audience = audience,
+                NotBefore = expiry.AddMinutes(-10),
+                IssuedAt = expiry.AddMinutes(-10),
+                Expires = expiry,
+                Claims = claims,
+                SigningCredentials = new SigningCredentials(key ?? Key, SecurityAlgorithms.RsaSha256),
+            }
+        );
     }
 
     private sealed class MemoryCounters : ICounterStore
@@ -524,7 +599,13 @@ public class ReviewApiTests
             }
         }
 
-        public Task<double> AddAsync(string partition, string id, double amount, TimeSpan timeToLive, CancellationToken cancellationToken = default)
+        public Task<double> AddAsync(
+            string partition,
+            string id,
+            double amount,
+            TimeSpan timeToLive,
+            CancellationToken cancellationToken = default
+        )
         {
             if (this.Fail)
             {
@@ -570,9 +651,16 @@ public class ReviewApiTests
             var plans = new FakePlans();
             var queue = new FakeQueue();
             var statuses = new FakeStatuses();
-            var tokens = new GitHubTokens(GitHubTokens.Parameters(
-                ApiOptions.Audience, GitHubTokens.Issuer, parameters => parameters.IssuerSigningKey = Key));
-            app.MapReviews(options ?? new ApiOptions(Allowed, ReleasedCommits), tokens, new ServiceStores(plans, queue, statuses) { Counters = counters });
+            var tokens = new GitHubTokens(
+                GitHubTokens.Parameters(ApiOptions.Audience, GitHubTokens.Issuer, parameters =>
+                    parameters.IssuerSigningKey = Key
+                )
+            );
+            app.MapReviews(
+                options ?? new ApiOptions(Allowed, ReleasedCommits),
+                tokens,
+                new ServiceStores(plans, queue, statuses) { Counters = counters }
+            );
 
             await app.StartAsync();
             return new Api(app, plans, queue, statuses);
@@ -585,7 +673,8 @@ public class ReviewApiTests
             this.Statuses.Fail = store == "statuses";
         }
 
-        public Task<HttpResponseMessage> SubmitAsync(string token, string plan = CleanPlan) => this.SendAsync(token, Body(plan));
+        public Task<HttpResponseMessage> SubmitAsync(string token, string plan = CleanPlan) =>
+            this.SendAsync(token, Body(plan));
 
         public Task<HttpResponseMessage> SendAsync(string token, object body)
         {
@@ -648,7 +737,11 @@ public class ReviewApiTests
 
         public bool Fail { get; set; }
 
-        public Task<ReviewStatus?> ReadAsync(string repositoryId, string reviewId, CancellationToken cancellationToken = default)
+        public Task<ReviewStatus?> ReadAsync(
+            string repositoryId,
+            string reviewId,
+            CancellationToken cancellationToken = default
+        )
         {
             FailIf(this.Fail);
             return Task.FromResult(this.statuses.GetValueOrDefault((repositoryId, reviewId)));

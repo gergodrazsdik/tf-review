@@ -12,7 +12,12 @@ public sealed class ConfigException(string message) : Exception(message);
 /// The parts of a repo's <c>.tf-review.yml</c> the review uses, as
 /// docs/contracts/tf-review-config.schema.json defines them. It's read from the PR's base commit (D27).
 /// </summary>
-public sealed partial record TfReviewConfig(string Repository, string Commit, IReadOnlyList<string> Agents, bool Blocking)
+public sealed partial record TfReviewConfig(
+    string Repository,
+    string Commit,
+    IReadOnlyList<string> Agents,
+    bool Blocking
+)
 {
     /// <summary>Whether agents get imported reference material as well as the team's rules (D42). Off by default.</summary>
     public bool References { get; init; }

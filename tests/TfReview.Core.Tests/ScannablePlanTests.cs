@@ -9,7 +9,9 @@ public class ScannablePlanTests
     [Test]
     public async Task Rebuilds_what_scanners_need_from_a_redacted_plan()
     {
-        var json = Parse(Scannable(PlanSide.After, Change(Vm, "update", """{"size":"small"}""", """{"size":"large"}""")));
+        var json = Parse(
+            Scannable(PlanSide.After, Change(Vm, "update", """{"size":"small"}""", """{"size":"large"}"""))
+        );
 
         var resource = json["planned_values"]!["root_module"]!["resources"]![0]!;
         await Assert.That(json["format_version"]!.GetValue<string>()).IsEqualTo("1.2");
@@ -48,9 +50,15 @@ public class ScannablePlanTests
         var before = Parse(Scannable(PlanSide.Before, change));
         var after = Parse(Scannable(PlanSide.After, change));
 
-        await Assert.That(before["resource_changes"]![0]!["change"]!["after"]!["size"]!.GetValue<string>()).IsEqualTo("small");
-        await Assert.That(after["resource_changes"]![0]!["change"]!["after"]!["size"]!.GetValue<string>()).IsEqualTo("large");
-        await Assert.That(after["resource_changes"]![0]!["change"]!["actions"]![0]!.GetValue<string>()).IsEqualTo("create");
+        await Assert
+            .That(before["resource_changes"]![0]!["change"]!["after"]!["size"]!.GetValue<string>())
+            .IsEqualTo("small");
+        await Assert
+            .That(after["resource_changes"]![0]!["change"]!["after"]!["size"]!.GetValue<string>())
+            .IsEqualTo("large");
+        await Assert
+            .That(after["resource_changes"]![0]!["change"]!["actions"]![0]!.GetValue<string>())
+            .IsEqualTo("create");
     }
 
     [Test]
@@ -59,8 +67,12 @@ public class ScannablePlanTests
         var created = Change("a.new", "create", "null", "{}");
         var deleted = Change("a.old", "delete", "{}", "null");
 
-        await Assert.That(ScannablePlan.From(Redact(created, deleted), PlanSide.Before).Addresses).IsEquivalentTo(["a.old"]);
-        await Assert.That(ScannablePlan.From(Redact(created, deleted), PlanSide.After).Addresses).IsEquivalentTo(["a.new"]);
+        await Assert
+            .That(ScannablePlan.From(Redact(created, deleted), PlanSide.Before).Addresses)
+            .IsEquivalentTo(["a.old"]);
+        await Assert
+            .That(ScannablePlan.From(Redact(created, deleted), PlanSide.After).Addresses)
+            .IsEquivalentTo(["a.new"]);
     }
 
     // They don't change what the plan costs, and each scan is a limited pricing run.
@@ -71,7 +83,8 @@ public class ScannablePlanTests
             Change("a.kept", "update", "{}", "{}"),
             Change("a.same", "no-op", "{}", "{}"),
             Change("data.a.read", "read", "null", "{}", """ "mode":"data", """),
-            Change("a.kept", "delete", "{}", "null", """ "deposed":"abc", """));
+            Change("a.kept", "delete", "{}", "null", """ "deposed":"abc", """)
+        );
 
         await Assert.That(ScannablePlan.From(plan, PlanSide.Before).Addresses).IsEquivalentTo(["a.kept"]);
     }
@@ -113,10 +126,20 @@ public class ScannablePlanTests
     private static JsonNode Parse(string json) => JsonNode.Parse(json)!;
 
     private static RedactedPlan Redact(params string[] changes) =>
-        ((Redacted)new PlanRedactor().Redact(
-            $$"""{"format_version":"1.2","resource_changes":[{{string.Join(',', changes)}}]}""")).Plan;
+        (
+            (Redacted)
+                new PlanRedactor().Redact(
+                    $$"""{"format_version":"1.2","resource_changes":[{{string.Join(',', changes)}}]}"""
+                )
+        ).Plan;
 
-    private static string Change(string address, string action, string before, string after, string extra = """  "mode":"managed", """)
+    private static string Change(
+        string address,
+        string action,
+        string before,
+        string after,
+        string extra = """  "mode":"managed", """
+    )
     {
         var type = address[(address.StartsWith("data.", StringComparison.Ordinal) ? 5 : 0)..].Split('.')[0];
         var beforeMarks = before == "null" ? "false" : "{}";

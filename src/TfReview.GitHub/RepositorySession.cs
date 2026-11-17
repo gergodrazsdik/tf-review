@@ -10,12 +10,19 @@ public sealed record PullRequestCommits(string Head, string Base);
 /// <summary>What one review does on one repo through its own token, which is revoked when this is disposed.</summary>
 public sealed class RepositorySession(HttpClient http, string repository) : IAsyncDisposable
 {
-    public async Task<PullRequestCommits> ReadPullRequestAsync(int pullRequest, CancellationToken cancellationToken = default)
+    public async Task<PullRequestCommits> ReadPullRequestAsync(
+        int pullRequest,
+        CancellationToken cancellationToken = default
+    )
     {
-        var body = await http.GetFromJsonAsync<JsonElement>($"repos/{repository}/pulls/{pullRequest}", cancellationToken);
+        var body = await http.GetFromJsonAsync<JsonElement>(
+            $"repos/{repository}/pulls/{pullRequest}",
+            cancellationToken
+        );
         return new PullRequestCommits(
             body.GetProperty("head").GetProperty("sha").GetString() ?? throw new JsonException("The PR has no head."),
-            body.GetProperty("base").GetProperty("sha").GetString() ?? throw new JsonException("The PR has no base."));
+            body.GetProperty("base").GetProperty("sha").GetString() ?? throw new JsonException("The PR has no base.")
+        );
     }
 
     /// <summary>A file at a commit, or null if it isn't there, which a review reports as an invalid config.</summary>
@@ -35,12 +42,18 @@ public sealed class RepositorySession(HttpClient http, string repository) : IAsy
         return await response.Content.ReadAsStringAsync(cancellationToken);
     }
 
-    public Task<CommentAction> UpsertCommentAsync(int pullRequest, string body, CancellationToken cancellationToken = default) =>
-        new StickyComment(http, repository, pullRequest).UpsertAsync(body, cancellationToken);
+    public Task<CommentAction> UpsertCommentAsync(
+        int pullRequest,
+        string body,
+        CancellationToken cancellationToken = default
+    ) => new StickyComment(http, repository, pullRequest).UpsertAsync(body, cancellationToken);
 
     /// <summary>Writes the comment built from the one it replaces, so ticks on it can be read first (D56).</summary>
-    public Task<CommentAction> UpsertCommentAsync(int pullRequest, Func<string?, string> build, CancellationToken cancellationToken = default) =>
-        new StickyComment(http, repository, pullRequest).UpsertAsync(build, cancellationToken);
+    public Task<CommentAction> UpsertCommentAsync(
+        int pullRequest,
+        Func<string?, string> build,
+        CancellationToken cancellationToken = default
+    ) => new StickyComment(http, repository, pullRequest).UpsertAsync(build, cancellationToken);
 
     /// <summary>Advisory by default (D9): findings are neutral, and only a repo's own rules could make it fail one day.</summary>
     public async Task PostCheckRunAsync(ReviewResult result, CancellationToken cancellationToken = default)
@@ -68,7 +81,8 @@ public sealed class RepositorySession(HttpClient http, string repository) : IAsy
                 conclusion,
                 output = new { title, summary = "The details are in the PR's comment." },
             },
-            cancellationToken);
+            cancellationToken
+        );
         response.EnsureSuccessStatusCode();
     }
 

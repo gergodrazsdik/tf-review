@@ -42,7 +42,10 @@ public sealed class InfracostRunner(IProcessRunner processes, string program = "
     /// <summary>What a scan needs passed on: its login, its pinned plugins, and no update or agent checks.</summary>
     public static readonly string[] EnvironmentVariables =
     [
-        "INFRACOST_CLI_AUTHENTICATION_TOKEN", "INFRACOST_CLI_PLUGIN_DIR", "INFRACOST_SKIP_UPDATE_CHECK", "INFRACOST_SKIP_AGENT_CHECK",
+        "INFRACOST_CLI_AUTHENTICATION_TOKEN",
+        "INFRACOST_CLI_PLUGIN_DIR",
+        "INFRACOST_SKIP_UPDATE_CHECK",
+        "INFRACOST_SKIP_AGENT_CHECK",
     ];
 
     // Without a token a scan waits forever for a login, so this also ends that.
@@ -57,7 +60,11 @@ public sealed class InfracostRunner(IProcessRunner processes, string program = "
         try
         {
             // A side with no resources isn't scanned: pricing runs are limited, and it would cost nothing.
-            var beforeScan = await ScanAsync(before, Path.Combine(directory.FullName, "before.json"), cancellationToken);
+            var beforeScan = await ScanAsync(
+                before,
+                Path.Combine(directory.FullName, "before.json"),
+                cancellationToken
+            );
             if (beforeScan.Failure is { } beforeFailure)
             {
                 return new InfracostFailed(beforeFailure);
@@ -100,13 +107,22 @@ public sealed class InfracostRunner(IProcessRunner processes, string program = "
                     foreach (var resource in project.GetProperty("resources").EnumerateArray())
                     {
                         var address = resource.GetProperty("name").GetString() ?? throw new JsonException();
-                        prices[address] = resource.GetProperty("is_supported").GetBoolean() ? MonthlyCost(resource) : null;
+                        prices[address] = resource.GetProperty("is_supported").GetBoolean()
+                            ? MonthlyCost(resource)
+                            : null;
                     }
                 }
 
                 return new ScanResult(prices, null);
             }
-            catch (Exception e) when (e is KeyNotFoundException or InvalidOperationException or JsonException or FormatException or OverflowException)
+            catch (Exception e)
+                when (e
+                        is KeyNotFoundException
+                            or InvalidOperationException
+                            or JsonException
+                            or FormatException
+                            or OverflowException
+                )
             {
                 return new ScanResult(null, InfracostFailure.MalformedResult);
             }
@@ -114,11 +130,16 @@ public sealed class InfracostRunner(IProcessRunner processes, string program = "
     }
 
     private static List<ResourceCost> Combine(
-        ScannablePlan before, ScannablePlan after, IReadOnlyDictionary<string, decimal?> beforePrices, IReadOnlyDictionary<string, decimal?> afterPrices)
+        ScannablePlan before,
+        ScannablePlan after,
+        IReadOnlyDictionary<string, decimal?> beforePrices,
+        IReadOnlyDictionary<string, decimal?> afterPrices
+    )
     {
         return
         [
-            .. before.Addresses.Union(after.Addresses, StringComparer.Ordinal)
+            .. before
+                .Addresses.Union(after.Addresses, StringComparer.Ordinal)
                 .Order(StringComparer.Ordinal)
                 .Select(address =>
                 {
@@ -129,7 +150,11 @@ public sealed class InfracostRunner(IProcessRunner processes, string program = "
         ];
     }
 
-    private static (decimal Cost, bool Priced) Price(string address, ScannablePlan side, IReadOnlyDictionary<string, decimal?> prices)
+    private static (decimal Cost, bool Priced) Price(
+        string address,
+        ScannablePlan side,
+        IReadOnlyDictionary<string, decimal?> prices
+    )
     {
         // Not on this side at all, as with one side of a create or a delete: it costs nothing there.
         if (!side.Addresses.Contains(address, StringComparer.Ordinal))
@@ -147,7 +172,10 @@ public sealed class InfracostRunner(IProcessRunner processes, string program = "
         {
             foreach (var component in components.EnumerateArray())
             {
-                total += decimal.Parse(component.GetProperty("total_monthly_cost").GetString() ?? throw new JsonException(), CultureInfo.InvariantCulture);
+                total += decimal.Parse(
+                    component.GetProperty("total_monthly_cost").GetString() ?? throw new JsonException(),
+                    CultureInfo.InvariantCulture
+                );
             }
         }
 
@@ -171,7 +199,11 @@ public sealed class InfracostRunner(IProcessRunner processes, string program = "
 
         await File.WriteAllTextAsync(path, plan.ToCanonicalJson(), cancellationToken);
         var result = await processes.RunAsync(
-            program, ["scan", path, "--json", "--no-color", "--currency", "USD"], Timeout, cancellationToken);
+            program,
+            ["scan", path, "--json", "--no-color", "--currency", "USD"],
+            Timeout,
+            cancellationToken
+        );
         if (result is null)
         {
             return new ScanResult(null, InfracostFailure.CouldNotRun);

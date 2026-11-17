@@ -8,7 +8,8 @@ public sealed record ReviewJob(
     int PullRequest,
     string Commit,
     string ConfigPath,
-    string? WorkingDirectory = null);
+    string? WorkingDirectory = null
+);
 
 public enum ReviewState
 {
@@ -27,7 +28,8 @@ public sealed record ReviewStatus(
     int PullRequest,
     string Commit,
     ReviewState State,
-    DateTimeOffset UpdatedAt)
+    DateTimeOffset UpdatedAt
+)
 {
     public string? Verdict { get; init; }
 }
@@ -38,7 +40,12 @@ public sealed record ReviewStatus(
 /// </summary>
 public interface IResultStore
 {
-    Task SaveAsync(string repositoryId, string reviewId, string resultJson, CancellationToken cancellationToken = default);
+    Task SaveAsync(
+        string repositoryId,
+        string reviewId,
+        string resultJson,
+        CancellationToken cancellationToken = default
+    );
 }
 
 public interface IPlanStore
@@ -69,7 +76,13 @@ public interface ICounterStore
     Task<double> ReadAsync(string partition, string id, CancellationToken cancellationToken = default);
 
     /// <summary>Adds to the counter, creating it with this lifetime, and returns the new value.</summary>
-    Task<double> AddAsync(string partition, string id, double amount, TimeSpan timeToLive, CancellationToken cancellationToken = default);
+    Task<double> AddAsync(
+        string partition,
+        string id,
+        double amount,
+        TimeSpan timeToLive,
+        CancellationToken cancellationToken = default
+    );
 }
 
 public interface IReviewStatusStore

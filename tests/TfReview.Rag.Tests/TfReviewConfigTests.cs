@@ -27,7 +27,9 @@ public class TfReviewConfigTests
     public async Task References_are_off_unless_a_config_asks()
     {
         var off = TfReviewConfig.Parse($"version: 1\nstandards:\n  repository: a/b\n  commit: {Sha}\n");
-        var on = TfReviewConfig.Parse($"version: 1\nstandards:\n  repository: a/b\n  commit: {Sha}\nreferences: true\n");
+        var on = TfReviewConfig.Parse(
+            $"version: 1\nstandards:\n  repository: a/b\n  commit: {Sha}\nreferences: true\n"
+        );
 
         await Assert.That(off.References).IsFalse();
         await Assert.That(on.References).IsTrue();
@@ -49,14 +51,21 @@ public class TfReviewConfigTests
     [Test]
     public async Task Refuses_a_minimum_severity_the_contract_doesnt_have()
     {
-        await Assert.That(() => TfReviewConfig.Parse($"version: 1\nstandards:\n  repository: a/b\n  commit: {Sha}\nthresholds:\n  comment_min_severity: bogus\n"))
+        await Assert
+            .That(() =>
+                TfReviewConfig.Parse(
+                    $"version: 1\nstandards:\n  repository: a/b\n  commit: {Sha}\nthresholds:\n  comment_min_severity: bogus\n"
+                )
+            )
             .Throws<ConfigException>();
     }
 
     [Test]
     public async Task Cost_is_opt_in_because_it_needs_a_secret()
     {
-        var config = TfReviewConfig.Parse($"version: 1\nstandards:\n  repository: a/b\n  commit: {Sha}\nagents: [conventions, cost]\n");
+        var config = TfReviewConfig.Parse(
+            $"version: 1\nstandards:\n  repository: a/b\n  commit: {Sha}\nagents: [conventions, cost]\n"
+        );
 
         await Assert.That(config.Agents).Contains("cost");
     }
@@ -64,7 +73,9 @@ public class TfReviewConfigTests
     [Test]
     public async Task Reads_blocking_mode()
     {
-        var config = TfReviewConfig.Parse($"version: 1\nstandards:\n  repository: a/b\n  commit: {Sha}\ngate:\n  mode: blocking\n");
+        var config = TfReviewConfig.Parse(
+            $"version: 1\nstandards:\n  repository: a/b\n  commit: {Sha}\ngate:\n  mode: blocking\n"
+        );
 
         await Assert.That(config.Blocking).IsTrue();
     }
@@ -75,11 +86,21 @@ public class TfReviewConfigTests
     [Arguments("version: 1\n")]
     [Arguments("version: 1\nstandards:\n  repository: a/b\n")]
     [Arguments("version: 1\nstandards:\n  repository: a/b\n  commit: main\n")]
-    [Arguments("version: 1\nstandards:\n  repository: a/b/../../c\n  commit: 0123456789abcdef0123456789abcdef01234567\n")]
-    [Arguments("version: 1\nstandards:\n  repository: https://evil.example/x\n  commit: 0123456789abcdef0123456789abcdef01234567\n")]
-    [Arguments("version: 1\nstandards:\n  repository: a/b\n  commit: 0123456789abcdef0123456789abcdef01234567\nagents: [orchestrator]\n")]
-    [Arguments("version: 1\nstandards:\n  repository: a/b\n  commit: 0123456789abcdef0123456789abcdef01234567\ngate:\n  mode: strict\n")]
-    [Arguments("version: 1\nstandards:\n  repository: a/b\n  commit: 0123456789abcdef0123456789abcdef01234567\nunknown: true\n")]
+    [Arguments(
+        "version: 1\nstandards:\n  repository: a/b/../../c\n  commit: 0123456789abcdef0123456789abcdef01234567\n"
+    )]
+    [Arguments(
+        "version: 1\nstandards:\n  repository: https://evil.example/x\n  commit: 0123456789abcdef0123456789abcdef01234567\n"
+    )]
+    [Arguments(
+        "version: 1\nstandards:\n  repository: a/b\n  commit: 0123456789abcdef0123456789abcdef01234567\nagents: [orchestrator]\n"
+    )]
+    [Arguments(
+        "version: 1\nstandards:\n  repository: a/b\n  commit: 0123456789abcdef0123456789abcdef01234567\ngate:\n  mode: strict\n"
+    )]
+    [Arguments(
+        "version: 1\nstandards:\n  repository: a/b\n  commit: 0123456789abcdef0123456789abcdef01234567\nunknown: true\n"
+    )]
     [Arguments("{not yaml: [")]
     public async Task Rejects_what_the_contract_doesnt_allow(string yaml)
     {
@@ -89,7 +110,9 @@ public class TfReviewConfigTests
     [Test]
     public async Task A_bad_config_doesnt_quote_itself_in_the_error()
     {
-        var error = await Assert.That(() => TfReviewConfig.Parse("my-secret-looking-value: [")).Throws<ConfigException>();
+        var error = await Assert
+            .That(() => TfReviewConfig.Parse("my-secret-looking-value: ["))
+            .Throws<ConfigException>();
 
         await Assert.That(error!.Message).DoesNotContain("my-secret-looking-value");
     }

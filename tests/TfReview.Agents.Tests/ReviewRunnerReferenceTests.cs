@@ -41,11 +41,24 @@ public class ReviewRunnerReferenceTests
         """;
 
     private static readonly string VnetPlan = TestPlans.Json(
-        TestPlans.Create(Vnet, "azurerm_virtual_network", """{"name":"vnet-a-prod","address_space":["10.0.0.0/16"],"tags":null}"""));
+        TestPlans.Create(
+            Vnet,
+            "azurerm_virtual_network",
+            """{"name":"vnet-a-prod","address_space":["10.0.0.0/16"],"tags":null}"""
+        )
+    );
 
     private static readonly ReferenceDoc Doc = new(
-        "REF-0123456789abcdef0123456789abcdef", "azurerm-docs", "azurerm_virtual_network", "Arguments Reference",
-        "CANARY text about address_space", "https://github.com/x", "MPL-2.0", "HashiCorp, MPL-2.0", ["azurerm_virtual_network"]);
+        "REF-0123456789abcdef0123456789abcdef",
+        "azurerm-docs",
+        "azurerm_virtual_network",
+        "Arguments Reference",
+        "CANARY text about address_space",
+        "https://github.com/x",
+        "MPL-2.0",
+        "HashiCorp, MPL-2.0",
+        ["azurerm_virtual_network"]
+    );
 
     [Test]
     public async Task A_config_that_asks_gets_references_in_their_own_fence()
@@ -57,7 +70,9 @@ public class ReviewRunnerReferenceTests
 
         var user = chat.Requests.Last().User;
         await Assert.That(user).Contains("<reference_material>").And.Contains("CANARY text about address_space");
-        await Assert.That(user.IndexOf("</reference_material>", StringComparison.Ordinal)).IsLessThan(user.IndexOf("<plan_data>", StringComparison.Ordinal));
+        await Assert
+            .That(user.IndexOf("</reference_material>", StringComparison.Ordinal))
+            .IsLessThan(user.IndexOf("<plan_data>", StringComparison.Ordinal));
         await Assert.That(chat.Requests.Count).IsEqualTo(2);
         await Assert.That(result.References!.CorpusVersion).IsEqualTo("0123456789abcdef");
         await Assert.That(result.References.Attributions.Single()).IsEqualTo("HashiCorp, MPL-2.0");
@@ -114,7 +129,11 @@ public class ReviewRunnerReferenceTests
             """;
         var chat = new FakeChat(FakeChat.Answer(Picked), FakeChat.Answer(answer));
 
-        var result = await Run(chat, new FakeRetriever(new ReferenceRetrieval([Doc], "0123456789abcdef", false)), Config + "\nreferences: true\n");
+        var result = await Run(
+            chat,
+            new FakeRetriever(new ReferenceRetrieval([Doc], "0123456789abcdef", false)),
+            Config + "\nreferences: true\n"
+        );
 
         await Assert.That(result.Findings).IsEmpty();
     }
@@ -135,7 +154,12 @@ public class ReviewRunnerReferenceTests
 
     // Per agent unless a test says otherwise, because most of these are about what an agent's prompt holds.
     private static async Task<ReviewResult> Run(
-        FakeChat chat, IReferenceRetriever retriever, string config, Action<string>? log = null, ReferencePlacement placement = ReferencePlacement.Agent)
+        FakeChat chat,
+        IReferenceRetriever retriever,
+        string config,
+        Action<string>? log = null,
+        ReferencePlacement placement = ReferencePlacement.Agent
+    )
     {
         var directory = Directory.CreateTempSubdirectory("tfreview-source-");
         try
@@ -151,7 +175,8 @@ public class ReviewRunnerReferenceTests
                 arbiter: new RuleArbiter(),
                 log: log,
                 references: retriever,
-                placement: placement);
+                placement: placement
+            );
 
             return await runner.RunAsync(VnetPlan, config, Commit, lockFile: LockFile);
         }
@@ -165,7 +190,10 @@ public class ReviewRunnerReferenceTests
     {
         public List<ReferenceQuery> Queries { get; } = [];
 
-        public Task<ReferenceRetrieval> RetrieveAsync(ReferenceQuery query, CancellationToken cancellationToken = default)
+        public Task<ReferenceRetrieval> RetrieveAsync(
+            ReferenceQuery query,
+            CancellationToken cancellationToken = default
+        )
         {
             this.Queries.Add(query);
             return result is null ? throw new HttpRequestException("Cosmos is away.") : Task.FromResult(result);

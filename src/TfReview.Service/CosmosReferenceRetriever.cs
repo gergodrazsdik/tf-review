@@ -26,15 +26,29 @@ public sealed partial class CosmosReferenceRetriever(Container container, IQuery
 {
     private const int MaxSearchTerms = 12;
 
-    private const string Fields = "c.id, c.source, c.title, c.heading, c.text, c.source_url, c.license, c.attribution, c.applies_to";
+    private const string Fields =
+        "c.id, c.source, c.title, c.heading, c.text, c.source_url, c.license, c.attribution, c.applies_to";
 
     // Words too common in these docs to say what a query is about.
     private static readonly HashSet<string> CommonWords = new(StringComparer.OrdinalIgnoreCase)
     {
-        "azurerm", "resource", "resources", "the", "and", "for", "with", "changed", "attributes", "types", "type",
+        "azurerm",
+        "resource",
+        "resources",
+        "the",
+        "and",
+        "for",
+        "with",
+        "changed",
+        "attributes",
+        "types",
+        "type",
     };
 
-    public async Task<ReferenceRetrieval> RetrieveAsync(ReferenceQuery query, CancellationToken cancellationToken = default)
+    public async Task<ReferenceRetrieval> RetrieveAsync(
+        ReferenceQuery query,
+        CancellationToken cancellationToken = default
+    )
     {
         if (await this.ActiveVersionAsync(cancellationToken) is not { } version)
         {
@@ -45,21 +59,36 @@ public sealed partial class CosmosReferenceRetriever(Container container, IQuery
         float[] vector = metadataOnly ? [] : await embedder.EmbedAsync(query.Text, cancellationToken);
         var terms = SearchTerms(query.Text);
 
-        var provider = query.ProviderVersion is { } providerVersion && query.ResourceTypes.Count > 0
-            ? await this.SearchAsync(
+        var provider =
+            query.ProviderVersion is { } providerVersion && query.ResourceTypes.Count > 0
+                ? await this.SearchAsync(
+                    version,
+                    // A resource's outputs, which a review of its inputs never needs, and which crowd out what it does.
+                    "c.provider_version = @providerVersion AND ARRAY_CONTAINS(@types, c.applies_to[0]) AND c.heading != 'Attributes Reference'",
+                    vector,
+                    terms,
+                    query.Ranking,
+                    query.Candidates,
+                    new Dictionary<string, object>
+                    {
+                        ["@providerVersion"] = providerVersion,
+                        ["@types"] = query.ResourceTypes.ToArray(),
+                    },
+                    cancellationToken
+                )
+                : [];
+        IReadOnlyList<ReferenceDoc> general = metadataOnly
+            ? []
+            : await this.SearchAsync(
                 version,
-                // A resource's outputs, which a review of its inputs never needs, and which crowd out what it does.
-                "c.provider_version = @providerVersion AND ARRAY_CONTAINS(@types, c.applies_to[0]) AND c.heading != 'Attributes Reference'",
+                "ARRAY_LENGTH(c.applies_to) = 0",
                 vector,
                 terms,
                 query.Ranking,
                 query.Candidates,
-                new Dictionary<string, object> { ["@providerVersion"] = providerVersion, ["@types"] = query.ResourceTypes.ToArray() },
-                cancellationToken)
-            : [];
-        IReadOnlyList<ReferenceDoc> general = metadataOnly
-            ? []
-            : await this.SearchAsync(version, "ARRAY_LENGTH(c.applies_to) = 0", vector, terms, query.Ranking, query.Candidates, [], cancellationToken);
+                [],
+                cancellationToken
+            );
 
         // Alternating keeps either kind from taking the whole budget. Policies and framework pages go first, because they
         // say what's expected of a resource, where provider docs mostly say how to write it.
@@ -76,23 +105,34 @@ public sealed partial class CosmosReferenceRetriever(Container container, IQuery
         }
 
         // Missing when the lock file names no version, or one that isn't indexed. Never another version's docs instead.
-        var providerMissing = query.ResourceTypes.Count > 0
-            && (query.ProviderVersion is null
-                || (provider.Count == 0 && !await this.HasProviderVersionAsync(version, query.ProviderVersion, cancellationToken)));
+        var providerMissing =
+            query.ResourceTypes.Count > 0
+            && (
+                query.ProviderVersion is null
+                || (
+                    provider.Count == 0
+                    && !await this.HasProviderVersionAsync(version, query.ProviderVersion, cancellationToken)
+                )
+            );
         return new ReferenceRetrieval(chosen, version, providerMissing);
     }
 
     /// <summary>The words worth a full-text match: identifiers and words, without the ones every chunk has.</summary>
     internal static IReadOnlyList<string> SearchTerms(string text) =>
-    [
-        .. Word().Matches(text).Select(match => match.Value.ToLowerInvariant())
-            .SelectMany(word => word.Split('_', StringSplitOptions.RemoveEmptyEntries))
-            .Where(word => word.Length > 2 && !CommonWords.Contains(word))
-            .Distinct(StringComparer.Ordinal)
-            .Take(MaxSearchTerms),
-    ];
+        [
+            .. Word()
+                .Matches(text)
+                .Select(match => match.Value.ToLowerInvariant())
+                .SelectMany(word => word.Split('_', StringSplitOptions.RemoveEmptyEntries))
+                .Where(word => word.Length > 2 && !CommonWords.Contains(word))
+                .Distinct(StringComparer.Ordinal)
+                .Take(MaxSearchTerms),
+        ];
 
-    private static IEnumerable<ReferenceDoc> Interleave(IReadOnlyList<ReferenceDoc> first, IReadOnlyList<ReferenceDoc> second)
+    private static IEnumerable<ReferenceDoc> Interleave(
+        IReadOnlyList<ReferenceDoc> first,
+        IReadOnlyList<ReferenceDoc> second
+    )
     {
         for (var index = 0; index < Math.Max(first.Count, second.Count); index++)
         {
@@ -110,20 +150,31 @@ public sealed partial class CosmosReferenceRetriever(Container container, IQuery
 
     private async Task<string?> ActiveVersionAsync(CancellationToken cancellationToken)
     {
-        using var response = await container.ReadItemStreamAsync("active", new PartitionKey("state"), cancellationToken: cancellationToken);
+        using var response = await container.ReadItemStreamAsync(
+            "active",
+            new PartitionKey("state"),
+            cancellationToken: cancellationToken
+        );
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
         }
 
         response.EnsureSuccessStatusCode();
-        return (await JsonNode.ParseAsync(response.Content, cancellationToken: cancellationToken))?["active_version"]?.GetValue<string>();
+        return (await JsonNode.ParseAsync(response.Content, cancellationToken: cancellationToken))?[
+            "active_version"
+        ]?.GetValue<string>();
     }
 
-    private async Task<bool> HasProviderVersionAsync(string version, string providerVersion, CancellationToken cancellationToken)
+    private async Task<bool> HasProviderVersionAsync(
+        string version,
+        string providerVersion,
+        CancellationToken cancellationToken
+    )
     {
-        var query = new QueryDefinition("SELECT TOP 1 VALUE c.id FROM c WHERE c.provider_version = @providerVersion")
-            .WithParameter("@providerVersion", providerVersion);
+        var query = new QueryDefinition(
+            "SELECT TOP 1 VALUE c.id FROM c WHERE c.provider_version = @providerVersion"
+        ).WithParameter("@providerVersion", providerVersion);
         return (await this.ReadAsync(query, version, cancellationToken)).Count > 0;
     }
 
@@ -135,7 +186,8 @@ public sealed partial class CosmosReferenceRetriever(Container container, IQuery
         ReferenceRanking ranking,
         int candidates,
         Dictionary<string, object> parameters,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         // FullTextScore takes its terms as arguments, so each is a parameter, never text spliced into the query.
         var order = ranking switch
@@ -146,7 +198,9 @@ public sealed partial class CosmosReferenceRetriever(Container container, IQuery
             _ => "ORDER BY VectorDistance(c.embedding, @vector)",
         };
 
-        var query = new QueryDefinition($"SELECT TOP {Math.Clamp(candidates, 1, 50)} {Fields} FROM c WHERE {filter} {order}");
+        var query = new QueryDefinition(
+            $"SELECT TOP {Math.Clamp(candidates, 1, 50)} {Fields} FROM c WHERE {filter} {order}"
+        );
         if (ranking != ReferenceRanking.Metadata)
         {
             query = query.WithParameter("@vector", vector);
@@ -167,10 +221,17 @@ public sealed partial class CosmosReferenceRetriever(Container container, IQuery
         return [.. (await this.ReadAsync(query, version, cancellationToken)).Select(ToDoc)];
     }
 
-    private async Task<List<JsonNode>> ReadAsync(QueryDefinition query, string version, CancellationToken cancellationToken)
+    private async Task<List<JsonNode>> ReadAsync(
+        QueryDefinition query,
+        string version,
+        CancellationToken cancellationToken
+    )
     {
         var items = new List<JsonNode>();
-        using var iterator = container.GetItemQueryStreamIterator(query, requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(version) });
+        using var iterator = container.GetItemQueryStreamIterator(
+            query,
+            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(version) }
+        );
         while (iterator.HasMoreResults)
         {
             using var page = await iterator.ReadNextAsync(cancellationToken);
@@ -182,16 +243,18 @@ public sealed partial class CosmosReferenceRetriever(Container container, IQuery
         return items;
     }
 
-    private static ReferenceDoc ToDoc(JsonNode item) => new(
-        Text(item, "id"),
-        Text(item, "source"),
-        Text(item, "title"),
-        Text(item, "heading"),
-        Text(item, "text"),
-        Text(item, "source_url"),
-        Text(item, "license"),
-        Text(item, "attribution"),
-        [.. (item["applies_to"]?.AsArray() ?? []).Select(type => type!.GetValue<string>())]);
+    private static ReferenceDoc ToDoc(JsonNode item) =>
+        new(
+            Text(item, "id"),
+            Text(item, "source"),
+            Text(item, "title"),
+            Text(item, "heading"),
+            Text(item, "text"),
+            Text(item, "source_url"),
+            Text(item, "license"),
+            Text(item, "attribution"),
+            [.. (item["applies_to"]?.AsArray() ?? []).Select(type => type!.GetValue<string>())]
+        );
 
     private static string Text(JsonNode item, string name) => item[name]?.GetValue<string>() ?? string.Empty;
 

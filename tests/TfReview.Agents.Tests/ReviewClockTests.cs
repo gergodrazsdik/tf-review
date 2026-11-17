@@ -28,7 +28,8 @@ public class ReviewClockTests
         var model = new FakeChat(FakeChat.Answer(Empty), FakeChat.Answer(Empty));
         using var chat = new ClockedChat(new Advancing(model, time, TimeSpan.FromMinutes(10)), clock);
 
-        var outcome = (AgentReviewed)await new ReviewAgent(chat, AgentProfile.Conventions).ReviewAsync(plan, [Tagging], []);
+        var outcome = (AgentReviewed)
+            await new ReviewAgent(chat, AgentProfile.Conventions).ReviewAsync(plan, [Tagging], []);
 
         await Assert.That(model.Requests.Count).IsEqualTo(1);
         await Assert.That(outcome.Skipped.Single().Reason).IsEqualTo(NotReviewedReason.Timeout);
@@ -38,7 +39,9 @@ public class ReviewClockTests
     [Test]
     public async Task A_call_past_the_reviews_time_isnt_made()
     {
-        var plan = TestPlans.Condensed(TestPlans.Create("azurerm_virtual_network.a", "azurerm_virtual_network", """{"name":"a"}"""));
+        var plan = TestPlans.Condensed(
+            TestPlans.Create("azurerm_virtual_network.a", "azurerm_virtual_network", """{"name":"a"}""")
+        );
         var time = new ManualTime();
         using var clock = new ReviewClock(TimeSpan.FromMinutes(9), TimeSpan.FromHours(1), time);
         time.Now += TimeSpan.FromMinutes(9);
@@ -55,11 +58,17 @@ public class ReviewClockTests
     [Test]
     public async Task The_cut_off_ends_a_running_call_as_timed_out()
     {
-        var plan = TestPlans.Condensed(TestPlans.Create("azurerm_virtual_network.a", "azurerm_virtual_network", """{"name":"a"}"""));
+        var plan = TestPlans.Condensed(
+            TestPlans.Create("azurerm_virtual_network.a", "azurerm_virtual_network", """{"name":"a"}""")
+        );
         using var clock = new ReviewClock(TimeSpan.FromHours(1), TimeSpan.FromMilliseconds(200));
         using var chat = new ClockedChat(new FakeChat(hang: true), clock);
 
-        var outcome = await new ReviewAgent(chat, AgentProfile.Conventions, TimeSpan.FromMinutes(5)).ReviewAsync(plan, [Tagging], []);
+        var outcome = await new ReviewAgent(chat, AgentProfile.Conventions, TimeSpan.FromMinutes(5)).ReviewAsync(
+            plan,
+            [Tagging],
+            []
+        );
 
         await Assert.That(((AgentFailed)outcome).Reason).IsEqualTo(NotReviewedReason.Timeout);
     }
@@ -75,7 +84,10 @@ public class ReviewClockTests
     private sealed class Advancing(IChatClient inner, ManualTime time, TimeSpan step) : DelegatingChatClient(inner)
     {
         public override async Task<ChatResponse> GetResponseAsync(
-            IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default
+        )
         {
             var response = await base.GetResponseAsync(messages, options, cancellationToken);
             time.Now += step;

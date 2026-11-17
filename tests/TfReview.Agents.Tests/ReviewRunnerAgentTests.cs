@@ -44,9 +44,16 @@ public class ReviewRunnerAgentTests
     private const string Empty = """{"policy_suggestions":[],"findings":[]}""";
 
     private static readonly string VnetPlan = TestPlans.Json(
-        TestPlans.Create(Vnet, "azurerm_virtual_network", """{"name":"vnet-a-prod","tags":{"environment":"production"}}"""));
+        TestPlans.Create(
+            Vnet,
+            "azurerm_virtual_network",
+            """{"name":"vnet-a-prod","tags":{"environment":"production"}}"""
+        )
+    );
 
-    private static readonly string SubnetPlan = TestPlans.Json(TestPlans.Create(Subnet, "azurerm_subnet", """{"name":"snet-a-prod"}"""));
+    private static readonly string SubnetPlan = TestPlans.Json(
+        TestPlans.Create(Subnet, "azurerm_subnet", """{"name":"snet-a-prod"}""")
+    );
 
     private static string Answer(string address, string doc = "ADR-002", string attribute = "tags") =>
         $$"""{"policy_suggestions":[],"findings":[{"breaks_standard":true,"resource_address":"{{address}}","doc_id":"{{doc}}","attribute":"{{attribute}}","title":"Model title","suggestion":"Model suggestion"}]}""";
@@ -117,7 +124,9 @@ public class ReviewRunnerAgentTests
 
         await Assert.That(result.Verdict).IsEqualTo(Verdict.Findings);
         await Assert.That(result.Findings.Single().Agent).IsEqualTo(Reporter.Scanner);
-        await Assert.That(result.NotReviewed.Single()).IsEqualTo(new NotReviewed(ReviewScope.Conventions, NotReviewedReason.Unavailable));
+        await Assert
+            .That(result.NotReviewed.Single())
+            .IsEqualTo(new NotReviewed(ReviewScope.Conventions, NotReviewedReason.Unavailable));
     }
 
     [Test]
@@ -129,7 +138,9 @@ public class ReviewRunnerAgentTests
 
         await Assert.That(chat.Requests).IsEmpty();
         await Assert.That(result.Findings.Count).IsEqualTo(1);
-        await Assert.That(result.NotReviewed.Single()).IsEqualTo(new NotReviewed(ReviewScope.Conventions, NotReviewedReason.StandardsUnavailable));
+        await Assert
+            .That(result.NotReviewed.Single())
+            .IsEqualTo(new NotReviewed(ReviewScope.Conventions, NotReviewedReason.StandardsUnavailable));
     }
 
     [Test]
@@ -213,23 +224,35 @@ public class ReviewRunnerAgentTests
         await Assert.That(parsed.Usage!.Model).IsEqualTo("test-model");
     }
 
-    private const string BlockingConfig = Config + "\n" + """
-        gate:
-          mode: blocking
-        """;
+    private const string BlockingConfig =
+        Config
+        + "\n"
+        + """
+            gate:
+              mode: blocking
+            """;
 
     private const string HighTagViolation = """
         [{"namespace":"adr002","failures":[{"msg":"ADR-002: missing tags","metadata":{"details":
         {"address":"azurerm_virtual_network.main","doc_id":"ADR-002","severity":"high","attribute":"tags"}}}]}]
         """;
 
-    private static readonly string HighTagging = Tagging.Replace("severity: medium", "severity: high", StringComparison.Ordinal);
+    private static readonly string HighTagging = Tagging.Replace(
+        "severity: medium",
+        "severity: high",
+        StringComparison.Ordinal
+    );
 
     // D55: a policy's own high finding fails the check where the repo opted in.
     [Test]
     public async Task A_policys_high_finding_blocks_under_a_blocking_gate()
     {
-        var result = await Run(VnetPlan, new FakeChat(FakeChat.Answer(Empty)), HighTagViolation, config: BlockingConfig);
+        var result = await Run(
+            VnetPlan,
+            new FakeChat(FakeChat.Answer(Empty)),
+            HighTagViolation,
+            config: BlockingConfig
+        );
 
         await Assert.That(result.Gate).IsEqualTo(GateMode.Blocking);
         await Assert.That(result.Findings.Single().Blocking).IsTrue();
@@ -247,7 +270,13 @@ public class ReviewRunnerAgentTests
     [Test]
     public async Task A_models_high_finding_never_blocks()
     {
-        var result = await Run(VnetPlan, new FakeChat(FakeChat.Answer(Answer(Vnet))), NoViolations, HighTagging, BlockingConfig);
+        var result = await Run(
+            VnetPlan,
+            new FakeChat(FakeChat.Answer(Answer(Vnet))),
+            NoViolations,
+            HighTagging,
+            BlockingConfig
+        );
 
         var finding = result.Findings.Single();
         await Assert.That(finding.Severity).IsEqualTo(Severity.High);
@@ -259,7 +288,13 @@ public class ReviewRunnerAgentTests
     [Test]
     public async Task A_model_merging_into_a_policys_medium_finding_doesnt_make_it_block()
     {
-        var result = await Run(VnetPlan, new FakeChat(FakeChat.Answer(Answer(Vnet))), TagViolation, HighTagging, BlockingConfig);
+        var result = await Run(
+            VnetPlan,
+            new FakeChat(FakeChat.Answer(Answer(Vnet))),
+            TagViolation,
+            HighTagging,
+            BlockingConfig
+        );
 
         var finding = result.Findings.Single();
         await Assert.That(finding.Deterministic).IsTrue();
@@ -317,7 +352,8 @@ public class ReviewRunnerAgentTests
         string config = Config,
         Action<string>? log = null,
         IAnswerStore? answers = null,
-        string? repositoryId = null)
+        string? repositoryId = null
+    )
     {
         var directory = Directory.CreateTempSubdirectory("tfreview-source-");
         try
@@ -330,7 +366,8 @@ public class ReviewRunnerAgentTests
                 new ConftestRunner(new FakeProcesses(conftestOutput)),
                 new ReviewModel(chat, "test-model"),
                 log: log,
-                answers: answers);
+                answers: answers
+            );
 
             return await runner.RunAsync(plan, config, Commit, repositoryId: repositoryId);
         }

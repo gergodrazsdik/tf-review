@@ -18,7 +18,11 @@ public interface IArbiter
     /// <param name="riskOrder">Addresses, riskiest first, used to order findings within a severity.</param>
     /// <param name="cancellationToken">Stops the work.</param>
     Task<Arbitration> ArbitrateAsync(
-        IReadOnlyList<Finding> findings, CondensedPlan plan, IReadOnlyList<string>? riskOrder = null, CancellationToken cancellationToken = default);
+        IReadOnlyList<Finding> findings,
+        CondensedPlan plan,
+        IReadOnlyList<string>? riskOrder = null,
+        CancellationToken cancellationToken = default
+    );
 }
 
 /// <summary>
@@ -29,7 +33,11 @@ public interface IArbiter
 public sealed class RuleArbiter : IArbiter
 {
     public Task<Arbitration> ArbitrateAsync(
-        IReadOnlyList<Finding> findings, CondensedPlan plan, IReadOnlyList<string>? riskOrder = null, CancellationToken cancellationToken = default)
+        IReadOnlyList<Finding> findings,
+        CondensedPlan plan,
+        IReadOnlyList<string>? riskOrder = null,
+        CancellationToken cancellationToken = default
+    )
     {
         Finding[] merged =
         [
@@ -57,8 +65,16 @@ public sealed class RuleArbiter : IArbiter
         var items = findings.SelectMany(finding => finding.Evidence).Select(item => item.Value).ToList();
         return
         [
-            .. items.OfType<PlanEvidence>().Distinct().OrderBy(item => item.PlanPointer, StringComparer.Ordinal).Select(item => (Evidence)item),
-            .. items.OfType<DocEvidence>().Distinct().OrderBy(item => item.DocId, StringComparer.Ordinal).Select(item => (Evidence)item),
+            .. items
+                .OfType<PlanEvidence>()
+                .Distinct()
+                .OrderBy(item => item.PlanPointer, StringComparer.Ordinal)
+                .Select(item => (Evidence)item),
+            .. items
+                .OfType<DocEvidence>()
+                .Distinct()
+                .OrderBy(item => item.DocId, StringComparer.Ordinal)
+                .Select(item => (Evidence)item),
         ];
     }
 
@@ -77,8 +93,12 @@ public sealed class RuleArbiter : IArbiter
             Agent = ordered.FirstOrDefault(finding => finding.Agent != Reporter.Scanner)?.Agent ?? Reporter.Scanner,
             Deterministic = ordered.Any(finding => finding.Deterministic),
             Evidence = MergeEvidence(ordered),
-            Suggestion = ordered.Select(finding => finding.Suggestion).FirstOrDefault(suggestion => suggestion is not null),
-            MonthlyCostDeltaUsd = ordered.Select(finding => finding.MonthlyCostDeltaUsd).FirstOrDefault(delta => delta is not null),
+            Suggestion = ordered
+                .Select(finding => finding.Suggestion)
+                .FirstOrDefault(suggestion => suggestion is not null),
+            MonthlyCostDeltaUsd = ordered
+                .Select(finding => finding.MonthlyCostDeltaUsd)
+                .FirstOrDefault(delta => delta is not null),
         };
     }
 }

@@ -33,14 +33,21 @@ public sealed class StickyComment(HttpClient http, string repository, int pullRe
         this.UpsertAsync(_ => body, cancellationToken);
 
     /// <summary>Writes the body built from the comment it replaces, or from null when there's none yet (D56).</summary>
-    public async Task<CommentAction> UpsertAsync(Func<string?, string> build, CancellationToken cancellationToken = default)
+    public async Task<CommentAction> UpsertAsync(
+        Func<string?, string> build,
+        CancellationToken cancellationToken = default
+    )
     {
         var existing = await FindAsync(cancellationToken);
         var request = new { body = build(existing?.Body) };
 
         using var response = existing is { Id: var id }
             ? await http.PatchAsJsonAsync($"repos/{repository}/issues/comments/{id}", request, cancellationToken)
-            : await http.PostAsJsonAsync($"repos/{repository}/issues/{pullRequest}/comments", request, cancellationToken);
+            : await http.PostAsJsonAsync(
+                $"repos/{repository}/issues/{pullRequest}/comments",
+                request,
+                cancellationToken
+            );
         response.EnsureSuccessStatusCode();
 
         return existing is null ? CommentAction.Created : CommentAction.Updated;
@@ -58,7 +65,11 @@ public sealed class StickyComment(HttpClient http, string repository, int pullRe
             {
                 var author = comment.GetProperty("user").GetProperty("login").GetString();
                 var text = comment.GetProperty("body").GetString();
-                if (author is not null && BotLogins.Contains(author) && text?.StartsWith(CommentRenderer.Marker, StringComparison.Ordinal) == true)
+                if (
+                    author is not null
+                    && BotLogins.Contains(author)
+                    && text?.StartsWith(CommentRenderer.Marker, StringComparison.Ordinal) == true
+                )
                 {
                     return (comment.GetProperty("id").GetInt64(), text);
                 }

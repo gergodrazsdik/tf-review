@@ -34,7 +34,8 @@ public sealed record ReferenceQuery(
     string? ProviderVersion,
     int TokenBudget,
     ReferenceRanking Ranking = ReferenceRanking.Hybrid,
-    int Candidates = 8);
+    int Candidates = 8
+);
 
 /// <summary>One reference chunk, with what a prompt shows and what attribution needs.</summary>
 public sealed record ReferenceDoc(
@@ -46,13 +47,18 @@ public sealed record ReferenceDoc(
     string SourceUrl,
     string License,
     string Attribution,
-    IReadOnlyList<string> AppliesTo);
+    IReadOnlyList<string> AppliesTo
+);
 
 /// <summary>
 /// The chunks found, best first, and whether provider docs were available, because a version that isn't indexed gets
 /// none and the result has to say so. A prompt sorts them by ID, so the same chunks always give the same prompt.
 /// </summary>
-public sealed record ReferenceRetrieval(IReadOnlyList<ReferenceDoc> Docs, string? CorpusVersion, bool ProviderDocsMissing)
+public sealed record ReferenceRetrieval(
+    IReadOnlyList<ReferenceDoc> Docs,
+    string? CorpusVersion,
+    bool ProviderDocsMissing
+)
 {
     public static readonly ReferenceRetrieval None = new([], null, false);
 }
@@ -78,6 +84,9 @@ public static partial class LockFile
         return match.Success ? match.Groups["version"].Value : null;
     }
 
-    [GeneratedRegex("""^provider "registry\.(opentofu\.org|terraform\.io)/hashicorp/azurerm" \{\n(?:[^}\n]*\n)*?\s*version\s*=\s*"(?<version>[0-9]+\.[0-9]+\.[0-9]+)"$""", RegexOptions.Multiline)]
+    [GeneratedRegex(
+        """^provider "registry\.(opentofu\.org|terraform\.io)/hashicorp/azurerm" \{\n(?:[^}\n]*\n)*?\s*version\s*=\s*"(?<version>[0-9]+\.[0-9]+\.[0-9]+)"$""",
+        RegexOptions.Multiline
+    )]
     private static partial Regex AzurermBlock();
 }

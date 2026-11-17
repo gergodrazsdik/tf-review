@@ -9,9 +9,9 @@ public class CondensedPlanTests
     [Test]
     public async Task Knows_the_types_that_change()
     {
-        var plan = Condense(Plan(
-            Resource("a.one", "[\"create\"]", "null", "{}"),
-            Resource("a.two", "[\"create\"]", "null", "{}")));
+        var plan = Condense(
+            Plan(Resource("a.one", "[\"create\"]", "null", "{}"), Resource("a.two", "[\"create\"]", "null", "{}"))
+        );
 
         await Assert.That(plan.TypeOf("a.two")).IsEqualTo("x");
         await Assert.That(plan.TypeOf("c.missing")).IsNull();
@@ -22,9 +22,17 @@ public class CondensedPlanTests
     [Test]
     public async Task Names_the_attributes_that_change_but_not_tags_or_names_kept_as_they_were()
     {
-        var plan = Condense(Plan(
-            Resource("a.one", "[\"update\"]", """{"name":"n","tags":{"a":"1"},"sku":"Basic"}""", """{"name":"n","tags":{"a":"1"},"sku":"Standard"}"""),
-            Resource("a.two", "[\"create\"]", "null", """{"name":"m","min_tls_version":"TLS1_2"}""")));
+        var plan = Condense(
+            Plan(
+                Resource(
+                    "a.one",
+                    "[\"update\"]",
+                    """{"name":"n","tags":{"a":"1"},"sku":"Basic"}""",
+                    """{"name":"n","tags":{"a":"1"},"sku":"Standard"}"""
+                ),
+                Resource("a.two", "[\"create\"]", "null", """{"name":"m","min_tls_version":"TLS1_2"}""")
+            )
+        );
 
         await Assert.That(plan.ChangedAttributeNames()).IsEquivalentTo(["min_tls_version", "name", "sku"]);
     }
@@ -32,7 +40,12 @@ public class CondensedPlanTests
     [Test]
     public async Task Drops_no_ops()
     {
-        var plan = Condense(Plan(Resource("a.keep", "[\"update\"]", """{"x":1}""", """{"x":2}"""), Resource("a.same", "[\"no-op\"]", """{"x":1}""", """{"x":1}""")));
+        var plan = Condense(
+            Plan(
+                Resource("a.keep", "[\"update\"]", """{"x":1}""", """{"x":2}"""),
+                Resource("a.same", "[\"no-op\"]", """{"x":1}""", """{"x":1}""")
+            )
+        );
 
         await Assert.That(Resources(plan).Select(field => field.Key).ToArray()).IsEquivalentTo(["a.keep"]);
     }
@@ -40,18 +53,31 @@ public class CondensedPlanTests
     [Test]
     public async Task Sorts_by_address_whatever_the_input_order()
     {
-        var plan = Condense(Plan(Resource("b.second", "[\"create\"]", "null", "{}"), Resource("a.first", "[\"create\"]", "null", "{}")));
+        var plan = Condense(
+            Plan(Resource("b.second", "[\"create\"]", "null", "{}"), Resource("a.first", "[\"create\"]", "null", "{}"))
+        );
 
         await Assert.That(Resources(plan).Select(field => field.Key).ToArray()).IsEquivalentTo(["a.first", "b.second"]);
-        await Assert.That(plan.ToCanonicalJson().IndexOf("a.first", StringComparison.Ordinal))
+        await Assert
+            .That(plan.ToCanonicalJson().IndexOf("a.first", StringComparison.Ordinal))
             .IsLessThan(plan.ToCanonicalJson().IndexOf("b.second", StringComparison.Ordinal));
     }
 
     [Test]
     public async Task Removes_attributes_that_didnt_change()
     {
-        var change = Change(Condense(Plan(Resource(
-            Address, "[\"update\"]", """{"location":"germany","sku":"a"}""", """{"location":"germany","sku":"b"}"""))));
+        var change = Change(
+            Condense(
+                Plan(
+                    Resource(
+                        Address,
+                        "[\"update\"]",
+                        """{"location":"germany","sku":"a"}""",
+                        """{"location":"germany","sku":"b"}"""
+                    )
+                )
+            )
+        );
 
         await Assert.That(change["after"]!.AsObject().ContainsKey("location")).IsFalse();
         await Assert.That(change["before"]!["sku"]!.GetValue<string>()).IsEqualTo("a");
@@ -62,10 +88,18 @@ public class CondensedPlanTests
     [Test]
     public async Task Keeps_name_and_tags_even_when_unchanged()
     {
-        var change = Change(Condense(Plan(Resource(
-            Address, "[\"update\"]",
-            """{"name":"vnet-a-prod","tags":{"owner":"x"},"sku":"a"}""",
-            """{"name":"vnet-a-prod","tags":{"owner":"x"},"sku":"b"}"""))));
+        var change = Change(
+            Condense(
+                Plan(
+                    Resource(
+                        Address,
+                        "[\"update\"]",
+                        """{"name":"vnet-a-prod","tags":{"owner":"x"},"sku":"a"}""",
+                        """{"name":"vnet-a-prod","tags":{"owner":"x"},"sku":"b"}"""
+                    )
+                )
+            )
+        );
 
         await Assert.That(change["after"]!["name"]!.GetValue<string>()).IsEqualTo("vnet-a-prod");
         await Assert.That(change["after"]!["tags"]!["owner"]!.GetValue<string>()).IsEqualTo("x");
@@ -74,8 +108,13 @@ public class CondensedPlanTests
     [Test]
     public async Task Keeps_a_changed_attribute_whole_so_list_indexes_dont_shift()
     {
-        var change = Change(Condense(Plan(Resource(
-            Address, "[\"update\"]", """{"subnets":["a","b","c"]}""", """{"subnets":["a","x","c"]}"""))));
+        var change = Change(
+            Condense(
+                Plan(
+                    Resource(Address, "[\"update\"]", """{"subnets":["a","b","c"]}""", """{"subnets":["a","x","c"]}""")
+                )
+            )
+        );
 
         await Assert.That(change["after"]!["subnets"]!.AsArray().Count).IsEqualTo(3);
         await Assert.That(change["after"]!["subnets"]![2]!.GetValue<string>()).IsEqualTo("c");
@@ -102,8 +141,19 @@ public class CondensedPlanTests
     [Test]
     public async Task A_value_becoming_unknown_counts_as_a_change()
     {
-        var change = Change(Condense(Plan(Resource(
-            Address, "[\"update\"]", """{"id":"old","sku":"a"}""", """{"sku":"a"}""", """{"id":true}"""))));
+        var change = Change(
+            Condense(
+                Plan(
+                    Resource(
+                        Address,
+                        "[\"update\"]",
+                        """{"id":"old","sku":"a"}""",
+                        """{"sku":"a"}""",
+                        """{"id":true}"""
+                    )
+                )
+            )
+        );
 
         await Assert.That(change["before"]!["id"]!.GetValue<string>()).IsEqualTo("old");
         await Assert.That(change["after_unknown"]!["id"]!.GetValue<bool>()).IsTrue();
@@ -120,11 +170,23 @@ public class CondensedPlanTests
     [Test]
     public async Task Keeps_why_a_resource_is_replaced()
     {
-        var plan = Condense(Plan(Resource(
-            Address, "[\"delete\",\"create\"]", """{"name":"a"}""", """{"name":"b"}""", "{}",
-            "\"replace_paths\":[[\"name\"]],"), Resource("a.b", "[\"create\"]", "null", "{}")));
+        var plan = Condense(
+            Plan(
+                Resource(
+                    Address,
+                    "[\"delete\",\"create\"]",
+                    """{"name":"a"}""",
+                    """{"name":"b"}""",
+                    "{}",
+                    "\"replace_paths\":[[\"name\"]],"
+                ),
+                Resource("a.b", "[\"create\"]", "null", "{}")
+            )
+        );
 
-        await Assert.That(plan.Resolves(CondensedPlan.PointerTo(Address, "change", "replace_paths", "0", "0"))).IsTrue();
+        await Assert
+            .That(plan.Resolves(CondensedPlan.PointerTo(Address, "change", "replace_paths", "0", "0")))
+            .IsTrue();
     }
 
     [Test]
@@ -149,18 +211,23 @@ public class CondensedPlanTests
     [Test]
     public async Task A_deposed_instance_gets_its_own_key()
     {
-        var plan = Condense(Plan(
-            Resource(Address, "[\"create\"]", "null", "{}"),
-            Resource(Address, "[\"delete\"]", "{}", "null", "{}", "\"deposed\":\"abc123\",", inChange: false)));
+        var plan = Condense(
+            Plan(
+                Resource(Address, "[\"create\"]", "null", "{}"),
+                Resource(Address, "[\"delete\"]", "{}", "null", "{}", "\"deposed\":\"abc123\",", inChange: false)
+            )
+        );
 
-        await Assert.That(Resources(plan).Select(field => field.Key).ToArray())
+        await Assert
+            .That(Resources(plan).Select(field => field.Key).ToArray())
             .IsEquivalentTo([Address, $"{Address} (deposed abc123)"]);
     }
 
     [Test]
     public async Task Pointer_matches_the_contract_form()
     {
-        await Assert.That(CondensedPlan.PointerTo("azurerm_storage_account.logs", "change", "after", "tags"))
+        await Assert
+            .That(CondensedPlan.PointerTo("azurerm_storage_account.logs", "change", "after", "tags"))
             .IsEqualTo("/resource_changes/azurerm_storage_account.logs/change/after/tags");
     }
 
@@ -211,11 +278,12 @@ public class CondensedPlanTests
         await Assert.That(Condense(plan).ToCanonicalJson()).IsEqualTo(Condense(plan).ToCanonicalJson());
     }
 
-    private static CondensedPlan Condense(string json) => new PlanRedactor().Redact(json) switch
-    {
-        Redacted redacted => CondensedPlan.From(redacted.Plan),
-        Refused refused => throw new InvalidOperationException($"Refused: {refused.Rule} at {refused.Location}"),
-    };
+    private static CondensedPlan Condense(string json) =>
+        new PlanRedactor().Redact(json) switch
+        {
+            Redacted redacted => CondensedPlan.From(redacted.Plan),
+            Refused refused => throw new InvalidOperationException($"Refused: {refused.Rule} at {refused.Location}"),
+        };
 
     private static JsonObject Resources(CondensedPlan plan) =>
         JsonNode.Parse(plan.ToCanonicalJson())!["resource_changes"]!.AsObject();
@@ -226,11 +294,20 @@ public class CondensedPlanTests
         $$"""{"format_version":"1.2","resource_changes":[{{string.Join(',', resources)}}]}""";
 
     private static string Resource(
-        string address, string actions, string before, string after, string unknown = "{}", string extra = "", bool inChange = true)
+        string address,
+        string actions,
+        string before,
+        string after,
+        string unknown = "{}",
+        string extra = "",
+        bool inChange = true
+    )
     {
         var name = System.Text.Json.JsonSerializer.Serialize(address);
         var marks = $$"""
-            "before_sensitive":{{(before == "null" ? "false" : "{}")}},"after_sensitive":{{(after == "null" ? "false" : "{}")}}
+            "before_sensitive":{{(before == "null" ? "false" : "{}")}},"after_sensitive":{{(
+                after == "null" ? "false" : "{}"
+            )}}
             """;
         var changeExtra = inChange ? extra : string.Empty;
         var resourceExtra = inChange ? string.Empty : extra;

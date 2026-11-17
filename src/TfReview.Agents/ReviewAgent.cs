@@ -9,7 +9,14 @@ using TfReview.Rag;
 namespace TfReview.Agents;
 
 /// <summary>One model call, for the logs and the cost metrics. It holds no prompt or answer text.</summary>
-public sealed record AgentCall(int Attempt, string Finish, long InputTokens, long OutputTokens, long CachedInputTokens, TimeSpan Latency);
+public sealed record AgentCall(
+    int Attempt,
+    string Finish,
+    long InputTokens,
+    long OutputTokens,
+    long CachedInputTokens,
+    TimeSpan Latency
+);
 
 public closed record AgentOutcome(int PromptVersion, IReadOnlyList<AgentCall> Calls);
 
@@ -130,7 +137,8 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
         IReadOnlyList<Finding> policyFindings,
         IReadOnlyList<ResourceCostChange>? costs = null,
         CancellationToken cancellationToken = default,
-        IReadOnlyList<ReferenceDoc>? references = null)
+        IReadOnlyList<ReferenceDoc>? references = null
+    )
     {
         var prompt = Prompts.Load(profile.Name);
         var calls = new List<AgentCall>();
@@ -160,7 +168,11 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
     /// first, and the cap cuts the routine end. A batch carries only its own resources' policy findings and cost figures.
     /// </summary>
     public static (IReadOnlyList<IReadOnlyList<string>> Batches, IReadOnlyList<string> Left) Batch(
-        CondensedPlan plan, Func<IReadOnlySet<string>, int> estimate, int maxTokens = MaxUserMessageTokens, int maxBatches = MaxBatches)
+        CondensedPlan plan,
+        Func<IReadOnlySet<string>, int> estimate,
+        int maxTokens = MaxUserMessageTokens,
+        int maxBatches = MaxBatches
+    )
     {
         var batches = new List<IReadOnlyList<string>>();
         var left = new List<string>();
@@ -189,7 +201,10 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
 
             batches.Add(current);
             current = [];
-            if (batches.Count < maxBatches && estimate(new HashSet<string>([address], StringComparer.Ordinal)) <= maxTokens)
+            if (
+                batches.Count < maxBatches
+                && estimate(new HashSet<string>([address], StringComparer.Ordinal)) <= maxTokens
+            )
             {
                 current.Add(address);
             }
@@ -214,12 +229,17 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
         IReadOnlyList<Finding> policies,
         IReadOnlyList<ResourceCostChange>? costs,
         IReadOnlyList<ReferenceDoc>? references,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
-        (CondensedPlan Plan, List<Finding> Policies, List<ResourceCostChange>? Costs) Part(IReadOnlySet<string> addresses) => (
-            plan.OnlyAddresses(addresses),
-            [.. policies.Where(finding => addresses.Contains(finding.ResourceAddress))],
-            costs is null ? null : [.. costs.Where(cost => addresses.Contains(cost.ResourceAddress))]);
+        (CondensedPlan Plan, List<Finding> Policies, List<ResourceCostChange>? Costs) Part(
+            IReadOnlySet<string> addresses
+        ) =>
+            (
+                plan.OnlyAddresses(addresses),
+                [.. policies.Where(finding => addresses.Contains(finding.ResourceAddress))],
+                costs is null ? null : [.. costs.Where(cost => addresses.Contains(cost.ResourceAddress))]
+            );
 
         var (batches, left) = Batch(plan, addresses =>
         {
@@ -252,7 +272,13 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
 
             var part = Part(new HashSet<string>(batch, StringComparer.Ordinal));
             var result = await this.CallAsync(
-                prompt, docs, UserMessage(part.Plan, docs, part.Policies, part.Costs, references), part.Policies, part.Costs, cancellationToken);
+                prompt,
+                docs,
+                UserMessage(part.Plan, docs, part.Policies, part.Costs, references),
+                part.Policies,
+                part.Costs,
+                cancellationToken
+            );
             calls.AddRange(result.Calls);
             if (result.Value is { } parsed)
             {
@@ -293,7 +319,8 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
         string user,
         IReadOnlyList<Finding> policies,
         IReadOnlyList<ResourceCostChange>? costs,
-        CancellationToken cancellationToken) =>
+        CancellationToken cancellationToken
+    ) =>
         StructuredCall.RunAsync(
             chat,
             profile.Name,
@@ -302,7 +329,8 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
             profile.Reporter == Reporter.Cost ? CostSchema : Schema,
             text => ParseFindings(text, docs, costs, policies),
             timeout,
-            cancellationToken);
+            cancellationToken
+        );
 
     /// <summary>The standards are sorted and nothing here varies per run, so the prefix can be cached from M2.</summary>
     private static string SystemMessage(Prompt prompt, IReadOnlyList<StandardsDoc> docs)
@@ -310,7 +338,8 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
         var system = new StringBuilder(prompt.Body).AppendLine();
         foreach (var doc in docs.OrderBy(doc => doc.Id, StringComparer.Ordinal))
         {
-            system.AppendLine()
+            system
+                .AppendLine()
                 .AppendLine($"<standard id=\"{doc.Id}\" applies_to=\"{string.Join(' ', doc.AppliesTo)}\">")
                 .AppendLine(doc.Body)
                 .AppendLine("</standard>");
@@ -325,18 +354,21 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
         IReadOnlyList<StandardsDoc> docs,
         IReadOnlyList<Finding> policyFindings,
         IReadOnlyList<ResourceCostChange>? costs,
-        IReadOnlyList<ReferenceDoc>? references)
+        IReadOnlyList<ReferenceDoc>? references
+    )
     {
-        var policies = new JsonArray(
-        [
-            .. policyFindings
-                .Select((finding, index) => (JsonNode)new JsonObject
-                {
-                    ["id"] = PolicyId(index),
-                    ["resource_address"] = finding.ResourceAddress,
-                    ["doc_id"] = finding.Rule,
-                    ["title"] = finding.Title,
-                }),
+        var policies = new JsonArray([
+            .. policyFindings.Select(
+                (finding, index) =>
+                    (JsonNode)
+                        new JsonObject
+                        {
+                            ["id"] = PolicyId(index),
+                            ["resource_address"] = finding.ResourceAddress,
+                            ["doc_id"] = finding.Rule,
+                            ["title"] = finding.Title,
+                        }
+            ),
         ]);
 
         var message = new StringBuilder()
@@ -347,62 +379,100 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
 
         if (costs is not null)
         {
-            var figures = new JsonArray(
-            [
-                .. costs.Where(cost => cost.Priced).Select(cost => (JsonNode)new JsonObject
-                {
-                    ["resource_address"] = cost.ResourceAddress,
-                    ["before_usd"] = cost.BeforeUsd,
-                    ["after_usd"] = cost.AfterUsd,
-                    ["delta_usd"] = cost.AfterUsd - cost.BeforeUsd,
+            var figures = new JsonArray([
+                .. costs
+                    .Where(cost => cost.Priced)
+                    .Select(cost =>
+                        (JsonNode)
+                            new JsonObject
+                            {
+                                ["resource_address"] = cost.ResourceAddress,
+                                ["before_usd"] = cost.BeforeUsd,
+                                ["after_usd"] = cost.AfterUsd,
+                                ["delta_usd"] = cost.AfterUsd - cost.BeforeUsd,
 
-                    // Worked out here, because the model got ADR-003's share rule wrong doing it itself.
-                    ["increase_percent"] = cost.BeforeUsd > 0 ? Math.Round((cost.AfterUsd - cost.BeforeUsd) / cost.BeforeUsd * 100, 1) : null,
-                }),
+                                // Worked out here, because the model got ADR-003's share rule wrong doing it itself.
+                                ["increase_percent"] =
+                                    cost.BeforeUsd > 0
+                                        ? Math.Round((cost.AfterUsd - cost.BeforeUsd) / cost.BeforeUsd * 100, 1)
+                                        : null,
+                            }
+                    ),
             ]);
 
-            message.AppendLine("<cost_data>").AppendLine(StructuredCall.Escape(CanonicalJson.Write(figures))).AppendLine("</cost_data>").AppendLine();
+            message
+                .AppendLine("<cost_data>")
+                .AppendLine(StructuredCall.Escape(CanonicalJson.Write(figures)))
+                .AppendLine("</cost_data>")
+                .AppendLine();
         }
 
         // Upstream text, which is untrusted like the plan, so it's data in the user message and never part of the
         // instructions. Escaped the same way, so nothing in it can close the fence.
         if (references is { Count: > 0 })
         {
-            var material = new JsonArray(
-            [
-                .. references.OrderBy(doc => doc.Id, StringComparer.Ordinal).Select(doc => (JsonNode)new JsonObject
-                {
-                    ["source"] = doc.Source,
-                    ["title"] = doc.Title,
-                    ["heading"] = doc.Heading,
-                    ["text"] = doc.Text,
-                }),
+            var material = new JsonArray([
+                .. references
+                    .OrderBy(doc => doc.Id, StringComparer.Ordinal)
+                    .Select(doc =>
+                        (JsonNode)
+                            new JsonObject
+                            {
+                                ["source"] = doc.Source,
+                                ["title"] = doc.Title,
+                                ["heading"] = doc.Heading,
+                                ["text"] = doc.Text,
+                            }
+                    ),
             ]);
 
-            message.AppendLine("<reference_material>").AppendLine(StructuredCall.Escape(CanonicalJson.Write(material))).AppendLine("</reference_material>").AppendLine();
+            message
+                .AppendLine("<reference_material>")
+                .AppendLine(StructuredCall.Escape(CanonicalJson.Write(material)))
+                .AppendLine("</reference_material>")
+                .AppendLine();
         }
 
-        return message.AppendLine("<plan_data>").AppendLine(StructuredCall.Escape(plan.ToCanonicalJson())).Append("</plan_data>").ToString();
+        return message
+            .AppendLine("<plan_data>")
+            .AppendLine(StructuredCall.Escape(plan.ToCanonicalJson()))
+            .Append("</plan_data>")
+            .ToString();
     }
 
     private static string PolicyId(int index) => $"P{index + 1}";
 
     /// <summary>The position an ID names, or -1 for one that wasn't given.</summary>
     private static int PolicyIndex(string id, int count) =>
-        id.StartsWith('P') && int.TryParse(id.AsSpan(1), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var number)
-            && number >= 1 && number <= count
+        id.StartsWith('P')
+        && int.TryParse(
+            id.AsSpan(1),
+            System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var number
+        )
+        && number >= 1
+        && number <= count
             ? number - 1
             : -1;
 
     /// <summary>The findings in an answer, or null if it doesn't match the wire schema exactly.</summary>
     private ParsedFindings? ParseFindings(
-        string text, IReadOnlyList<StandardsDoc> docs, IReadOnlyList<ResourceCostChange>? costs, IReadOnlyList<Finding> policies)
+        string text,
+        IReadOnlyList<StandardsDoc> docs,
+        IReadOnlyList<ResourceCostChange>? costs,
+        IReadOnlyList<Finding> policies
+    )
     {
         var output = StructuredCall.ParseWire<WireOutput>(text);
         // Only a finding that stands needs an address and a title: one the model retracts is only counted, and a blank
         // one shouldn't cost the whole answer (BUG-24).
-        if (output is null
-            || output.Findings.Any(finding => finding.BreaksStandard && (finding.ResourceAddress.Length == 0 || finding.Title.Trim().Length == 0)))
+        if (
+            output is null
+            || output.Findings.Any(finding =>
+                finding.BreaksStandard && (finding.ResourceAddress.Length == 0 || finding.Title.Trim().Length == 0)
+            )
+        )
         {
             return null;
         }
@@ -413,45 +483,73 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
         // A policy finding gets its suggestion by ID and keeps everything else code gave it: the title, evidence and its
         // being deterministic. So a deletion, which has no attribute to point at, gets one too, and the agent can't skip
         // one by not repeating it (C28, C29). The arbiter merges it with the scanner's copy as before.
-        var suggested = output.PolicySuggestions
-            .Where(item => !string.IsNullOrWhiteSpace(item.Suggestion))
+        var suggested = output
+            .PolicySuggestions.Where(item => !string.IsNullOrWhiteSpace(item.Suggestion))
             .Select(item => (Index: PolicyIndex(item.Id, policies.Count), item.Suggestion))
             .Where(item => item.Index >= 0)
             .DistinctBy(item => item.Index)
-            .Select(item => policies[item.Index] with { Agent = profile.Reporter, Suggestion = item.Suggestion!.Trim() });
+            .Select(item =>
+                policies[item.Index] with
+                {
+                    Agent = profile.Reporter,
+                    Suggestion = item.Suggestion!.Trim(),
+                }
+            );
 
         return new ParsedFindings(
             [
                 .. suggested,
-                .. output.Findings.Where(finding => finding.BreaksStandard).Select(finding => ToFinding(finding, docs, costs)),
+                .. output
+                    .Findings.Where(finding => finding.BreaksStandard)
+                    .Select(finding => ToFinding(finding, docs, costs)),
             ],
-            output.Findings.Count(finding => !finding.BreaksStandard));
+            output.Findings.Count(finding => !finding.BreaksStandard)
+        );
     }
 
-    private Finding ToFinding(WireFinding wire, IReadOnlyList<StandardsDoc> docs, IReadOnlyList<ResourceCostChange>? costs)
+    private Finding ToFinding(
+        WireFinding wire,
+        IReadOnlyList<StandardsDoc> docs,
+        IReadOnlyList<ResourceCostChange>? costs
+    )
     {
         // An unknown document gets a placeholder severity, and the evidence check then drops the finding.
         var severity = docs.FirstOrDefault(doc => doc.Id == wire.DocId)?.Severity ?? Severity.Low;
 
         // Models like to write tags.environment. Pointers stop at the top-level attribute, as the policies' do.
         var attribute = wire.Attribute.Split(['.', '/', '['], 2)[0].Trim();
-        Evidence[] evidence = attribute.Length == 0
-            ? [new DocEvidence(wire.DocId)]
-            : [new PlanEvidence(CondensedPlan.PointerTo(wire.ResourceAddress, "change", "after", attribute)), new DocEvidence(wire.DocId)];
+        Evidence[] evidence =
+            attribute.Length == 0
+                ? [new DocEvidence(wire.DocId)]
+                :
+                [
+                    new PlanEvidence(CondensedPlan.PointerTo(wire.ResourceAddress, "change", "after", attribute)),
+                    new DocEvidence(wire.DocId),
+                ];
 
-        return new Finding(wire.ResourceAddress, wire.DocId, severity, profile.Reporter, Deterministic: false, wire.Title.Trim(), evidence)
+        return new Finding(
+            wire.ResourceAddress,
+            wire.DocId,
+            severity,
+            profile.Reporter,
+            Deterministic: false,
+            wire.Title.Trim(),
+            evidence
+        )
         {
             Suggestion = string.IsNullOrWhiteSpace(wire.Suggestion) ? null : wire.Suggestion.Trim(),
 
             // From Infracost, never the model. The evidence check drops a cost finding with no increase here.
-            MonthlyCostDeltaUsd = costs?.FirstOrDefault(cost => cost.Priced && cost.ResourceAddress == wire.ResourceAddress) is { } figure
+            MonthlyCostDeltaUsd = costs?.FirstOrDefault(cost =>
+                cost.Priced && cost.ResourceAddress == wire.ResourceAddress
+            )
+                is { } figure
                 ? figure.AfterUsd - figure.BeforeUsd
                 : null,
         };
     }
 
-    private sealed record WireOutput(
-        [property: JsonPropertyName("findings")] IReadOnlyList<WireFinding> Findings)
+    private sealed record WireOutput([property: JsonPropertyName("findings")] IReadOnlyList<WireFinding> Findings)
     {
         // Absent from the cost agent's answers, which the strict schema then guarantees.
         [JsonPropertyName("policy_suggestions")]
@@ -460,7 +558,8 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
 
     private sealed record WirePolicySuggestion(
         [property: JsonPropertyName("id")] string Id,
-        [property: JsonPropertyName("suggestion")] string? Suggestion);
+        [property: JsonPropertyName("suggestion")] string? Suggestion
+    );
 
     private sealed record ParsedFindings(IReadOnlyList<Finding> Findings, int Retracted);
 
@@ -470,5 +569,6 @@ public sealed class ReviewAgent(IChatClient chat, AgentProfile profile, TimeSpan
         [property: JsonPropertyName("doc_id")] string DocId,
         [property: JsonPropertyName("attribute")] string Attribute,
         [property: JsonPropertyName("title")] string Title,
-        [property: JsonPropertyName("suggestion")] string? Suggestion);
+        [property: JsonPropertyName("suggestion")] string? Suggestion
+    );
 }

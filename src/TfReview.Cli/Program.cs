@@ -48,7 +48,9 @@ static async Task<int> Redact(string planPath, string outputPath)
     {
         case Redacted redacted:
             await File.WriteAllTextAsync(outputPath, redacted.Plan.ToCanonicalJson());
-            Console.WriteLine($"Redacted {redacted.SecretsFound} value(s), and dropped {redacted.FieldsDropped} field(s).");
+            Console.WriteLine(
+                $"Redacted {redacted.SecretsFound} value(s), and dropped {redacted.FieldsDropped} field(s)."
+            );
             break;
         case Refused refused:
             await File.WriteAllTextAsync(outputPath, """{"refused":true}""");
@@ -73,18 +75,22 @@ static async Task<int> Review(string redactedPath, string configPath, string out
     else
     {
         // A short timeout: the download gets one retry, and the job has other work to fit in its 10 minutes.
-        using var http = new HttpClient { BaseAddress = new Uri("https://codeload.github.com/"), Timeout = TimeSpan.FromSeconds(30) };
+        using var http = new HttpClient
+        {
+            BaseAddress = new Uri("https://codeload.github.com/"),
+            Timeout = TimeSpan.FromSeconds(30),
+        };
         var runner = new ReviewRunner(
             new GitHubTarballSource(http),
             new ConftestRunner(new ProcessRunner()),
             ReviewModel.FromEnvironment(),
             log: Console.WriteLine,
-
             // Without a token a scan waits forever for a login.
             infracost: string.IsNullOrEmpty(Environment.GetEnvironmentVariable("INFRACOST_CLI_AUTHENTICATION_TOKEN"))
                 ? null
                 : new InfracostRunner(new ProcessRunner(InfracostRunner.EnvironmentVariables)),
-            checkov: new CheckovRunner(new ProcessRunner()));
+            checkov: new CheckovRunner(new ProcessRunner())
+        );
         try
         {
             result = await runner.RunAsync(redacted, config, commit);
@@ -144,8 +150,9 @@ static async Task<int> Publish(string resultPath, string redactedPath, string co
     // Ticks on the comment it replaces carry over (D56). They aren't counted here, where there are no metrics, so they
     // stay uncounted until the worker next rewrites the comment.
     using var http = StickyComment.CreateClient(new Uri(apiUrl.TrimEnd('/') + "/"), Required("GITHUB_TOKEN"));
-    var action = await new StickyComment(http, repository, pullRequest)
-        .UpsertAsync(previous => CommentRenderer.Rewrite(result, counts, previous, record: false).Body);
+    var action = await new StickyComment(http, repository, pullRequest).UpsertAsync(previous =>
+        CommentRenderer.Rewrite(result, counts, previous, record: false).Body
+    );
     Console.WriteLine($"Comment {action.ToString().ToLowerInvariant()} for commit {commit}.");
     return 0;
 }
@@ -159,16 +166,22 @@ static async Task<int> Submit(string redactedPath, string commit, string configP
     }
 
     // Long enough for a cold start, and a retry gets a new token and asks again.
-    using var api = new HttpClient { BaseAddress = new Uri(Required("TF_REVIEW_API_URL").TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(90) };
+    using var api = new HttpClient
+    {
+        BaseAddress = new Uri(Required("TF_REVIEW_API_URL").TrimEnd('/') + "/"),
+        Timeout = TimeSpan.FromSeconds(90),
+    };
     using var github = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
     var tokenUrl = Required("ACTIONS_ID_TOKEN_REQUEST_URL");
     var tokenSecret = Required("ACTIONS_ID_TOKEN_REQUEST_TOKEN");
 
     var submitter = new ReviewSubmitter(
         api,
-        cancellationToken => ActionsIdToken.GetAsync(github, tokenUrl, tokenSecret, ReviewSubmitter.Audience, cancellationToken),
+        cancellationToken =>
+            ActionsIdToken.GetAsync(github, tokenUrl, tokenSecret, ReviewSubmitter.Audience, cancellationToken),
         Task.Delay,
-        Console.WriteLine);
+        Console.WriteLine
+    );
     return await submitter.SubmitAsync(plan, commit, configPath, workingDirectory) ? 0 : 1;
 }
 
@@ -186,7 +199,7 @@ static async Task<string?> ReadOrNull(string path)
     }
 }
 
-static string Required(string name) => Environment.GetEnvironmentVariable(name)
-    ?? throw new InvalidOperationException($"{name} isn't set.");
+static string Required(string name) =>
+    Environment.GetEnvironmentVariable(name) ?? throw new InvalidOperationException($"{name} isn't set.");
 
 static bool IsCommit(string value) => Regex.IsMatch(value, "^[0-9a-f]{40}$");

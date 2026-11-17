@@ -5,7 +5,11 @@ public sealed class LocalDirectorySource(string directory) : IStandardsSource
 {
     private static readonly string[] KeptExtensions = [".md", ".rego"];
 
-    public async Task FetchAsync(TfReviewConfig config, string targetDirectory, CancellationToken cancellationToken = default)
+    public async Task FetchAsync(
+        TfReviewConfig config,
+        string targetDirectory,
+        CancellationToken cancellationToken = default
+    )
     {
         if (!Directory.Exists(directory))
         {

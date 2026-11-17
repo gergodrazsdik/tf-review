@@ -15,7 +15,10 @@ public static class StepSummary
         var summary = new StringBuilder()
             .AppendLine("### tf-review")
             .AppendLine()
-            .AppendLine(CultureInfo.InvariantCulture, $"Verdict: {CommentRenderer.Code(VerdictName(result.Verdict))}, {result.Findings.Count} finding(s).");
+            .AppendLine(
+                CultureInfo.InvariantCulture,
+                $"Verdict: {CommentRenderer.Code(VerdictName(result.Verdict))}, {result.Findings.Count} finding(s)."
+            );
 
         if (result.Usage is { } usage)
         {
@@ -48,17 +51,22 @@ public static class StepSummary
             ? string.Create(CultureInfo.InvariantCulture, $"~${estimate:0.0000}")
             : "unknown";
 
-        summary.AppendLine()
+        summary
+            .AppendLine()
             .AppendLine("| Model | Calls | Input tokens | Cached | Output tokens | Estimated cost | Model time |")
             .AppendLine("| --- | --- | --- | --- | --- | --- | --- |")
-            .AppendLine(CultureInfo.InvariantCulture, $"| {CommentRenderer.Code(usage.Model ?? "unknown", inTable: true)} | {usage.Calls ?? 0} | {usage.InputTokens} | {usage.CachedInputTokens ?? 0} | {usage.OutputTokens} | {cost} | {(usage.LatencyMs ?? 0) / 1000m:0.0} s |");
+            .AppendLine(
+                CultureInfo.InvariantCulture,
+                $"| {CommentRenderer.Code(usage.Model ?? "unknown", inTable: true)} | {usage.Calls ?? 0} | {usage.InputTokens} | {usage.CachedInputTokens ?? 0} | {usage.OutputTokens} | {cost} | {(usage.LatencyMs ?? 0) / 1000m:0.0} s |"
+            );
     }
 
-    private static string VerdictName(Verdict verdict) => verdict switch
-    {
-        Verdict.NoFindings => "no_findings",
-        Verdict.Findings => "findings",
-        Verdict.NotReviewed => "not_reviewed",
-        _ => throw new ArgumentOutOfRangeException(nameof(verdict)),
-    };
+    private static string VerdictName(Verdict verdict) =>
+        verdict switch
+        {
+            Verdict.NoFindings => "no_findings",
+            Verdict.Findings => "findings",
+            Verdict.NotReviewed => "not_reviewed",
+            _ => throw new ArgumentOutOfRangeException(nameof(verdict)),
+        };
 }

@@ -7,7 +7,12 @@ public sealed record ProcessResult(int ExitCode, string Output);
 public interface IProcessRunner
 {
     /// <summary>Runs a program, and returns null if it can't start or doesn't finish in time.</summary>
-    Task<ProcessResult?> RunAsync(string program, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken = default);
+    Task<ProcessResult?> RunAsync(
+        string program,
+        IReadOnlyList<string> arguments,
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default
+    );
 }
 
 /// <summary>
@@ -19,12 +24,28 @@ public sealed class ProcessRunner(params string[] passedOn) : IProcessRunner
 {
     private static readonly string[] Basics =
     [
-        "PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "PYTHONDONTWRITEBYTECODE",
-        "SSL_CERT_DIR", "SSL_CERT_FILE", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy",
+        "PATH",
+        "HOME",
+        "TMPDIR",
+        "LANG",
+        "LC_ALL",
+        "PYTHONDONTWRITEBYTECODE",
+        "SSL_CERT_DIR",
+        "SSL_CERT_FILE",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "NO_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "no_proxy",
     ];
 
     public async Task<ProcessResult?> RunAsync(
-        string program, IReadOnlyList<string> arguments, TimeSpan timeout, CancellationToken cancellationToken = default)
+        string program,
+        IReadOnlyList<string> arguments,
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default
+    )
     {
         var start = new ProcessStartInfo(program)
         {
