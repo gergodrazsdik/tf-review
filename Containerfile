@@ -9,7 +9,7 @@ RUN dotnet publish src/TfReview.Cli --configuration Release --output /app
 # conftest v0.71.1 from source, because its release binary has high and critical findings from
 # go1.27.1, x/net, go-jose and klauspost/compress, and no release fixes them yet. Go back to the release binary from
 # scripts/install-ci-tools.sh when one does (see docs/plan.md).
-FROM docker.io/library/golang:1.27.3-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9 AS conftest
+FROM docker.io/library/golang:1.27.4-bookworm@sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea AS conftest
 WORKDIR /conftest
 ENV CGO_ENABLED=0 GOTOOLCHAIN=local
 RUN git init --quiet \
@@ -21,14 +21,14 @@ RUN git init --quiet \
 # The Infracost CLI from source for the same reason, and its plugins, which are closed source and have no
 # signatures, so they're pinned by checksum. INFRACOST_CLI_PLUGIN_DIR below stops anything being fetched
 # at run time. Update the versions and checksums together with the setup doc (see docs/plan.md).
-FROM docker.io/library/golang:1.27.3-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9 AS infracost
+FROM docker.io/library/golang:1.27.4-bookworm@sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea AS infracost
 WORKDIR /infracost
 ENV CGO_ENABLED=0 GOTOOLCHAIN=local
 RUN git init --quiet \
-    && git fetch --quiet --depth 1 https://github.com/infracost/cli 22564928d350dfead14063f7a15b97ae138a3a06 \
+    && git fetch --quiet --depth 1 https://github.com/infracost/cli 91ad9add1b46b15a738b7dc717a9c3eac123f3a8 \
     && git checkout --quiet FETCH_HEAD \
     && go get golang.org/x/net@v0.60.0 \
-    && go build -trimpath -ldflags "-s -w -X github.com/infracost/cli/version.Version=2.18.3-patched" -o /out/infracost .
+    && go build -trimpath -ldflags "-s -w -X github.com/infracost/cli/version.Version=2.19.1-patched" -o /out/infracost .
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 RUN for pin in \
       "infracost-parser-terraform-plan 0.0.37 61a7c6363a04bc8270265b80c36fc4c87e18d6758bee564ad9116734012cbd8e" \
