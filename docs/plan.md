@@ -24,7 +24,7 @@ Status: v1, every decision taken (see the Decision log); M0's to M4's gates have
 
 ## Prerequisites: install before M0
 
-Installed and verified on 2026-11-01 (setup doc step 41): OpenTofu 1.13.2, conftest 0.71.1, OPA 1.22.0, Checkov 3.4.0, Infracost CLI 2.18.3, TFLint 0.65.0, tofu-ls 0.5.3. Every install follows `~/AGENTS.md` (vscan, checksum or signature, setup-doc step, tools page, `update-sources`).
+Installed and verified on 2026-11-01 (setup doc step 41), and on the laptop on 2026-11-17: OpenTofu 1.13.9, conftest 0.71.1, OPA 1.22.4, Checkov 3.4.5, Infracost CLI 2.19.1, TFLint 0.66.0, tofu-ls 0.5.3. Every install follows `~/AGENTS.md` (vscan, checksum or signature, setup-doc step, tools page, `update-sources`).
 
 | Tool | Used for | Install | Needed from |
 | --- | --- | --- | --- |

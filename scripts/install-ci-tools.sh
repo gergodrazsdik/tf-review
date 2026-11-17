@@ -47,13 +47,13 @@ for tool in "$@"; do
       ;;
     tofu)
       install_tool tofu \
-        "$gh_url/opentofu/opentofu/releases/download/v1.13.2/tofu_1.13.2_linux_amd64.zip" \
-        723bebb0df8411daff1e5fc3862e28ff5581fe5634087f4c29a9aa41d78208b5
+        "$gh_url/opentofu/opentofu/releases/download/v1.13.9/tofu_1.13.9_linux_amd64.zip" \
+        bc44eb6b06446ba83bd4072114891987f590f66cca712737a7f1147c50c539ce
       ;;
     tflint)
       install_tool tflint \
-        "$gh_url/terraform-linters/tflint/releases/download/v0.65.0/tflint_linux_amd64.zip" \
-        d4c545ed2e29d6338604b586f34f544f380f70f243aa72f7b484713835eaec61
+        "$gh_url/terraform-linters/tflint/releases/download/v0.66.0/tflint_linux_amd64.zip" \
+        22be11cadc25cd02401e94c0ccc91aa63467debb8485c2a755d98f4c0a9d1e2e
       ;;
     conftest)
       install_tool conftest \
@@ -62,8 +62,8 @@ for tool in "$@"; do
       ;;
     opa)
       install_tool opa_linux_amd64_static \
-        "$gh_url/open-policy-agent/opa/releases/download/v1.22.0/opa_linux_amd64_static" \
-        791790254c598a942eb140959bcec9a47f844535a632fd01d11d870ba2a47047
+        "$gh_url/open-policy-agent/opa/releases/download/v1.22.4/opa_linux_amd64_static" \
+        35e3b352e715e80624ead6c89930d8585f6f7d94cdc409eb2a9fe36620dcccba
       ;;
     *)
       echo "unknown tool: $tool" >&2
