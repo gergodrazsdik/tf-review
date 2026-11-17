@@ -721,6 +721,12 @@ Work runs in this order, so the unknowns surface before anything depends on them
 - [x] Plugin: `plugin-v0.1.1`, repinned in tf-review #136, demo #59 and demo2 #7
 - [x] The plaintext state versions blob versioning kept from before D59: 217, 104 and 7 on 2026-11-07, before bootstrap's lifecycle rule (#126, set 2026-11-06 19:28 UTC) first ran. The rule deleted them where the manual delete had failed with `OperationNotAllowedOnAutomaticSnapshot`: on 2026-11-17 no container had a previous version of `infra.tfstate` from before 2026-11-07. Soft delete keeps them restorable for 30 days after the rule's run, so they're purged for good by mid-December
 
+**The 2026-11-17 update round**: the repos caught up with the laptop's tool versions (setup doc step 41). Released 2026-11-17:
+
+- [x] Image: Infracost's plan parser 0.0.41 with no `.grype.yaml` exceptions left (#146), go1.27.4, the Infracost CLI source build at 2.19.1 and Checkov 3.4.5 (#147), OpenTofu 1.13.9 as the version stamped into scanned plans (#149), C# formatted and checked by CSharpier 1.4.0 (#150, #151). `image-v0.0.22` stopped at the Grype gate on soupsieve 3.0.4 (GHSA-mmhr-3c5m-f64f, high, in Checkov's environment) and was never pushed; soupsieve 4.0.1 (#152) fixed it, and `image-v0.0.23` was pinned in #153
+- [x] Workflow: `v0.0.15` at `99bf8cf` (released in #154), which defaults to `image-v0.0.23` and to OpenTofu 1.13.9 when a repo names no `tool_version`. Proved on draft demo #64 (POL-002 and `CKV_AZURE_10` on an open SSH rule, planned with 1.13.9), and repinned in demo #65, demo2 #11 and tf-review #155 with `just release repin`
+- [x] CI tools: OpenTofu 1.13.9, TFLint 0.66.0 and OPA 1.22.4 in `scripts/install-ci-tools.sh` (#148, demo #62, demo2 #9, tf-standards #8); every repo plans and applies with OpenTofu 1.13.9 (#149, demo #63, demo2 #10)
+
 **Service fixes from the 2026-11-06 review** (`docs/reviews/2026-11-06/findings.md`)
 
 - [x] The worker sets itself up after it takes a message: the App's key, the Infracost token and the clients. A Key Vault, secret or setting fault fails a try of that message and ends in "not reviewed" after 3, instead of crashing every execution while the message waits a week. A missing Infracost token costs only the cost scope. Without the App the give-up still marks the review failed, finishes the message and logs `ERROR`. Every give-up counts in `tfreview.give_ups` (`repository`, `cause`, `posted`), for an alert, and a give-up for a commit that's no longer the head posts nothing (OPS-1, MNT-12, BUG-1, MNT-3)
