@@ -112,7 +112,7 @@ jobs:
             if [ "$TOOL" = terraform ]; then
               version=1.17.1
             else
-              version=1.13.9
+              version=1.13.10
             fi
           fi
           echo "tool-version=$version" >>"$GITHUB_OUTPUT"
