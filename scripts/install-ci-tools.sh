@@ -47,8 +47,8 @@ for tool in "$@"; do
       ;;
     tofu)
       install_tool tofu \
-        "$gh_url/opentofu/opentofu/releases/download/v1.13.9/tofu_1.13.9_linux_amd64.zip" \
-        bc44eb6b06446ba83bd4072114891987f590f66cca712737a7f1147c50c539ce
+        "$gh_url/opentofu/opentofu/releases/download/v1.13.10/tofu_1.13.10_linux_amd64.zip" \
+        c1f0d6b34d8328f963d3b1ad10896fae30a6c6890596190ffef477dab991090f
       ;;
     tflint)
       install_tool tflint \
@@ -62,8 +62,8 @@ for tool in "$@"; do
       ;;
     opa)
       install_tool opa_linux_amd64_static \
-        "$gh_url/open-policy-agent/opa/releases/download/v1.22.4/opa_linux_amd64_static" \
-        35e3b352e715e80624ead6c89930d8585f6f7d94cdc409eb2a9fe36620dcccba
+        "$gh_url/open-policy-agent/opa/releases/download/v1.23.0/opa_linux_amd64_static" \
+        5a3fe2aee94c370a5cdf59acca2101e2a48ae17d2cf911d45f0af6cdd3fe4e6a
       ;;
     *)
       echo "unknown tool: $tool" >&2
