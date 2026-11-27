@@ -25,14 +25,14 @@ FROM docker.io/library/golang:1.27.4-bookworm@sha256:ce59b41415e2524ae99926fe1f3
 WORKDIR /infracost
 ENV CGO_ENABLED=0 GOTOOLCHAIN=local
 RUN git init --quiet \
-    && git fetch --quiet --depth 1 https://github.com/infracost/cli 91ad9add1b46b15a738b7dc717a9c3eac123f3a8 \
+    && git fetch --quiet --depth 1 https://github.com/infracost/cli 6771a36b9c34a3fc1d147d74e65bb1823c945c92 \
     && git checkout --quiet FETCH_HEAD \
     && go get golang.org/x/net@v0.60.0 \
-    && go build -trimpath -ldflags "-s -w -X github.com/infracost/cli/version.Version=2.19.1-patched" -o /out/infracost .
+    && go build -trimpath -ldflags "-s -w -X github.com/infracost/cli/version.Version=2.21.0-patched" -o /out/infracost .
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 RUN for pin in \
-      "infracost-parser-terraform-plan 0.0.41 09cc8577d810f22e28e8897ea643f19318ba0838318d84684683492da99b9fd4" \
-      "infracost-provider-azure 0.0.27 9b40cc689b52c1668fbb8bb650214f7ca26fbb6a4681bd733b4943ae1cedbc94"; do \
+      "infracost-parser-terraform-plan 0.0.44 7207ea4cd4c567ee02e708e3d2afabb1ded9741e2b819a652c092678c55fe297" \
+      "infracost-provider-azure 0.0.28 f22234d0e2c1c75aa8365dc2605563c96c75bd783e93b79b283c028adecf9aec"; do \
       read -r name version sum <<<"$pin"; \
       curl -fsSL -o data.tar.gz "https://releases.infracost.io/$name/linux/amd64/v$version/data.tar.gz"; \
       sha256sum -c - <<<"$sum  data.tar.gz"; \
