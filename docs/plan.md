@@ -24,7 +24,7 @@ Status: v1, every decision taken (see the Decision log); M0's to M4's gates have
 
 ## Prerequisites: install before M0
 
-Installed and verified on 2026-11-01 (setup doc step 41), and on the laptop on 2026-11-17: OpenTofu 1.13.9, conftest 0.71.1, OPA 1.22.4, Checkov 3.4.5, Infracost CLI 2.19.1, TFLint 0.66.0, tofu-ls 0.5.3. Every install follows `~/AGENTS.md` (vscan, checksum or signature, setup-doc step, tools page, `update-sources`).
+Installed and verified on 2026-11-01 (setup doc step 41), and on the laptop on 2026-11-27: OpenTofu 1.13.10, conftest 0.71.1, OPA 1.23.0, Checkov 3.4.11, Infracost CLI 2.21.0, TFLint 0.66.0, tofu-ls 0.5.3. Every install follows `~/AGENTS.md` (vscan, checksum or signature, setup-doc step, tools page, `update-sources`).
 
 | Tool | Used for | Install | Needed from |
 | --- | --- | --- | --- |
@@ -726,6 +726,12 @@ Work runs in this order, so the unknowns surface before anything depends on them
 - [x] Image: Infracost's plan parser 0.0.41 with no `.grype.yaml` exceptions left (#146), go1.27.4, the Infracost CLI source build at 2.19.1 and Checkov 3.4.5 (#147), OpenTofu 1.13.9 as the version stamped into scanned plans (#149), C# formatted and checked by CSharpier 1.4.0 (#150, #151). `image-v0.0.22` stopped at the Grype gate on soupsieve 3.0.4 (GHSA-mmhr-3c5m-f64f, high, in Checkov's environment) and was never pushed; soupsieve 4.0.1 (#152) fixed it, and `image-v0.0.23` was pinned in #153
 - [x] Workflow: `v0.0.15` at `99bf8cf` (released in #154), which defaults to `image-v0.0.23` and to OpenTofu 1.13.9 when a repo names no `tool_version`. Proved on draft demo #64 (POL-002 and `CKV_AZURE_10` on an open SSH rule, planned with 1.13.9), and repinned in demo #65, demo2 #11 and tf-review #155 with `just release repin`
 - [x] CI tools: OpenTofu 1.13.9, TFLint 0.66.0 and OPA 1.22.4 in `scripts/install-ci-tools.sh` (#148, demo #62, demo2 #9, tf-standards #8); every repo plans and applies with OpenTofu 1.13.9 (#149, demo #63, demo2 #10)
+
+**The 2026-11-27 update round**: the repos caught up with the laptop's tool versions again (setup doc steps 28 and 41). Released 2026-11-27:
+
+- [x] Image: re-pinned .NET 11 SDK, ASP.NET and golang 1.27.4 base digests and uv 0.13.10, the Infracost CLI source build at 2.21.0 (still with x/net 0.60.0) with plan parser 0.0.44 and azure provider 0.0.28, and Checkov 3.4.11 (#158). A local build passed the Grype gate before tagging, and `image-v0.0.24` was pinned in #159
+- [x] Workflow: `v0.0.16` at `6565106` (released in #160), which defaults to `image-v0.0.24` and to OpenTofu 1.13.10 when a repo names no `tool_version`. Proved on draft demo #67 (POL-002 and `CKV_AZURE_10` on an open SSH rule, planned with 1.13.10), and repinned in demo #68, demo2 #13 and tf-review #161 with `just release repin`
+- [x] CI tools and actions: OpenTofu 1.13.10 and OPA 1.23.0 in `scripts/install-ci-tools.sh`, and setup-uv 10.4.0 (#158, demo #66, demo2 #12, tf-standards #9); every repo plans and applies with OpenTofu 1.13.10; CSharpier 1.4.1, setup-dotnet 6.1.0 and cosign-installer 4.1.3 (#158). Releases under a week old waited for the next round: cosign-installer 4.1.4, anchore/sbom-action 0.24.4 and anchore/scan-action 7.4.3
 
 **Service fixes from the 2026-11-06 review** (`docs/reviews/2026-11-06/findings.md`)
 
