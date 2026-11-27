@@ -1,5 +1,5 @@
 # Moving to .NET 11 GA means re-pinning both .NET digests (see docs/plan.md).
-FROM mcr.microsoft.com/dotnet/sdk:11.0-resolute@sha256:65f3c7c6a25a239ab3e6719f2896147e7b68242ff2d8818dd70498bde6ef8bea AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0-resolute@sha256:2794448a07118a6eaf00f29ab5d2bf44928517ce5ff86505a63a69230374f599 AS build
 WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props ./
 COPY src/ src/
@@ -9,7 +9,7 @@ RUN dotnet publish src/TfReview.Cli --configuration Release --output /app
 # conftest v0.71.1 from source, because its release binary has high and critical findings from
 # go1.27.1, x/net, go-jose and klauspost/compress, and no release fixes them yet. Go back to the release binary from
 # scripts/install-ci-tools.sh when one does (see docs/plan.md).
-FROM docker.io/library/golang:1.27.4-bookworm@sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea AS conftest
+FROM docker.io/library/golang:1.27.4-bookworm@sha256:ce59b41415e2524ae99926fe1f37ce48ba8c194dcbd2a56a65436cdcefa2bd34 AS conftest
 WORKDIR /conftest
 ENV CGO_ENABLED=0 GOTOOLCHAIN=local
 RUN git init --quiet \
@@ -21,7 +21,7 @@ RUN git init --quiet \
 # The Infracost CLI from source for the same reason, and its plugins, which are closed source and have no
 # signatures, so they're pinned by checksum. INFRACOST_CLI_PLUGIN_DIR below stops anything being fetched
 # at run time. Update the versions and checksums together with the setup doc (see docs/plan.md).
-FROM docker.io/library/golang:1.27.4-bookworm@sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea AS infracost
+FROM docker.io/library/golang:1.27.4-bookworm@sha256:ce59b41415e2524ae99926fe1f37ce48ba8c194dcbd2a56a65436cdcefa2bd34 AS infracost
 WORKDIR /infracost
 ENV CGO_ENABLED=0 GOTOOLCHAIN=local
 RUN git init --quiet \
@@ -42,13 +42,13 @@ RUN for pin in \
 
 # Checkov and its own Python, pinned by tools/checkov/uv.lock. The paths match the final image, because a
 # virtual environment finds its Python by absolute path.
-FROM ghcr.io/astral-sh/uv:0.13.6-debian-slim@sha256:caa9f629fcb575ba2ed6ee160ec51e82e8444f6bdc3fc05c855b2636a5511eb8 AS checkov
+FROM ghcr.io/astral-sh/uv:0.13.10-debian-slim@sha256:8b48445a9a356d395bc87d0cc15d6a65e91e67424562f6de9fdcd6205ac3f040 AS checkov
 WORKDIR /tools/checkov
 COPY tools/checkov/ ./
 ENV UV_PYTHON_INSTALL_DIR=/opt/checkov/python UV_PROJECT_ENVIRONMENT=/opt/checkov/venv UV_LINK_MODE=copy
 RUN uv sync --frozen --no-install-project --managed-python --python 3.13
 
-FROM mcr.microsoft.com/dotnet/aspnet:11.0-resolute@sha256:bc0d6653979efba491ab3d6f589d691f96c309c3c3ef81325efa6978e7b7f242
+FROM mcr.microsoft.com/dotnet/aspnet:11.0-resolute@sha256:ca396ece3f2a2e62c7a03f1d7d710b8bc7e8c9dea5597d091178d9f5bfca13f0
 ENV DOTNET_EnableDiagnostics=0 \
     INFRACOST_CLI_PLUGIN_DIR=/opt/infracost/plugins \
     INFRACOST_SKIP_UPDATE_CHECK=true \
