@@ -185,16 +185,15 @@ public class InfracostRunnerTests
             """;
 
     // The shape recorded in the spike, including the tagging policy the runner has to ignore.
-    private static string Scan(string address, decimal instance, decimal disk) =>
-        $$"""
-            {"currency":"USD","summary":{"projects":1,"resources":1,"costed_resources":1},
-            "projects":[{"project_name":"p","finops_results":[],
-            "tagging_results":[{"policy_name":"FinOps tags","failing_resources":[{"address":"{{address}}"}]}],
-            "resources":[{"name":"{{address}}","type":"t","is_supported":true,"is_free":false,
-            "cost_components":[{"name":"Instance usage","price":"0.1","quantity":"730","total_monthly_cost":"{{instance}}"}],
-            "subresources":[{"name":"os_disk","is_supported":false,"cost_components":[
-            {"name":"Storage","total_monthly_cost":"{{disk}}"},{"name":"Disk operations","total_monthly_cost":"0","usage_based":true}]}]}]}]}
-            """;
+    private static string Scan(string address, decimal instance, decimal disk) => $$"""
+        {"currency":"USD","summary":{"projects":1,"resources":1,"costed_resources":1},
+        "projects":[{"project_name":"p","finops_results":[],
+        "tagging_results":[{"policy_name":"FinOps tags","failing_resources":[{"address":"{{address}}"}]}],
+        "resources":[{"name":"{{address}}","type":"t","is_supported":true,"is_free":false,
+        "cost_components":[{"name":"Instance usage","price":"0.1","quantity":"730","total_monthly_cost":"{{instance}}"}],
+        "subresources":[{"name":"os_disk","is_supported":false,"cost_components":[
+        {"name":"Storage","total_monthly_cost":"{{disk}}"},{"name":"Disk operations","total_monthly_cost":"0","usage_based":true}]}]}]}]}
+        """;
 
     private sealed class FakeProcesses(string? before = null, string? after = null, bool fail = false) : IProcessRunner
     {

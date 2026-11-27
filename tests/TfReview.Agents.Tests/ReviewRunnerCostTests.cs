@@ -209,10 +209,9 @@ public class ReviewRunnerCostTests
             infracost: new InfracostRunner(scans)
         ).RunAsync(Plan, config, Commit);
 
-    private static string Scan(decimal cost) =>
-        $$"""
-            {"projects":[{"resources":[{"name":"{{Vm}}","is_supported":true,"cost_components":[{"total_monthly_cost":"{{cost}}"}]}]}]}
-            """;
+    private static string Scan(decimal cost) => $$"""
+        {"projects":[{"resources":[{"name":"{{Vm}}","is_supported":true,"cost_components":[{"total_monthly_cost":"{{cost}}"}]}]}]}
+        """;
 
     private sealed class EmptySource : IStandardsSource
     {

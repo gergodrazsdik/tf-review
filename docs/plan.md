@@ -36,7 +36,7 @@ Installed and verified on 2026-11-01 (setup doc step 41), and on the laptop on 2
 | TFLint + azurerm ruleset | Provider-aware lint in the pre-commit hook | Release binary, SLSA attestation; ruleset fetched by `tflint --init` | M0, optional |
 | tofu-ls | OpenTofu language server for Neovim and the `dg-lsp` plugin Source build at a pinned tag (`go mod download` + `go build`, because `go install` rejects its `replace` directive), checked against Go's checksum database | Optional |
 
-Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET SDK 11 with TUnit templates, `podman`, `actionlint`, `pinact`, `yamllint`/`yamlfmt`, `shellcheck`, `hadolint`, `gitleaks`, `cosign`/`syft`/`grype`, `jq`/`yq`, `ijhttp`, Claude Code. CSharpier is pinned by the repo instead: 1.4.0 in `dotnet-tools.json`, restored by `just hooks` (`dotnet tool restore`). Terraform stays installed for the D1 Terraform input in M2.
+Already installed and used as-is: `just`, `gh`, `lefthook`, `pass`, `az`, .NET SDK 11 with TUnit templates, `podman`, `actionlint`, `pinact`, `yamllint`/`yamlfmt`, `shellcheck`, `hadolint`, `gitleaks`, `cosign`/`syft`/`grype`, `jq`/`yq`, `ijhttp`, Claude Code. CSharpier is pinned by the repo instead: 1.4.1 in `dotnet-tools.json`, restored by `just hooks` (`dotnet tool restore`). Terraform stays installed for the D1 Terraform input in M2.
 
 **Accounts and one-off setup**
 

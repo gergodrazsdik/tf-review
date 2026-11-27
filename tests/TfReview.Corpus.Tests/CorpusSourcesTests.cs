@@ -12,35 +12,33 @@ public class CorpusSourcesTests
         string repository = "a/b",
         string include = "docs",
         string id = "azure-policy"
-    ) =>
-        $"""
-            version: 1
-            embedding_model: test-model
-            sources:
-              - id: {id}
-                repository: {repository}
-                commit: {commit}
-                license: {license}
-                attribution: Someone, MIT
-                include: [{include}]
-            """;
+    ) => $"""
+        version: 1
+        embedding_model: test-model
+        sources:
+          - id: {id}
+            repository: {repository}
+            commit: {commit}
+            license: {license}
+            attribution: Someone, MIT
+            include: [{include}]
+        """;
 
-    private static string Provider(string version = "5.12.0") =>
-        $"""
-            version: 1
-            embedding_model: test-model
-            sources:
-              - id: azurerm-docs
-                repository: a/b
-                license: MPL-2.0
-                attribution: Someone, MPL-2.0
-                include: [website/docs/r]
-                versions:
-                  - version: {version}
-                    commit: {Commit}
-                  - version: 5.13.0
-                    commit: {Commit}
-            """;
+    private static string Provider(string version = "5.12.0") => $"""
+        version: 1
+        embedding_model: test-model
+        sources:
+          - id: azurerm-docs
+            repository: a/b
+            license: MPL-2.0
+            attribution: Someone, MPL-2.0
+            include: [website/docs/r]
+            versions:
+              - version: {version}
+                commit: {Commit}
+              - version: 5.13.0
+                commit: {Commit}
+        """;
 
     [Test]
     public async Task The_real_sources_file_is_valid_and_pins_every_source()

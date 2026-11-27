@@ -207,10 +207,9 @@ public class CheckovRunnerTests
             """;
     }
 
-    private static string Change(string address, string after) =>
-        $$"""
-            {"address":"{{address}}","type":"azurerm_storage_account","mode":"managed","change":{"actions":["create"],"before":null,"after":{{after}},"after_unknown":{},"before_sensitive":false,"after_sensitive":{} } }
-            """;
+    private static string Change(string address, string after) => $$"""
+        {"address":"{{address}}","type":"azurerm_storage_account","mode":"managed","change":{"actions":["create"],"before":null,"after":{{after}},"after_unknown":{},"before_sensitive":false,"after_sensitive":{} } }
+        """;
 
     private static RedactedPlan Redacted(params string[] changes) =>
         (

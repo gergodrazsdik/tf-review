@@ -400,13 +400,12 @@ public class PlanRedactorTests
 
     private const string SubscriptionId = "12345678-90ab-cdef-1234-567890abcdef";
 
-    private static string PlanWithId(string address = "a.b", string before = "null") =>
-        $$"""
-            {"address":"{{address}}","type":"a","change":{"actions":["update"],
-            "before":{{before}},
-            "after":{"id":"/subscriptions/{{SubscriptionId}}/resourceGroups/rg/x","tenant_id":"AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE","name":"keep-me"},
-            "after_unknown":{},"before_sensitive":{},"after_sensitive":{} } }
-            """;
+    private static string PlanWithId(string address = "a.b", string before = "null") => $$"""
+        {"address":"{{address}}","type":"a","change":{"actions":["update"],
+        "before":{{before}},
+        "after":{"id":"/subscriptions/{{SubscriptionId}}/resourceGroups/rg/x","tenant_id":"AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE","name":"keep-me"},
+        "after_unknown":{},"before_sensitive":{},"after_sensitive":{} } }
+        """;
 
     private static string PlanOf(params string[] resources) =>
         $$"""{"format_version":"1.2","resource_changes":[{{string.Join(',', resources)}}]}""";
@@ -529,19 +528,17 @@ public class PlanRedactorTests
             .Single(change => change!["address"]!.GetValue<string>() == address)!
             .ToJsonString();
 
-    private static string Plan(string after, string afterSensitive) =>
-        $$$"""
-            {"format_version":"1.2","resource_changes":[{"address":"a.b","type":"a","name":"b","change":{
-            "actions":["update"],"before":null,"after":{{{after}}},"after_unknown":{},
-            "before_sensitive":false,"after_sensitive":{{{afterSensitive}}} }}]}
-            """;
+    private static string Plan(string after, string afterSensitive) => $$$"""
+        {"format_version":"1.2","resource_changes":[{"address":"a.b","type":"a","name":"b","change":{
+        "actions":["update"],"before":null,"after":{{{after}}},"after_unknown":{},
+        "before_sensitive":false,"after_sensitive":{{{afterSensitive}}} }}]}
+        """;
 
-    private static string Update(string before, string after) =>
-        $$$"""
-            {"format_version":"1.2","resource_changes":[{"address":"a.b","change":{"actions":["update"],
-            "before":{"value":"{{{before}}}"},"after":{"value":"{{{after}}}"},"after_unknown":{},
-            "before_sensitive":{"value":true},"after_sensitive":{"value":true} }}]}
-            """;
+    private static string Update(string before, string after) => $$$"""
+        {"format_version":"1.2","resource_changes":[{"address":"a.b","change":{"actions":["update"],
+        "before":{"value":"{{{before}}}"},"after":{"value":"{{{after}}}"},"after_unknown":{},
+        "before_sensitive":{"value":true},"after_sensitive":{"value":true} }}]}
+        """;
 
     private static JsonNode? Reverse(JsonNode? node) =>
         node switch

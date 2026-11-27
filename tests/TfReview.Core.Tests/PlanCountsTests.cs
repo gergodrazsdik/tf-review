@@ -45,11 +45,10 @@ public class PlanCountsTests
     private static PlanCounts Count(params string[] actions)
     {
         var changes = actions.Select(
-            (action, i) =>
-                $$$"""
-                    {"address":"a.r{{{i}}}","change":{"actions":{{{action}}},"before":null,"after":null,"after_unknown":{},
-                    "before_sensitive":false,"after_sensitive":false} }
-                    """
+            (action, i) => $$$"""
+                {"address":"a.r{{{i}}}","change":{"actions":{{{action}}},"before":null,"after":null,"after_unknown":{},
+                "before_sensitive":false,"after_sensitive":false} }
+                """
         );
         var plan = $$"""{"format_version":"1.2","resource_changes":[{{string.Join(',', changes)}}]}""";
         return PlanCounts.From(((Redacted)new PlanRedactor().Redact(plan)).Plan);
